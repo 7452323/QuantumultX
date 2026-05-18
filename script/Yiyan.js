@@ -4,7 +4,7 @@
 https://apps.apple.com/cn/app/id1010174792
 
 [rewrite_local]
-^https:\/\/app\.yiyan\.art\/yiyan\/(getuserinfoandbooklist|checkpro|getvipproduct) url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/yiyan.js
+^https:\/\/app\.yiyan\.art\/yiyan\/(getuserinfoandbooklist|checkpro|getvipproduct) url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Yiyan.js
 
 [mitm]
 hostname = app.yiyan.art
