@@ -1,4 +1,4 @@
-# https://blog.xbookcn.net — 零依赖版（仅用Python标准库）
+# https://blog.xbookcn.net — 
 # 适用于 iOS Python IDE (https://apps.apple.com/cn/app/python-ide/id6753987304)
 
 import urllib.request
