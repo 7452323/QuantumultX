@@ -1,249 +1,324 @@
 /*
-╔══════════════════════════════════════════════════════════════╗
-║               签到脚本通用框架 (Checkin Framework)           ║
-║ 适用于: Quantumult X / Surge / Loon                        ║
-║ 版本: v2.0.0                                                ║
-║                                                              ║
-║ 【使用方法】                                                  ║
-║ 1. 复制本文件，重命名为 你的App名称.js                        ║
-║ 2. 修改 SEARCH_URL / CHECKIN_URL 等配置项                    ║
-║ 3. 修改 Cookie 采集的正则匹配                                 ║
-║ 4. 部署并测试                                                 ║
-║                                                              ║
-║ 【配置参考】                                                  ║
-║ Quantumult X:                                                ║
-║ [rewrite_local]                                              ║
-║ ^https?:\/\/api\.app\.com\/user url script-request-header    ║
-║   https://raw.githubusercontent.com/Reviewa/QuantumultX/main/║
-║   script/checkin.js                                          ║
-║                                                              ║
-║ [task_local]                                                 ║
-║ 30 9 * * * https://raw.githubusercontent.com/Reviewa/        ║
-║   QuantumultX/main/script/checkin.js                         ║
-║                                                              ║
-║ [mitm]                                                       ║
-║ hostname = api.app.com                                       ║
-╚══════════════════════════════════════════════════════════════╝
+═══════════════════════════════════════════════════════════════
+                    签到脚本框架 (Checkin Framework)
+                          版本 3.0.0
+                   适用于 QX / Surge / Loon / Node
+═══════════════════════════════════════════════════════════════
+
+【免责声明】
+------------------------------------------
+1. 本框架仅供学习研究，不保证其合法性、准确性、有效性。
+2. 您必须在下载后 24 小时内将本框架从您的设备中完全删除。
+3. 请勿将本框架用于任何商业或非法目的。
+4. 使用本框架所造成的一切后果，由使用者自行承担。
+5. 本框架不存储任何用户数据，所有数据由使用者自行管理。
+------------------------------------------
+
+【使用方法】
+1. 复制本文件，重命名为 你的签到名称.js
+2. 在 APP_CONFIG 中配置签到接口信息
+3. 部署并测试
+
+【快速配置示例 — Quantumult X】
+[rewrite_local]
+^https?:\/\/api\.app\.com\/user url script-request-header checkin.js
+
+[task_local]
+30 9 * * * checkin.js, tag=签到, enabled=true
+
+[mitm]
+hostname = api.app.com
 */
 
-// ============================================================
-// 第一步：配置区（修改这里）
-// ============================================================
+// ═══════════════════════════════════════════════════════════
+//                     配 置 区 
+// ═══════════════════════════════════════════════════════════
 
-const CONFIG = {
-    // App 名称
+const APP_CONFIG = {
+    // 脚本名称（用于日志和通知）
     name: '签到',
     
-    // 存储键名（持久化用）
+    // 持久化存储键名
     storageKey: 'app_checkin_data',
     
-    // Cookie 提取正则（从请求头中匹配关键字段）
-    // 例: /(session=[^;]+|token=[^;]+)/
+    // Cookie 提取正则（从请求头匹配关键字段）
     cookiePattern: /(sessionid=[^;]+|token=[^;]+|sid=[^;]+)/,
     
-    // Cookie 去重字段正则（用于多账号去重）
-    // 例: /user_id=([^;]+)/
+    // 多账号分隔符（用于 Cookie 去重）
+    accountSeparator: '#',
+    
+    // 去重标识提取正则
     dedupPattern: /uid=([^;]+)/,
     
     // 签到接口
     checkin: {
         url: 'https://api.example.com/user/checkin',
         method: 'POST',
-        headers: {
-            'User-Agent': 'Mozilla/5.0',
-            'Content-Type': 'application/json'
-        },
-        body: null, // null = GET 请求不需要 body
+        headers: { 'User-Agent': 'Mozilla/5.0', 'Content-Type': 'application/json' },
     },
     
-    // Cookie 采集触发接口（设置后只有匹配此URL才采Cookie）
-    cookieTrigger: '/user/info',
+    // Cookie 采集触发路径（仅匹配此路径时才采集）
+    cookieTrigger: '',
     
     // 通知标题
     notifyTitle: '签到完成',
 };
 
+// ═══════════════════════════════════════════════════════════
+//                   Env 框架（无需修改）
+// ═══════════════════════════════════════════════════════════
 
-// ============================================================
-// 第二步：框架代码（通常不需要修改）
-// ============================================================
+const $ = new Env(APP_CONFIG.name);
 
-// ---- 平台检测 ----
-const isQX     = typeof $task !== 'undefined';
-const isSurge  = typeof $httpClient !== 'undefined';
-const isLoon   = typeof $loon !== 'undefined';
-
-// ---- 日志 ----
-function log(msg) {
-    console.log(`[${CONFIG.name}] ${msg}`);
-}
-
-// ---- 跨平台 HTTP 请求 ----
-async function httpRequest(method, url, headers = {}, body = null) {
-    const options = { url, headers };
-    if (body) options.body = typeof body === 'string' ? body : JSON.stringify(body);
-
-    if (isQX) {
-        const resp = await $task.fetch({ ...options, method });
-        return { status: resp.statusCode, body: resp.body, headers: resp.headers };
+!(async () => {
+    if (typeof $request !== 'undefined') {
+        await collectCookie();
+        return;
     }
-    if (isSurge || isLoon) {
-        return new Promise((resolve) => {
-            const cb = (err, resp, data) => resolve({
-                status: resp.status || resp.statusCode,
-                body: data,
-                headers: resp.headers || {}
-            });
-            if (method === 'GET')  $httpClient.get(options, cb);
-            else                    $httpClient.post(options, cb);
-        });
-    }
-    return { status: 0, body: '' };
-}
+    await doCheckin();
+})().catch(e => $.logErr(e)).finally(() => $.done());
 
-// ---- 跨平台持久化存储 ----
-function storeRead(key) {
-    if (isQX && $prefs.valueForKey)       return $prefs.valueForKey(key) || '';
-    if (isSurge && $persistentStore.read)  return $persistentStore.read(key) || '';
-    return '';
-}
-function storeWrite(key, val) {
-    if (isQX && $prefs.setValueForKey)       $prefs.setValueForKey(val, key);
-    if (isSurge && $persistentStore.write)   $persistentStore.write(val, key);
-}
-
-// ---- 通知 ----
-function notify(title, subtitle, content) {
-    if (typeof $notification !== 'undefined') {
-        $notification.post(title, subtitle || '', content || '');
-    }
-    log(`${title}: ${subtitle} - ${content}`);
-}
-
-// ---- 延迟 ----
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-
-
-// ============================================================
-// 第三步：Cookie 采集（拦截请求时触发）
-// ============================================================
+// ═══════════════════════════════════════════════════════════
+//                   Cookie 采集逻辑
+// ═══════════════════════════════════════════════════════════
 
 async function collectCookie() {
-    // 非请求上下文，跳过
-    if (typeof $request === 'undefined') return false;
-    
-    // 跳过 OPTIONS 预检请求
-    if ($request.method === 'OPTIONS') { $done({}); return true; }
-    
-    // 如果设置了触发URL，检查是否匹配
-    if (CONFIG.cookieTrigger && !$request.url.includes(CONFIG.cookieTrigger)) {
-        return false;
-    }
+    if ($request.method === 'OPTIONS') return;
+    if (APP_CONFIG.cookieTrigger && !$request.url.includes(APP_CONFIG.cookieTrigger)) return;
 
-    // 从请求头中提取 Cookie
-    const cookieHeader = $request.headers['Cookie']
-                       || $request.headers['cookie']
-                       || $request.headers['Authorization']
-                       || $request.headers['authorization'];
+    const value = $request.headers['Cookie']
+               || $request.headers['cookie']
+               || $request.headers['Authorization']
+               || $request.headers['authorization'];
 
-    if (!cookieHeader) return false;
-
-    // 用正则提取关键部分
-    const match = cookieHeader.match(CONFIG.cookiePattern);
-    const cookieValue = match ? match[0] : cookieHeader;
-
-    // 多账号去重存储
-    let cookies = storeRead(CONFIG.storageKey).split('#').filter(Boolean);
-    
-    // 去重
-    const dedupMatch = cookieValue.match(CONFIG.dedupPattern);
-    const dedupKey = dedupMatch ? dedupMatch[1] : cookieValue.slice(0, 20);
-    
-    cookies = cookies.filter(c => {
-        const m = c.match(CONFIG.dedupPattern);
-        const k = m ? m[1] : c.slice(0, 20);
-        return k !== dedupKey;
-    });
-    
-    cookies.push(cookieValue);
-    storeWrite(CONFIG.storageKey, cookies.join('#'));
-    
-    log(`✅ Cookie 已采集 (共 ${cookies.length} 个账号)`);
-    notify(CONFIG.name, `Cookie 已保存 (${cookies.length} 个账号)`, '');
-    
-    $done({});
-    return true;
-}
-
-
-// ============================================================
-// 第四步：签到执行（定时任务触发）
-// ============================================================
-
-async function doCheckin() {
-    const raw = storeRead(CONFIG.storageKey);
-    if (!raw) {
-        log('❌ 无 Cookie，请先打开 App 采集');
-        notify(CONFIG.name, '签到失败', '无 Cookie，请先打开 App');
+    if (!value) {
+        $.log('未找到 Cookie，跳过采集');
         return;
     }
 
-    const cookies = raw.split('#').filter(Boolean);
-    log(`📋 共 ${cookies.length} 个账号`);
+    const cookieValue = value.match(APP_CONFIG.cookiePattern)
+        ? value.match(APP_CONFIG.cookiePattern)[0]
+        : value;
 
-    let success = 0, failed = 0, results = [];
+    let cookies = $.getdata(APP_CONFIG.storageKey) || '';
+    let list = cookies ? cookies.split(APP_CONFIG.accountSeparator) : [];
 
-    for (let i = 0; i < cookies.length; i++) {
+    // 去重
+    const key = cookieValue.match(APP_CONFIG.dedupPattern);
+    const dedupKey = key ? key[1] : cookieValue.slice(0, 20);
+    list = list.filter(c => {
+        const m = c.match(APP_CONFIG.dedupPattern);
+        return m ? m[1] !== dedupKey : c.slice(0, 20) !== dedupKey;
+    });
+    list.push(cookieValue);
+
+    $.setdata(list.join(APP_CONFIG.accountSeparator), APP_CONFIG.storageKey);
+    $.msg(APP_CONFIG.name, `✅ Cookie 已采集 (共 ${list.length} 个账号)`, '');
+    $.log(`Cookie 采集成功，当前 ${list.length} 个账号`);
+}
+
+// ═══════════════════════════════════════════════════════════
+//                   签到执行逻辑
+// ═══════════════════════════════════════════════════════════
+
+async function doCheckin() {
+    const raw = $.getdata(APP_CONFIG.storageKey);
+    if (!raw) {
+        $.log('❌ 未找到 Cookie，请先打开 App 采集');
+        $.msg(APP_CONFIG.name, '签到失败', '未找到 Cookie');
+        return;
+    }
+
+    const list = raw.split(APP_CONFIG.accountSeparator).filter(Boolean);
+    $.log(`共 ${list.length} 个账号，开始签到`);
+
+    let success = 0, failed = 0;
+    const results = [];
+
+    for (let i = 0; i < list.length; i++) {
         try {
-            const headers = {
-                ...CONFIG.checkin.headers,
-                'Cookie': cookies[i],
-            };
-
-            const resp = await httpRequest(
-                CONFIG.checkin.method,
-                CONFIG.checkin.url,
+            const headers = { ...APP_CONFIG.checkin.headers, 'Cookie': list[i] };
+            const resp = await $.http({
+                url: APP_CONFIG.checkin.url,
                 headers,
-                CONFIG.checkin.body
-            );
+                method: APP_CONFIG.checkin.method,
+                body: APP_CONFIG.checkin.body || undefined,
+            });
 
-            let data;
-            try { data = JSON.parse(resp.body); } catch { data = {}; }
+            let data = {};
+            try { data = JSON.parse(resp.body); } catch {}
+            const msg = data.message || data.msg || data.info || `HTTP ${resp.status}`;
             
-            const msg = data.message || data.msg || data.info
-                      || `HTTP ${resp.status}`;
-            
-            log(`  账号 ${i+1}: ${msg}`);
-            results.push(`账号${i+1}: ${msg}`);
+            $.log(`账号 ${i + 1}: ${msg}`);
+            results.push(`账号${i + 1}: ${msg}`);
             success++;
         } catch (e) {
-            log(`  ❌ 账号 ${i+1}: ${e.message || e}`);
-            results.push(`账号${i+1}: ❌ ${e.message || e}`);
+            $.log(`账号 ${i + 1} 失败: ${e.message || e}`);
+            results.push(`账号${i + 1}: ❌ ${e.message || e}`);
             failed++;
         }
-        
-        if (i < cookies.length - 1) await sleep(2000);
+        if (i < list.length - 1) await $.wait(2000);
     }
 
     const summary = `成功 ${success} / 失败 ${failed}`;
-    log(`📊 ${summary}`);
-    notify(CONFIG.notifyTitle, summary, results.slice(0, 5).join('\n'));
+    $.log(`签到完成: ${summary}`);
+    $.msg(APP_CONFIG.notifyTitle, summary, results.slice(0, 5).join('\n'));
 }
 
+// ═══════════════════════════════════════════════════════════
+//                  Env 框架核心代码
+//          from chavyleung's Env.js / Sliverkiss
+// ═══════════════════════════════════════════════════════════
 
-// ============================================================
-// 第五步：入口
-// ============================================================
+function Env(t, e) {
+    return new class {
+        constructor(t, e) {
+            this.name = t;
+            this.data = null;
+            this.logs = [];
+            this.startTime = Date.now();
+            Object.assign(this, e);
+            this.log(`🔔 ${this.name}, 开始!`);
+        }
 
-!(async () => {
-    // 优先判断是否为 Cookie 采集
-    if (await collectCookie()) return;
-    
-    // 执行签到
-    await doCheckin();
-})().catch((e) => {
-    log(`❌ 运行时错误: ${e.message || e}`);
-    notify(CONFIG.name, '运行错误', e.message || e);
-}).finally(() => {
-    $done();
-});
+        getEnv() {
+            if (typeof $environment !== 'undefined' && $environment['surge-version']) return 'Surge';
+            if (typeof $environment !== 'undefined' && $environment['stash-version']) return 'Stash';
+            if (typeof module !== 'undefined' && module.exports) return 'Node.js';
+            if (typeof $task !== 'undefined') return 'Quantumult X';
+            if (typeof $loon !== 'undefined') return 'Loon';
+            if (typeof $rocket !== 'undefined') return 'Shadowrocket';
+        }
+
+        isNode()   { return this.getEnv() === 'Node.js'; }
+        isQuanX()  { return this.getEnv() === 'Quantumult X'; }
+        isSurge()  { return this.getEnv() === 'Surge'; }
+        isLoon()   { return this.getEnv() === 'Loon'; }
+
+        getjson(key, fallback) {
+            let val = this.getdata(key);
+            try { return val ? JSON.parse(val) : fallback; } catch { return fallback; }
+        }
+
+        setjson(val, key) {
+            try { return this.setdata(JSON.stringify(val), key); } catch { return false; }
+        }
+
+        getdata(key) {
+            switch (this.getEnv()) {
+                case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket':
+                    return $persistentStore.read(key) || '';
+                case 'Quantumult X':
+                    return $prefs.valueForKey(key) || '';
+                case 'Node.js':
+                    return this.data && this.data[key] || '';
+                default: return '';
+            }
+        }
+
+        setdata(val, key) {
+            switch (this.getEnv()) {
+                case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket':
+                    return $persistentStore.write(val, key);
+                case 'Quantumult X':
+                    return $prefs.setValueForKey(val, key);
+                case 'Node.js':
+                    this.data = this.data || {};
+                    this.data[key] = val;
+                    return true;
+                default: return false;
+            }
+        }
+
+        async http(options) {
+            const method = (options.method || 'GET').toUpperCase();
+            
+            return new Promise((resolve, reject) => {
+                switch (this.getEnv()) {
+                    case 'Quantumult X': {
+                        const opts = { url: options.url, headers: options.headers, method };
+                        if (options.body) opts.body = options.body;
+                        $task.fetch(opts).then(
+                            r => resolve({ status: r.statusCode, body: r.body, headers: r.headers }),
+                            e => reject(e)
+                        );
+                        break;
+                    }
+                    case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket': default: {
+                        const cb = (err, resp, body) => {
+                            if (err) reject(err);
+                            else resolve({ status: resp.status || resp.statusCode, body, headers: resp.headers || {} });
+                        };
+                        const httpOpts = { url: options.url, headers: options.headers };
+                        if (options.body) httpOpts.body = options.body;
+                        if (method === 'GET') $httpClient.get(httpOpts, cb);
+                        else if (method === 'POST') $httpClient.post(httpOpts, cb);
+                        else $httpClient[method.toLowerCase()](httpOpts, cb);
+                        break;
+                    }
+                    case 'Node.js': {
+                        try {
+                            const url = require('url');
+                            const http = options.url.startsWith('https') ? require('https') : require('http');
+                            const parsed = url.parse(options.url);
+                            const req = http.request({
+                                hostname: parsed.hostname, path: parsed.path, method,
+                                headers: options.headers || {},
+                            }, resp => {
+                                let data = '';
+                                resp.on('data', c => data += c);
+                                resp.on('end', () => resolve({ status: resp.statusCode, body: data, headers: resp.headers }));
+                            });
+                            req.on('error', reject);
+                            if (options.body) req.write(options.body);
+                            req.end();
+                        } catch (e) { reject(e); }
+                        break;
+                    }
+                }
+            });
+        }
+
+        msg(title, subtitle, content) {
+            switch (this.getEnv()) {
+                case 'Quantumult X':
+                    $notify(title, subtitle || '', content || '');
+                    break;
+                case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket': default:
+                    $notification.post(title, subtitle || '', content || '');
+                    break;
+                case 'Node.js':
+                    console.log(`${title}: ${subtitle} - ${content}`);
+                    break;
+            }
+        }
+
+        log(msg) {
+            console.log(msg);
+            this.logs.push(msg);
+        }
+
+        logErr(e) {
+            this.log(`❌ 错误: ${e.message || e}`);
+            if (e.stack) this.log(e.stack);
+        }
+
+        wait(ms) {
+            return new Promise(r => setTimeout(r, ms));
+        }
+
+        done() {
+            const elapsed = ((Date.now() - this.startTime) / 1000).toFixed(2);
+            this.log(`🔔 ${this.name}, 结束! 🕛 ${elapsed} 秒`);
+            
+            switch (this.getEnv()) {
+                case 'Quantumult X': case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket': default:
+                    $done();
+                    break;
+                case 'Node.js':
+                    process.exit(0);
+                    break;
+            }
+        }
+    }(t, e);
+}

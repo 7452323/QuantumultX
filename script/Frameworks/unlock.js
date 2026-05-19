@@ -1,37 +1,40 @@
 /*
-╔══════════════════════════════════════════════════════════════╗
-║              解锁脚本通用框架 (Unlock Framework)             ║
-║ 适用于: Quantumult X / Surge / Loon                        ║
-║ 版本: v2.0.0                                                ║
-║                                                              ║
-║ 【使用方法】                                                  ║
-║ 1. 复制本文件，重命名为 你的App名称.js                        ║
-║ 2. 在 UNLOCK_CONFIG 中配置要拦截的接口和要改的字段            ║
-║ 3. 部署到 QX/Surge/Loon 并测试                                ║
-║                                                              ║
-║ 【配置参考】                                                  ║
-║ [rewrite_local]                                              ║
-║ ^https?:\/\/api\.app\.com\/(vip|user|subscription)           ║
-║   url script-response-body                                   ║
-║   https://raw.githubusercontent.com/Reviewa/QuantumultX/main/║
-║   script/unlock.js                                           ║
-║                                                              ║
-║ [mitm]                                                       ║
-║ hostname = api.app.com                                       ║
-╚══════════════════════════════════════════════════════════════╝
+═══════════════════════════════════════════════════════════════
+                    解锁脚本框架 (Unlock Framework)
+                          版本 3.0.0
+                   适用于 QX / Surge / Loon / Node
+═══════════════════════════════════════════════════════════════
+
+【免责声明】
+------------------------------------------
+1. 本框架仅供学习研究，不保证其合法性、准确性、有效性。
+2. 您必须在下载后 24 小时内将本框架从您的设备中完全删除。
+3. 请勿将本框架用于任何商业或非法目的。
+4. 使用本框架所造成的一切后果，由使用者自行承担。
+5. 本框架不存储任何用户数据，所有数据由使用者自行管理。
+------------------------------------------
+
+【使用方法】
+1. 复制本文件，重命名为 你的解锁名称.js
+2. 在 UNLOCK_CONFIG 中配置要拦截的接口和要修改的字段
+3. 部署并测试
+
+【快速配置示例 — QX】
+[rewrite_local]
+^https?:\/\/api\.app\.com\/(vip|user|subscription) url script-response-body unlock.js
+[mitm]
+hostname = api.app.com
 */
 
-// ============================================================
-// 第一步：配置区（修改这里）
-// ============================================================
+// ═══════════════════════════════════════════════════════════
+//                     配 置 区
+// ═══════════════════════════════════════════════════════════
 
 const UNLOCK_CONFIG = [
-    // ---- 配置示例1：修改响应体字段 ----
-    // URL 包含此字符串时触发
+    // ── 示例1: 修改会员信息接口 ──
     {
         url: '/user/vip',
         handler: function(obj) {
-            // 修改 obj 中的字段
             if (obj.data) {
                 obj.data.vip = 1;
                 obj.data.vip_type = 'svip';
@@ -39,56 +42,51 @@ const UNLOCK_CONFIG = [
                 obj.data.is_year = true;
             }
             obj.vip = 1;
-            obj.isvip = 1;
             return obj;
         }
     },
-    
-    // ---- 配置示例2：替换整个响应体 ----
+
+    // ── 示例2: 替换整个订阅数据（适用于 GraphQL） ──
     {
         url: '/subscription/status',
-        handler: function(obj) {
-            // 完全替换
+        handler: function() {
             return {
-                "data": {
-                    "processAppleReceipt": {
-                        "__typename": "SubscriptionResult",
-                        "error": 0,
-                        "subscription": {
-                            "__typename": "AppStoreSubscription",
-                            "status": "active",
-                            "originalPurchaseDate": "2024-01-01T00:00:00.000Z",
-                            "originalTransactionId": "570001185968888",
-                            "expirationDate": "9999-12-31T23:59:59.000Z",
-                            "productId": "com.example.premium",
-                            "tier": "premium",
-                            "refundedDate": null,
-                            "isInBillingRetryPeriod": false
+                data: {
+                    processAppleReceipt: {
+                        __typename: 'SubscriptionResult',
+                        error: 0,
+                        subscription: {
+                            __typename: 'AppStoreSubscription',
+                            status: 'active',
+                            expirationDate: '9999-12-31T23:59:59.000Z',
+                            productId: 'com.example.premium',
+                            tier: 'premium',
+                            refundedDate: null,
                         }
                     }
                 }
             };
         }
     },
-    
-    // ---- 配置示例3：修改使用次数 ----
+
+    // ── 示例3: 修改使用次数 ──
     {
         url: '/usage/remaining',
         handler: function(obj) {
             if (obj.data) {
                 obj.data.remaining = 99999;
-                obj.data.pdf_quota = 99999;
+                obj.data.quota = 99999;
                 obj.data.export_times = 99999;
             }
             return obj;
         }
     },
 
-    // ---- 配置示例4：修改功能开关列表 ----
+    // ── 示例4: 解锁功能列表 ──
     {
         url: '/feature/list',
         handler: function(obj) {
-            if (obj.data && Array.isArray(obj.data)) {
+            if (Array.isArray(obj.data)) {
                 obj.data.forEach(function(item) {
                     item.unlocked = true;
                     item.locked = false;
@@ -96,139 +94,45 @@ const UNLOCK_CONFIG = [
             }
             return obj;
         }
-    }
+    },
 ];
 
+// ── 常用 App 快速模板 ──
+// 扫描全能王: /purchase/cs/query_property → vip_type=svip, auto_renewal=true, in_trial=1
+// Notability: /global → 整个替换为 GraphQL 订阅响应
+// Foodie: /v1/user/privilege → vip=1, svip=1, isYear=true
+// Lightroom: /v1/profile → status=active, plan=premium
+// PDF Expert: /api/2.0/subscription → isPro=true, expireDate=2099-12-31
 
-// ============================================================
-// 第二步：常见 App 快速配置（取消注释即可使用）
-// ============================================================
-
-// ---- 扫描全能王 ----
-// 接口: /purchase/cs/query_property
-// const UNLOCK_CONFIG = [{
-//     url: '/queryProperty',
-//     handler: function(obj) {
-//         obj.group1_paid = 1;
-//         obj.ms_first_pay = 0;
-//         obj.vip_type = 'svip';
-//         obj.auto_renewal = true;
-//         obj.in_trial = 1;
-//         obj.members_page = 0;
-//         obj.pc_vip = 1;
-//         obj.renew_type = 'year';
-//         return obj;
-//     }
-// }];
-
-// ---- Notability ----
-// 接口: notability.com/global
-// const UNLOCK_CONFIG = [{ url: '/global', handler: function() {
-//     return { "data": { "processAppleReceipt": {
-//         "__typename": "SubscriptionResult", "error": 0,
-//         "subscription": {
-//             "__typename": "AppStoreSubscription",
-//             "status": "active",
-//             "originalPurchaseDate": "2024-01-01T00:00:00.000Z",
-//             "originalTransactionId": "570001185968888",
-//             "expirationDate": "9999-12-31T23:59:59.000Z",
-//             "productId": "com.gingerlabs.Notability.premium_subscription",
-//             "tier": "premium", "refundedDate": null,
-//             "isInBillingRetryPeriod": false
-//         }
-//     }}};
-// }}];
-
-// ---- Adobe Lightroom ----
-// 接口: /v1/profile
-// const UNLOCK_CONFIG = [{ url: '/v1/profile', handler: function(obj) {
-//     obj.status = 'active';
-//     obj.plan = 'premium';
-//     return obj;
-// }}];
-
-// ---- Foodie ----
-// 接口: /v1/user/privilege
-// const UNLOCK_CONFIG = [{ url: '/user/privilege', handler: function(obj) {
-//     obj.vip = 1; obj.svip = 1; obj.isYear = true;
-//     return obj;
-// }}];
-
-
-// ============================================================
-// 第三步：框架代码（不需要修改）
-// ============================================================
-
-// ---- 日志 ----
-function log(msg) {
-    console.log(`[Unlock] ${msg}`);
-}
-
-// ---- 获取当前请求的 URL ----
-function getRequestUrl() {
-    return $request ? $request.url : '';
-}
-
-// ---- 查找匹配的配置 ----
-function findMatch(url) {
-    for (var i = 0; i < UNLOCK_CONFIG.length; i++) {
-        if (url.indexOf(UNLOCK_CONFIG[i].url) !== -1) {
-            return UNLOCK_CONFIG[i];
-        }
-    }
-    return null;
-}
-
-// ---- 通用解锁流程 ----
-function doUnlock(body, config) {
-    // 解析 JSON
-    var obj;
-    try {
-        obj = JSON.parse(body);
-    } catch (e) {
-        log(`❌ JSON 解析失败: ${e.message}`);
-        return body;
-    }
-    
-    // 记录原始字段（便于调试）
-    var keys = Object.keys(obj);
-    log(`🔍 原始字段: ${keys.join(', ')}`);
-    
-    // 执行自定义处理
-    var result = config.handler(obj);
-    
-    // 如果 handler 返回了完整对象，使用它
-    // 否则使用修改后的 obj
-    var finalObj = result || obj;
-    
-    log('✅ 解锁成功');
-    return JSON.stringify(finalObj);
-}
-
-
-// ============================================================
-// 第四步：入口
-// ============================================================
+// ═══════════════════════════════════════════════════════════
+//                   框架代码（无需修改）
+// ═══════════════════════════════════════════════════════════
 
 (function() {
-    var url = getRequestUrl();
-    log(`📥 拦截: ${url}`);
-    
-    // 查找匹配的配置
-    var config = findMatch(url);
-    
+    const url = $request ? $request.url : '';
+    console.log(`[Unlock] 📥 ${url}`);
+
+    const config = UNLOCK_CONFIG.find(c => url.indexOf(c.url) !== -1);
     if (!config) {
-        log('⏭️ 无匹配配置，透传');
+        console.log('[Unlock] ⏭️ 无匹配配置');
         $done({});
         return;
     }
-    
-    log(`🔓 匹配: ${config.url}`);
-    
-    // 执行解锁
-    var modifiedBody = doUnlock($response.body, config);
-    
-    $done({
-        body: modifiedBody
-    });
+
+    console.log(`[Unlock] 🔓 匹配: ${config.url}`);
+
+    try {
+        let obj = JSON.parse($response.body);
+        const originalKeys = Object.keys(obj);
+        console.log(`[Unlock] 📊 原始字段: ${originalKeys.join(', ')}`);
+
+        const result = config.handler(obj);
+        const finalBody = JSON.stringify(result || obj);
+
+        console.log('[Unlock] ✅ 解锁成功');
+        $done({ body: finalBody });
+    } catch (e) {
+        console.log(`[Unlock] ❌ 错误: ${e.message}`);
+        $done({});
+    }
 })();
