@@ -31,6 +31,10 @@ https://apps.apple.com/cn/app/id1032287195
 # 其他
 ^https?:\/\/api-a\.soulapp\.cn\/(loveBell\/queryMatchSpeedupConf|videoMatch\/getConfig|probability\/match\/entrance|meet\/my\/count|MeasureResult\/New) url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js
 ^https?:\/\/post\.soulapp\.cn\/(v1\/post\/highLight\/recommend\/quota|soulreal\/post\/highlight\/quota) url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js
+# UI自定义
+^https?:\/\/api-a\.soulapp\.cn\/v6\/planet\/config url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js
+^https?:\/\/post\.soulapp\.cn\/v3\/rec\/square\/header\/tabs url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js
+^https?:\/\/api-user\.soulapp\.cn\/user\/homepage\/metrics url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js
 
 [mitm]
 hostname = api-pay.soulapp.cn, api-chat.soulapp.cn, api-user.soulapp.cn, api-a.soulapp.cn, post.soulapp.cn
@@ -198,5 +202,37 @@ if (url.indexOf('/privilege/supervip/status') >= 0) {
   obj.data.remainedQuota = 999;
   obj.data.remained = 999;
 }
+
+
+// ===== UI 自定义（基于抓包数据验证的路径）=====
+} else if (url.indexOf('/v6/planet/config') >= 0) {
+  obj.data.showLuckyBag = false;
+  obj.data.showRedMind = false;
+  obj.data.chatRoomInfo = obj.data.chatRoomInfo || {};
+  obj.data.chatRoomInfo.showChatRoom = false;
+  if (obj.data.luckBagEntryConfig) {
+    obj.data.luckBagEntryConfig.show = false;
+  }
+
+} else if (url.indexOf('/v3/rec/square/header/tabs') >= 0) {
+  if (Array.isArray(obj.data)) {
+    obj.data.forEach(function(tab) {
+      if (tab.unreadFlag) tab.unreadFlag = 0;
+    });
+    obj.data = obj.data.filter(function(tab) {
+      return tab.pageId === "PostSquare_Recommend";
+    });
+  }
+
+} else if (url.indexOf('/user/homepage/metrics') >= 0) {
+  obj.data.recentViewNum = 0;
+  obj.data.showMetric = false;
+  obj.data.showTipsCard = false;
+  obj.data.hasHomePageLiked = false;
+  if (obj.data.homePageLikedMetric) {
+    obj.data.homePageLikedMetric.addNum = 0;
+    obj.data.homePageLikedMetric.likedTotalNum = 0;
+    obj.data.homePageLikedMetric.hasShowHistoryDynamic = false;
+  }
 
 $done({ body: JSON.stringify(obj) });
