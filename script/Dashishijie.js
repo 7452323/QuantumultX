@@ -20,8 +20,4 @@ if (obj.content) {
   obj.msg = "success";
 }
 
-if (obj.receipt) {
-  ...（完整假收据）
-}
-
 $done({ body: JSON.stringify(obj) });
