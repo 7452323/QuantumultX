@@ -1,0 +1,10 @@
+#!name=Wscs
+#!desc=Wscs 解锁
+#!author=Reviewa
+#!homepage=https://github.com/Reviewa/QuantumultX
+
+[Script]
+Wscs = type=http-response,pattern=^https?://iap\.etm\.tech/v1/products.*atlasv\.speedtestlite,script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Wscs.js,requires-body=true
+
+[MITM]
+hostname = iap.etm.tech

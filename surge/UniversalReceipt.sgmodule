@@ -1,0 +1,10 @@
+#!name=Apple 收据通杀
+#!desc=通杀 buy.itunes.apple.com/verifyReceipt
+#!author=Reviewa
+#!homepage=https://github.com/Reviewa/QuantumultX
+
+[Script]
+Apple收据 = type=http-response,pattern=^https?://(sandbox\.)?buy\.itunes\.apple\.com/verifyReceipt,script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/UniversalReceipt.js,requires-body=true
+
+[MITM]
+hostname = buy.itunes.apple.com

@@ -1,0 +1,10 @@
+#!name=Yitongtanmu
+#!desc=Yitongtanmu 解锁
+#!author=Reviewa
+#!homepage=https://github.com/Reviewa/QuantumultX
+
+[Script]
+http-response ^https?:\/\/[^\/]+\.api\.moji\.com\/(sns\/json\/profile\/get_info.*|json\/member_new\/homepage_info.*|user\/personal\/json\/profile.*|flycard\/novice|shortvideo\/.*) script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Mojitianqi.js, requires-body=true, tag=Mojitianqi
+
+[MITM]
+hostname = %APPEND% *.qweather.com

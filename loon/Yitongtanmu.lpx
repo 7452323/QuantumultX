@@ -1,0 +1,10 @@
+#!name=Yitongtanmu
+#!desc=Yitongtanmu 解锁
+#!author=Reviewa
+#!homepage=https://github.com/Reviewa/QuantumultX
+
+[Script]
+http-response ^https?://ytbarrage\.sky808\.com/api/(user\?method=user_info|index\?method=login_phone) script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Yitongtanmu.js, requires-body=true, tag=Yitongtanmu
+
+[MITM]
+hostname = ytbarrage.sky808.com
