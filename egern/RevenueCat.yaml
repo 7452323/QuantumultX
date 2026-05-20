@@ -1,0 +1,9 @@
+# RevenueCat 通杀 — Egern 配置
+# 来源: https://github.com/Reviewa/QuantumultX
+
+http-response:
+  - match: ^https?://([a-z0-9-]+\.)*revenuecat\.com/(v[12]/)?(receipts|subscribers/.+)
+    script: https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/RevenueCat.js
+
+mitm:
+  - hostname: "*.revenuecat.com"

@@ -1,0 +1,9 @@
+# UniversalReceipt 通杀 — Egern 配置
+# 来源: https://github.com/Reviewa/QuantumultX
+
+http-response:
+  - match: ^https?://(sandbox\.)?buy\.itunes\.apple\.com/verifyReceipt
+    script: https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/UniversalReceipt.js
+
+mitm:
+  - hostname: "buy.itunes.apple.com"
