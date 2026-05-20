@@ -60,6 +60,12 @@ function isLifetime(pid) {
   return lifetimeIds.includes(pid);
 }
 
+// ====== 生成随机过去日期（看起来像真实购买）======
+function pastDate(daysAgo) {
+  const d = new Date(now - daysAgo * 86400000 - Math.floor(Math.random() * 86400000));
+  return d.toISOString();
+}
+
 // ====== Entitlement Key 库 ======
 const entitlementKeys = [
   "pro", "premium", "vip", "default", "membership", "access",
@@ -88,7 +94,7 @@ for (let ent of entitlementKeys) {
   entitlements[ent] = {
     expires_date: useLifetime ? null : expireDateMs,
     grace_period_expires_date: null,
-    purchase_date: nowISO,
+    purchase_date: pastDate(Math.floor(Math.random() * 365) + 30),
     product_identifier: useLifetime
       ? lifetimeIds[Math.floor(Math.random() * lifetimeIds.length)]
       : subscriptionIds[Math.floor(Math.random() * subscriptionIds.length)],
@@ -106,10 +112,10 @@ for (let pid of allProductIds) {
     expires_date: life ? null : expireDateMs,
     grace_period_expires_date: null,
     is_sandbox: false,
-    original_purchase_date: nowISO,
+    original_purchase_date: pastDate(Math.floor(Math.random() * 365) + 30),
     ownership_type: "PURCHASED",
     period_type: "normal",
-    purchase_date: nowISO,
+    purchase_date: pastDate(Math.floor(Math.random() * 30) + 1),
     refunded_at: null,
     store: stores[Math.floor(Math.random() * stores.length)],
     store_transaction_id: Math.random() > 0.5
@@ -144,8 +150,8 @@ $done({
         }]
       },
       original_app_user_id: "$RCAnonymousID:" + genTxId(),
-      original_application_version: "2999.1.0",
-      original_purchase_date: "2020-01-01T00:00:00Z",
+      original_application_version: String(Math.floor(Math.random() * 100) + 100) + "." + Math.floor(Math.random() * 20) + "." + Math.floor(Math.random() * 10),
+      original_purchase_date: pastDate(Math.floor(Math.random() * 1000) + 365),
       other_purchases: {},
       subscriptions: subscriptions
     }
