@@ -7,7 +7,7 @@
 
  [rewrite_local]
 # QX — 通配子域名 + v1/v2 全部端点 + 带尾部斜杠/query参数
-^https?:\/\/[a-z0-9-]+\.revenuecat\.com\/(v[12]\/)?(receipts|subscribers\/[^?#]+) url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/RevenueCat.js
+^https?:\/\/([a-z0-9-]+\.)*revenuecat\.com\/(v[12]\/)?(receipts|subscribers\/[^?#]+) url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/RevenueCat.js
 
 [mitm]
 hostname = *.revenuecat.com

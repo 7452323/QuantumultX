@@ -1,7 +1,7 @@
 /*
 [rewrite_local]
-^https:\/\/buy\.itunes\.apple\.com\/verifyReceipt$ url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/UniversalReceipt.js
-^https:\/\/buy\.itunes\.apple\.com\/verifyReceipt\/?$ url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/UniversalReceipt.js
+^https:\/\/(sandbox\.)?buy\.itunes\.apple\.com\/verifyReceipt$ url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/UniversalReceipt.js
+^https:\/\/(sandbox\.)?buy\.itunes\.apple\.com\/verifyReceipt\/?$ url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/UniversalReceipt.js
 
 [mitm]
 hostname = buy.itunes.apple.com
@@ -48,6 +48,7 @@ try {
 } catch(e) {
   body = {};
 }
+const isSandbox = typeof $request !== 'undefined' && $request.url && $request.url.includes('sandbox');
 const bundleId = body?.receipt?.bundle_id || "com.unknown.app";
 
 // ====== 收据项（统一使用2999过期，通杀终身+订阅）======
@@ -100,7 +101,7 @@ const rcptBase64 = "MIIV" + Array(200).fill(0).map(() => "ABCDEFGHIJKLMNOPQRSTUV
 $done({
   body: JSON.stringify({
     status: 0,
-    environment: "Production",
+    environment: isSandbox ? "Sandbox" : "Production",
     receipt: fakeReceipt,
     latest_receipt_info: [receiptItem],
     latest_receipt: rcptBase64,

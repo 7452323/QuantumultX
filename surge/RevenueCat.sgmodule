@@ -4,7 +4,7 @@
 #!homepage=https://github.com/Reviewa/QuantumultX
 
 [Script]
-http-response ^https:\/\/[a-z0-9-]+\.revenuecat\.com\/(v[12]\/)?(receipts|subscribers\/.+) requires-body=true, script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/RevenueCat.js, tag=RevenueCat通杀
+http-response ^https:\/\/([a-z0-9-]+\.)*revenuecat.com\/(v[12]\/)?(receipts|subscribers\/.+) requires-body=true, script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/RevenueCat.js, tag=RevenueCat通杀
 
 [MITM]
 hostname = %APPEND% *.revenuecat.com
