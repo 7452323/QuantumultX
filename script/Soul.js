@@ -33,9 +33,20 @@ https://apps.apple.com/cn/app/id1032287195
 ^https?:\/\/api-pay\.soulapp\.cn\/vip\/meet\/userInfo url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js
 # 匹配剩余次数
 ^https?:\/\/api-a\.soulapp\.cn\/probability\/match\/entrance url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js
+# 遗漏补充
+^https?:\/\/post\.soulapp\.cn\/v1\/post\/highLight\/recommend\/quota url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js
+^https?:\/\/post\.soulapp\.cn\/soulreal\/post\/highlight\/quota url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js
+^https?:\/\/api-chat\.soulapp\.cn\/chat\/aigc\/preCheckConfig url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js
+^https?:\/\/api-chat\.soulapp\.cn\/robot\/call\/remainTimesAndSpeedCards url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js
+^https?:\/\/api-chat\.soulapp\.cn\/privilege\/bubble\/status\/simple url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js
+^https?:\/\/api-user\.soulapp\.cn\/user\/intimacyinfo url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js
+^https?:\/\/api-chat\.soulapp\.cn\/chat\/mp\/(getUserInfo|pool) url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js
+^https?:\/\/api-pay\.soulapp\.cn\/vip\/rights\/avatar\/qryMyAvatarRights url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js
+^https?:\/\/api-a\.soulapp\.cn\/meet\/my\/count url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js
+^https?:\/\/api-a\.soulapp\.cn\/MeasureResult\/New url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js
 
 [mitm]
-hostname = api-pay.soulapp.cn, api-chat.soulapp.cn, api-user.soulapp.cn, api-a.soulapp.cn
+hostname = api-pay.soulapp.cn, api-chat.soulapp.cn, api-user.soulapp.cn, api-a.soulapp.cn, post.soulapp.cn
 */
 
 var body = JSON.parse($response.body);
@@ -159,5 +170,53 @@ if (url.indexOf('/privilege/supervip/status') > 0) {
 } else if (url.indexOf('/probability/match/entrance') > 0) {
   body.data.remainTime = 999;
 }
+
+
+// === 遗漏补充 ===
+} else if (url.indexOf('/v1/post/highLight/recommend/quota') > 0 || url.indexOf('/soulreal/post/highlight/quota') > 0) {
+  body.data.remainedQuota = 999;
+  body.data.remained = 999;
+
+} else if (url.indexOf('/chat/aigc/preCheckConfig') > 0) {
+  body.data.sessionLimit = 9999;
+
+} else if (url.indexOf('/chat/limitInfo') > 0) {
+  body.data.packageRemainCount = 999;
+  body.data.limitPopupStyleCode = 0;
+
+} else if (url.indexOf('/robot/call/remainTimesAndSpeedCards') > 0) {
+  body.data.freeRemains = 999;
+  body.data.remainTimes = 999;
+  body.data.remainSpeedCards = 999;
+  body.data.todayTimes = 999;
+  body.data.packetTimes = 999;
+  body.data.sumTimes = 999;
+
+} else if (url.indexOf('/privilege/bubble/status/simple') > 0) {
+  body.data.aggPictureCount = 999;
+  body.data.pictureIntervalTime = 0;
+  body.data.has = true;
+
+} else if (url.indexOf('/user/intimacyinfo') > 0) {
+  body.data.roundCount = 999;
+  body.data.heartCount = 999;
+  body.data.heartTotalCount = 999;
+
+} else if (url.indexOf('/chat/mp/getUserInfo') > 0) {
+  body.data.accountType = 2;
+
+} else if (url.indexOf('/vip/rights/avatar/qryMyAvatarRights') > 0) {
+  body.data.avatarFreeTimes = 999;
+
+} else if (url.indexOf('/meet/my/count') > 0) {
+  body.data.viewUserCount = 9999;
+  body.data.oneUserViewCount = 999;
+  body.data.viewUserCountConfigLimit = 9999;
+
+} else if (url.indexOf('/MeasureResult/New') > 0) {
+  body.data.measureTxtCountsHasDo = 999;
+
+} else if (url.indexOf('/chat/mp/pool') > 0) {
+  body.data.remainGetFreeTimes = 999;
 
 $done({ body: JSON.stringify(body) });
