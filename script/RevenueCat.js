@@ -1,6 +1,6 @@
 /*
  * @name RevenueCat
- * @description 伪造 RevenueCat 响应，实现通杀（增强版）
+ * @description 伪造 RevenueCat 响应，实现通杀
  * @compatible QuantumultX, Loon, Surge, Stash
  * @author Qiq
  * @github https://github.com/Reviewa/QuantumultX
