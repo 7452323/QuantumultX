@@ -18,11 +18,6 @@ Soul App - AI 聊天完全解锁 v8
 ^https?://api-chat\.soulapp\.cn/chat/config/rounds url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js
 ^https?://api-chat\.soulapp\.cn/chat/check/privilegeExpireRemind url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js
 ^https?://api-chat\.soulapp\.cn/robot/call/remainTimesAndSpeedCards url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js
-# 谁看过我
-^https?://api-a\.soulapp\.cn/meet/see/me/v2 url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js
-^https?://api-a\.soulapp\.cn/html/settlement/meet/see/me url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js
-^https?://api-a\.soulapp\.cn/meet/mine/see url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js
-^https?://api-a\.soulapp\.cn/meet/queryInvisibleCount url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js
 # 支付/会员
 ^https?://api-pay\.soulapp\.cn/privilege/supervip/status url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js
 ^https?://api-pay\.soulapp\.cn/show/superVIP/detail/v2 url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js
@@ -38,7 +33,7 @@ Soul App - AI 聊天完全解锁 v8
 ^https?://api-user\.soulapp\.cn/user/soulmate/status url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js
 
 [mitm]
-hostname = api-chat.soulapp.cn, api-pay.soulapp.cn, api-user.soulapp.cn, api-a.soulapp.cn
+hostname = api-chat.soulapp.cn, api-pay.soulapp.cn, api-user.soulapp.cn
 */
 
 var obj = JSON.parse($response.body);
@@ -53,6 +48,7 @@ if (url.indexOf('/chat/aigc/privilege/info') >= 0 && obj.data) {
   obj.data.remainTimes = 99999;
   obj.data.characterTotalTimes = 99999;
   obj.data.soulBalance = 99999;
+  obj.data.singlePriceSoul = 0;      // 灵魂币单价设为0，免费
   obj.data.newUser = 0;
   obj.data.title = "无限电量";
   obj.data.prologueTitle = "";
@@ -97,7 +93,6 @@ if (url.indexOf('/chat/limitInfo') >= 0 && obj.data) {
   delete obj.data.blockReason;
 }
 if (url.indexOf('/chat/user/info') >= 0 && obj.data) {
-  // 不改 superVIP（会影响别人主页渲染）
   obj.data.userLimitType = 0;
 }
 if (url.indexOf('/chat/session/protect/status/get') >= 0 && obj.data) obj.data.remainMsgCount = 99999;
@@ -117,21 +112,6 @@ if (url.indexOf('/privilege/supervip/status') >= 0 && obj.data) {
   obj.data.superVIP = true; obj.data.showSuperVIP = true;
   obj.data.remainDay = 99999; obj.data.hasCancelVIPSubscription = false;
   obj.data.hasAiSocialVip = true; obj.data.permanentVip = true;
-}
-
-// === 谁看过我 ===
-if (url.indexOf('/meet/see/me/v2') >= 0 && obj.data) {
-  obj.data.superUser = true;
-  obj.data.uncoverSecretCount = 999;
-}
-if (url.indexOf('/html/settlement/meet/see/me') >= 0 && obj.data) {
-  obj.data.superUser = true;
-}
-if (url.indexOf('/meet/mine/see') >= 0 && obj.data) {
-  obj.data.superUser = true;
-}
-if (url.indexOf('/meet/queryInvisibleCount') >= 0) {
-  obj.data = 9999;
 }
 if (url.indexOf('/vip/show/info') >= 0 && obj.data) {
   obj.data.experiment = true; obj.data.vipShowModel = "superVip";
