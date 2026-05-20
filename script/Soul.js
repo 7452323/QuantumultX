@@ -205,7 +205,7 @@ if (url.indexOf('/privilege/supervip/status') >= 0) {
 
 
 // ===== UI 自定义（基于抓包数据验证的路径）=====
-} else if (url.indexOf('/v6/planet/config') >= 0) {
+if (url.indexOf('/v6/planet/config') >= 0) {
   obj.data.showLuckyBag = false;
   obj.data.showRedMind = false;
   obj.data.chatRoomInfo = obj.data.chatRoomInfo || {};
@@ -223,8 +223,9 @@ if (url.indexOf('/privilege/supervip/status') >= 0) {
       return tab.pageId === "PostSquare_Recommend";
     });
   }
+}
 
-} else if (url.indexOf('/user/homepage/metrics') >= 0) {
+if (url.indexOf('/user/homepage/metrics') >= 0) {
   obj.data.recentViewNum = 0;
   obj.data.showMetric = false;
   obj.data.showTipsCard = false;
@@ -234,5 +235,6 @@ if (url.indexOf('/privilege/supervip/status') >= 0) {
     obj.data.homePageLikedMetric.likedTotalNum = 0;
     obj.data.homePageLikedMetric.hasShowHistoryDynamic = false;
   }
+}
 
 $done({ body: JSON.stringify(obj) });
