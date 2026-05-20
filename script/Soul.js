@@ -181,8 +181,13 @@ if (url.indexOf('/privilege/supervip/status') > 0) {
   body.data.sessionLimit = 9999;
 
 } else if (url.indexOf('/chat/limitInfo') > 0) {
+  body.data.limit = false;
   body.data.packageRemainCount = 999;
   body.data.limitPopupStyleCode = 0;
+  body.data.remainFreeCount = 999;
+  body.data.freeEquityStatus = true;
+  body.data.extMsg = '';
+  body.data.subMsg = '';
 
 } else if (url.indexOf('/robot/call/remainTimesAndSpeedCards') > 0) {
   body.data.freeRemains = 999;
