@@ -16,8 +16,9 @@ hostname = *.revenuecat.com
 
 const now = Date.now();
 const nowISOString = new Date(now).toISOString();
-const expireDate = "2099-12-31T23:59:59Z";
-const expireDateMs = "2099-12-31T23:59:59.000000Z";
+const expireTimestamp = 32503679999000; // 2999-12-31T23:59:59Z
+const expireDate = "2999-12-31T23:59:59Z";
+const expireDateMs = "2999-12-31T23:59:59.000000Z";
 
 // ====== 通用产品ID库（覆盖绝大多数app）======
 const productIds = [
