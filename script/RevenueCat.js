@@ -96,7 +96,7 @@ function genTxId() {
 let entitlements = {};
 for (let ent of entitlementKeys) {
   entitlements[ent] = {
-    expires_date: expireDateMs,
+    expires_date: null,
     grace_period_expires_date: null,
     purchase_date: nowISO,
     product_identifier: productIds[Math.floor(Math.random() * productIds.length)],
@@ -115,11 +115,11 @@ for (let pid of productIds) {
     is_sandbox: false,
     original_purchase_date: nowISO,
     ownership_type: "PURCHASED",
-    period_type: "active",
+    period_type: "normal",
     purchase_date: nowISO,
     refunded_at: null,
     store: stores[Math.floor(Math.random() * stores.length)],
-    store_transaction_id: genTxId(),
+    store_transaction_id: Math.random() > 0.5 ? genTxId() : parseInt("1000000" + String(Math.floor(Math.random() * 1000000000)).padStart(9, '0')),
     unsubscribe_detected_at: null
   };
 }
@@ -134,7 +134,26 @@ $done({
       first_seen: "2020-01-01T00:00:00Z",
       last_seen: nowISO,
       management_url: "https://apps.apple.com/account/subscriptions",
-      non_subscriptions: {},
+      non_subscriptions: {
+        "lifetime": [{
+          "id": "RC" + genTxId(),
+          "is_sandbox": false,
+          "purchase_date": nowISO,
+          "store": stores[Math.floor(Math.random() * stores.length)]
+        }],
+        "onetime": [{
+          "id": "RC" + genTxId(),
+          "is_sandbox": false,
+          "purchase_date": nowISO,
+          "store": stores[Math.floor(Math.random() * stores.length)]
+        }],
+        "consumable": [{
+          "id": "RC" + genTxId(),
+          "is_sandbox": false,
+          "purchase_date": nowISO,
+          "store": stores[Math.floor(Math.random() * stores.length)]
+        }]
+      },
       original_app_user_id: "$RCAnonymousID:" + genTxId(),
       original_application_version: "2999.1.0",
       original_purchase_date: "2020-01-01T00:00:00Z",
