@@ -33,6 +33,8 @@ https://apps.apple.com/cn/app/id1032287195
 ^https?:\/\/api-pay\.soulapp\.cn\/vip\/meet\/userInfo url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js
 # 匹配剩余次数
 ^https?:\/\/api-a\.soulapp\.cn\/probability\/match\/entrance url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js
+# 送礼接口
+^https?:\/\/api-chat\.soulapp\.cn\/chat\/limit\/gift\/give url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js
 # 遗漏补充
 ^https?:\/\/post\.soulapp\.cn\/v1\/post\/highLight\/recommend\/quota url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js
 ^https?:\/\/post\.soulapp\.cn\/soulreal\/post\/highlight\/quota url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js
@@ -142,6 +144,12 @@ if (url.indexOf('/privilege/supervip/status') > 0) {
   body.data.forbidCall = false;
   body.data.remainCreateChatSessionNum = -1;
   body.data.createSessionLimit = false;
+
+} else if (url.indexOf('/chat/limit/gift/give') > 0) {
+  // 送礼接口 — 伪造成功响应
+  body.code = 10001;
+  body.success = true;
+  body.data = { resultCode: 10001, resultMsg: '送礼成功' };
 
 } else if (url.indexOf('/chat/limitInfo') > 0) {
   body.data.limit = false;
