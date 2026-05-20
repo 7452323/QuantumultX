@@ -21,6 +21,8 @@ Soul App - AI 聊天完全解锁 v8
 # 谁看过我
 ^https?://api-a\.soulapp\.cn/meet/see/me/v2 url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js
 ^https?://api-a\.soulapp\.cn/html/settlement/meet/see/me url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js
+^https?://api-a\.soulapp\.cn/meet/mine/see url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js
+^https?://api-a\.soulapp\.cn/meet/queryInvisibleCount url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js
 # 支付/会员
 ^https?://api-pay\.soulapp\.cn/privilege/supervip/status url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js
 ^https?://api-pay\.soulapp\.cn/show/superVIP/detail/v2 url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js
@@ -124,6 +126,12 @@ if (url.indexOf('/meet/see/me/v2') >= 0 && obj.data) {
 }
 if (url.indexOf('/html/settlement/meet/see/me') >= 0 && obj.data) {
   obj.data.superUser = true;
+}
+if (url.indexOf('/meet/mine/see') >= 0 && obj.data) {
+  obj.data.superUser = true;
+}
+if (url.indexOf('/meet/queryInvisibleCount') >= 0) {
+  obj.data = 9999;
 }
 if (url.indexOf('/vip/show/info') >= 0 && obj.data) {
   obj.data.experiment = true; obj.data.vipShowModel = "superVip";
