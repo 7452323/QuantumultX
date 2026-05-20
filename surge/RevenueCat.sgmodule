@@ -1,11 +1,10 @@
-#!name=RevenueCat 通杀模块
-#!desc=通杀所有使用 RevenueCat 的 App，伪造订阅信息
+#!name=RevenueCat 通杀（终极版）
+#!desc=通杀所有使用 RevenueCat 的 App，伪造完整订阅响应
 #!author=Reviewa
 #!homepage=https://github.com/Reviewa/QuantumultX
 
 [Script]
-http-response ^https:\/\/api\.revenuecat\.com\/v\d\/subscribers\/ requires-body=true, script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/RevenueCat.js, tag=RevenueCat订阅通杀
-http-response ^https:\/\/api\.revenuecat\.com\/v\d\/receipts requires-body=true, script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/RevenueCat.js, tag=RevenueCat收据通杀
+http-response ^https:\/\/[a-z0-9-]+\.revenuecat\.com\/(v[12]\/)?(receipts|subscribers\/.+) requires-body=true, script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/RevenueCat.js, tag=RevenueCat通杀
 
 [MITM]
-hostname = %APPEND% api.revenuecat.com
+hostname = %APPEND% *.revenuecat.com

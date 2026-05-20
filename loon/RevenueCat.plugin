@@ -1,13 +1,11 @@
-#!name=RevenueCat 通杀模块
+#!name=RevenueCat 通杀（终极版）
 #!desc=通杀所有使用 RevenueCat 的 App
 #!author=Reviewa
 #!icon=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/icon/Loon.png
 #!homepage=https://github.com/Reviewa/QuantumultX
 
 [Script]
-http-response ^https:\/\/api\.revenuecat\.com\/v\d\/subscribers\/ script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/RevenueCat.js, requires-body=true, tag=RevenueCat订阅通杀
-
-http-response ^https:\/\/api\.revenuecat\.com\/v\d\/receipts script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/RevenueCat.js, requires-body=true, tag=RevenueCat收据通杀
+http-response ^https:\/\/[a-z0-9-]+\.revenuecat\.com\/(v[12]\/)?(receipts|subscribers\/.+) script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/RevenueCat.js, requires-body=true, tag=RevenueCat通杀
 
 [MITM]
-hostname = api.revenuecat.com
+hostname = *.revenuecat.com
