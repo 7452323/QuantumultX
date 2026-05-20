@@ -1,88 +1,117 @@
 /*
 [rewrite_local]
 ^https:\/\/buy\.itunes\.apple\.com\/verifyReceipt$ url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/UniversalReceipt.js
+^https:\/\/buy\.itunes\.apple\.com\/verifyReceipt\/?$ url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/UniversalReceipt.js
 
 [mitm]
 hostname = buy.itunes.apple.com
 */
 
-const now = Date.now()
-const toUTC = t => new Date(t).toUTCString()
-const toPST = t => new Date(t).toLocaleString("en-US", { timeZone: "America/Los_Angeles" })
+// ==========================================
+//  🍎 Apple verifyReceipt 通杀脚本
+//  通用返回伪造收据，覆盖所有 bundle_id
+//  无需维护白名单，自动适配
+// ==========================================
 
-const apps = {
-  "me.imgbase.intolive": {
-    product_id: "me.imgbase.intolive.proSubYearly2024",
-    transaction_id: "666000666000666",
-    expire_time: 4102415999000
-  },
-  "me.imgbase.imgplay": {
-    product_id: "me.imgbase.imgplay.subscriptionYearly",
-    transaction_id: "777000777000777",
-    expire_time: 4102415999000
-  },
-  "com.liangpin.hireader": {
-    product_id: "HiReader_Lifetime",
-    transaction_id: "888000888000888",
-    expire_time: 32503651199000
-  },
-  "com.zerone.hidesktop": {
-    product_id: "com.zerone.hidesktop.forever",
-    transaction_id: "999000999000999",
-    expire_time: 32503626054000
-  }
+const now = Date.now();
+
+// ====== 苹果日期格式 ======
+// Apple 用的是 "2024-01-01 00:00:00 Etc/GMT" 而非 UTC String
+function appleDate(ts) {
+  const d = new Date(ts);
+  const pad = n => String(n).padStart(2, "0");
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} Etc/GMT`;
 }
 
-let body = JSON.parse($response.body)
-let bundle_id = body?.receipt?.bundle_id
+function appleDatePST(ts) {
+  const d = new Date(ts);
+  const opts = { timeZone: "America/Los_Angeles", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false };
+  const parts = new Intl.DateTimeFormat("en-US", opts).formatToParts(d);
+  const map = {};
+  for (const p of parts) map[p.type] = p.value;
+  return `${map.year}-${map.month}-${map.day} ${map.hour}:${map.minute}:${map.second} America/Los_Angeles`;
+}
 
-if (bundle_id && apps[bundle_id]) {
-  const app = apps[bundle_id]
-  const receiptItem = {
-    quantity: "1",
-    product_id: app.product_id,
-    transaction_id: app.transaction_id,
-    original_transaction_id: app.transaction_id,
-    purchase_date: toUTC(now),
-    purchase_date_ms: `${now}`,
-    purchase_date_pst: toPST(now),
-    original_purchase_date: toUTC(now),
-    original_purchase_date_ms: `${now}`,
-    original_purchase_date_pst: toPST(now),
-    expires_date: toUTC(app.expire_time),
-    expires_date_ms: `${app.expire_time}`,
-    expires_date_pst: toPST(app.expire_time),
-    is_trial_period: "false",
-    in_app_ownership_type: "PURCHASED"
-  }
-  body = {
+// ====== 过期时间 ======
+// 2999-12-31T23:59:59Z — 对所有App都返回这个，永久有效
+const EXPIRE_FAR = 32503679999000;
+
+// ====== 生成随机交易ID ======
+function txId() {
+  return "1" + String(Math.floor(Math.random() * 1000000000000000)).padStart(15, "0");
+}
+
+// ====== 获取 bundle_id 和原始响应 ======
+let body;
+try {
+  body = JSON.parse($response.body);
+} catch(e) {
+  body = {};
+}
+const bundleId = body?.receipt?.bundle_id || "com.unknown.app";
+
+// ====== 收据项（统一使用2999过期，通杀终身+订阅）======
+const receiptItem = {
+  quantity: "1",
+  product_id: bundleId + ".subscription",
+  transaction_id: txId(),
+  original_transaction_id: txId(),
+  purchase_date: appleDate(now),
+  purchase_date_ms: String(now),
+  purchase_date_pst: appleDatePST(now),
+  original_purchase_date: appleDate(now - 86400000 * 365),
+  original_purchase_date_ms: String(now - 86400000 * 365),
+  original_purchase_date_pst: appleDatePST(now - 86400000 * 365),
+  expires_date: appleDate(EXPIRE_FAR),
+  expires_date_ms: String(EXPIRE_FAR),
+  expires_date_pst: appleDatePST(EXPIRE_FAR),
+  is_trial_period: "false",
+  in_app_ownership_type: "PURCHASED",
+  web_order_line_item_id: txId()
+};
+
+// ====== 伪造完整收据响应 ======
+const fakeReceipt = {
+  receipt_type: "Production",
+  adam_id: 0,
+  app_item_id: 0,
+  bundle_id: bundleId,
+  application_version: "9999",
+  download_id: 0,
+  version_external_identifier: 0,
+  receipt_creation_date: appleDate(now),
+  receipt_creation_date_ms: String(now),
+  receipt_creation_date_pst: appleDatePST(now),
+  request_date: appleDate(now),
+  request_date_ms: String(now),
+  request_date_pst: appleDatePST(now),
+  original_purchase_date: appleDate(now - 86400000 * 1000),
+  original_purchase_date_ms: String(now - 86400000 * 1000),
+  original_purchase_date_pst: appleDatePST(now - 86400000 * 1000),
+  original_application_version: "1.0",
+  in_app: [receiptItem]
+};
+
+// ====== latest_receipt ======
+// 用更长更真实的base64字符串（Apple的实际收据很长）
+const rcptBase64 = "MIIV" + Array(200).fill(0).map(() => "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=".charAt(Math.floor(Math.random() * 65))).join("");
+
+// ====== 返回 ======
+$done({
+  body: JSON.stringify({
     status: 0,
     environment: "Production",
-    receipt: {
-      receipt_type: "Production",
-      bundle_id: bundle_id,
-      application_version: "9999",
-      original_application_version: "1.0",
-      receipt_creation_date: toUTC(now),
-      receipt_creation_date_ms: `${now}`,
-      receipt_creation_date_pst: toPST(now),
-      request_date: toUTC(now),
-      request_date_ms: `${now}`,
-      request_date_pst: toPST(now),
-      original_purchase_date: toUTC(now),
-      original_purchase_date_ms: `${now}`,
-      original_purchase_date_pst: toPST(now),
-      in_app: [receiptItem]
-    },
+    receipt: fakeReceipt,
     latest_receipt_info: [receiptItem],
+    latest_receipt: rcptBase64,
     pending_renewal_info: [{
-      auto_renew_product_id: app.product_id,
-      product_id: app.product_id,
-      original_transaction_id: app.transaction_id,
-      auto_renew_status: "1"
-    }],
-    latest_receipt: "MIIFakeBase64=="
-  }
-}
-
-$done({ body: JSON.stringify(body) })
+      auto_renew_product_id: bundleId + ".subscription",
+      auto_renew_status: "1",
+      original_transaction_id: receiptItem.original_transaction_id,
+      product_id: bundleId + ".subscription",
+      expiration_intent: null,
+      is_in_billing_retry_period: "0",
+      price_consent_status: null
+    }]
+  })
+});
