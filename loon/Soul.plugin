@@ -1,0 +1,14 @@
+#!name=Soul 通杀
+#!desc=Soul App 超级VIP + 聊天限制全解锁
+#!author=Reviewa
+#!icon=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/icon/Loon.png
+#!homepage=https://github.com/Reviewa/QuantumultX
+
+[Script]
+http-response ^https?://api-pay\.soulapp\.cn/(privilege/supervip/status|show/superVIP/detail/v2|soul-coin/total|soul-coin/total-detail|vip/meet/userInfo) script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js, requires-body=true, tag=SoulSuperVIP
+http-response ^https?://api-chat\.soulapp\.cn/(chat/user/info|chat/session/protect/status/get|chat/aigc/privilege/info|chat/aigc/charge/page/v2|chat/limit/friendly/check|chat/limit/socialGraceScore|chat/limitInfo) script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js, requires-body=true, tag=SoulChat
+http-response ^https?://api-user\.soulapp\.cn/(html/user/userDetail|user/userDetail|user/soulmate/status|user/queryInvisibleSetting) script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js, requires-body=true, tag=SoulUser
+http-response ^https?://api-a\.soulapp\.cn/(loveBell/queryMatchSpeedupConf|videoMatch/getConfig|probability/match/entrance) script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js, requires-body=true, tag=SoulMatch
+
+[MITM]
+hostname = %APPEND% api-pay.soulapp.cn, api-chat.soulapp.cn, api-user.soulapp.cn, api-a.soulapp.cn
