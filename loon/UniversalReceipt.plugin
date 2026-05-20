@@ -1,0 +1,11 @@
+#!name=Apple 收据通杀
+#!desc=通杀 buy.itunes.apple.com/verifyReceipt，伪造苹果收据响应
+#!author=Reviewa
+#!icon=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/icon/Loon.png
+#!homepage=https://github.com/Reviewa/QuantumultX
+
+[Script]
+http-response ^https:\/\/(sandbox\.)?buy\.itunes\.apple\.com\/verifyReceipt script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/UniversalReceipt.js, requires-body=true, tag=Apple收据通杀
+
+[MITM]
+hostname = buy.itunes.apple.com
