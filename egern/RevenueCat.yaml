@@ -1,9 +1,15 @@
-# RevenueCat 通杀 — Egern 配置
-# 来源: https://github.com/Reviewa/QuantumultX
+name: "RevenueCat 通杀"
+description: "通杀所有使用 RevenueCat 的 App，伪造订阅响应"
+author: "Qiq"
+homepage: "https://github.com/Reviewa/QuantumultX"
+icon: "creditcard.fill"
 
-http-response:
-  - match: ^https?://([a-z0-9-]+\.)*revenuecat\.com/(v[12]/)?(receipts|subscribers/.+)
-    script: https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/RevenueCat.js
+scriptings:
+  - http_response:
+      name: RevenueCat订阅通杀
+      match: ^https?://([a-z0-9-]+\.)*revenuecat\.com/(v[12]/)?(receipts|subscribers/.+)
+      script: https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/RevenueCat.js
 
 mitm:
-  - hostname: "*.revenuecat.com"
+  hostnames:
+    - "*.revenuecat.com"
