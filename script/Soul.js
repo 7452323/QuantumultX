@@ -52,9 +52,18 @@ if (url.indexOf('/soul-coin/total-detail') >= 0 && obj.data) {
   obj.data.availableBalance = 999999; obj.data.giftBalance = 999999;
 }
 if (url.indexOf('/chat/limitInfo') >= 0 && obj.data) {
-  obj.data.limit = false; obj.data.packageRemainCount = 999;
-  delete obj.data.subMsg; delete obj.data.extMsg;
-  delete obj.data.freeEquityStatus; delete obj.data.remainFreeCount;
+  obj.data.limit = false;
+  obj.data.packageRemainCount = 999;
+  obj.data.limitPopupStyleCode = 0;
+  obj.data.remainFreeCount = 999;
+  obj.data.freeEquityStatus = true;
+  obj.data.subMsg = '';
+  obj.data.extMsg = '';
+  obj.data.msg = '';
+  delete obj.data.title;
+  delete obj.data.bottomText;
+  delete obj.data.abValue;
+  delete obj.data.blockReason;
 }
 if (url.indexOf('/chat/user/info') >= 0 && obj.data) {
   obj.data.superVIP = true; obj.data.userLimitType = 0;
