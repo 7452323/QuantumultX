@@ -55,15 +55,22 @@ def get_post_links(bookname, max_pages=100):
     """搜索并获取相关文章的链接"""
     links = []
     encoded = re.sub(r"\s+", "+", bookname.strip())
-    next_url = f"https://book.xbookcn.net/search/label/{encoded}?max-results=500"
+    base = "https://book.xbookcn.net"
+    next_url = f"{base}/search/label/{encoded}?max-results=500"
     page = 0
 
     while next_url and page < max_pages:
         print(f"📄 目录页: {next_url[:80]}")
         html = fetch(next_url)
         if not html:
-            print("  ❌ 获取失败")
-            break
+            # fallback: 尝试blog.域名
+            if "blog.xbookcn.net" not in next_url and "book.xbookcn.net" in next_url:
+                fallback = next_url.replace("book.xbookcn.net", "blog.xbookcn.net")
+                print(f"  ⚠️ 尝试备用域名...")
+                html = fetch(fallback)
+            if not html:
+                print("  ❌ 获取失败")
+                break
 
         soup = BeautifulSoup(html, "html.parser")
         found = 0
