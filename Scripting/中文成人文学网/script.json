@@ -1,0 +1,40 @@
+{
+  "localizedDescriptions" : {
+    "zh" : "从 blog.xbookcn.net 和 book.xbookcn.net 下载成人情色小说，支持分类浏览、选择下载、导出为文本文件。",
+    "it" : "",
+    "es" : "",
+    "fr" : "",
+    "de" : "",
+    "pt" : "",
+    "en" : "",
+    "ja" : "",
+    "ru" : ""
+  },
+  "color" : "rgba(71, 102, 194,1)",
+  "runInApp" : true,
+  "author" : null,
+  "iconImage" : null,
+  "version" : "1.0.0",
+  "remoteResource" : null,
+  "entry" : "index.tsx",
+  "localizedNames" : {
+    "zh" : "xbookcn 电子书下载器",
+    "it" : "",
+    "es" : "",
+    "fr" : "",
+    "de" : "",
+    "pt" : "",
+    "en" : "",
+    "ja" : "",
+    "ru" : ""
+  },
+  "intentInputTypes" : [
+
+  ],
+  "icon" : "square.2.layers.3d.fill",
+  "contributors" : [
+
+  ],
+  "name" : "中文成人文学网",
+  "description" : null
+}
