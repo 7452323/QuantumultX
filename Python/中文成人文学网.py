@@ -76,10 +76,14 @@ def get_post_links(bookname, max_pages=100):
         found = 0
         for a in soup.find_all("a", href=True):
             href, title = a["href"], a.get_text(strip=True)
-            if href and title and "xbookcn.net" in href and len(title) < 50:
-                if bookname.lower() in title.lower():
-                    links.append((title, href))
-                    found += 1
+            # 只取真实文章URL(/20xx/xx/blog-post格式)，排除搜索标签和分类
+            if not href or not title or len(title) < 5 or len(title) > 50:
+                continue
+            if "/search/label/" in href or "/2000/01/" in href:
+                continue  # 跳过搜索页、分类页
+            if bookname.lower() in title.lower():
+                links.append((title, href))
+                found += 1
 
         print(f"  ✅ 找到 {found} 篇, 累计 {len(links)}")
 
