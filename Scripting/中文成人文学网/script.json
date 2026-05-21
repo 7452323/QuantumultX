@@ -1,0 +1,40 @@
+{
+  "name" : "中文成人文学网",
+  "author" : null,
+  "contributors" : [
+
+  ],
+  "localizedNames" : {
+    "zh" : "",
+    "es" : "",
+    "ja" : "",
+    "ru" : "",
+    "en" : "",
+    "de" : "",
+    "fr" : "",
+    "it" : "",
+    "pt" : ""
+  },
+  "iconImage" : null,
+  "entry" : "index.tsx",
+  "localizedDescriptions" : {
+    "zh" : "",
+    "es" : "",
+    "ja" : "",
+    "ru" : "",
+    "en" : "",
+    "de" : "",
+    "fr" : "",
+    "it" : "",
+    "pt" : ""
+  },
+  "icon" : "square.2.layers.3d.fill",
+  "color" : "rgba(174, 109, 216,1)",
+  "intentInputTypes" : [
+
+  ],
+  "version" : "1.0.0",
+  "remoteResource" : null,
+  "runInApp" : false,
+  "description" : null
+}
