@@ -1,5 +1,5 @@
-# https://blog.xbookcn.net — 中文成人文学网 下载器
-# 适用于 iOS Python IDE (https://apps.apple.com/cn/app/python-ide/id6753987304)
+# https://blog.xbookcn.net 
+
 # v2.0 — 修复：网站已启用Cloudflare防护，通过Web Archive绕过
 
 import urllib.request
