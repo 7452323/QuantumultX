@@ -1,9 +1,9 @@
 #!name=FoodiePro解锁
 #!desc=专业拍美食_你值得拥有
-#!icon=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/icon/Foodie.png
+#!icon=https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Foodie.png
 
 [Script]
-http-response ^https:\/\/purchase-foodie-api\.snow\.me\/v1\/purchase\/subscription\/subscriber\/status script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Foodie.js, requires-body=true, timeout=60, tag=Foodie
+http-response ^https:\/\/purchase-foodie-api\.snow\.me\/v1\/purchase\/subscription\/subscriber\/status script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Foodie.js, requires-body=true, timeout=60, tag=Foodie
 
 [MITM]
 hostname = purchase-foodie-api.snow.me

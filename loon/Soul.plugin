@@ -1,35 +1,35 @@
 #!name=Soul 通杀 v2
 #!desc=Soul超级VIP+聊天送礼限制全解锁+UI自定义
-#!author=Reviewa
-#!icon=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/icon/Loon.png
-#!homepage=https://github.com/Reviewa/QuantumultX
+#!author=7452323
+#!icon=https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Loon.png
+#!homepage=https://github.com/7452323/QuantumultX
 
 [Script]
-http-response ^https?:\/\/api-a\.soulapp\.cn\/(loveBell\/queryMatchSpeedupConf|videoMatch\/getConfig|probability\/match\/entrance|meet\/my\/count|MeasureResult\/New) script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul1
-http-response ^https?:\/\/api-a\.soulapp\.cn\/v6\/planet\/config script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul2
-http-response ^https?:\/\/api-chat\.soulapp\.cn\/chat\/user\/info script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul3
-http-response ^https?:\/\/api-chat\.soulapp\.cn\/chat\/limitInfo script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul4
-http-response ^https?:\/\/api-chat\.soulapp\.cn\/chat\/session\/protect\/status\/get script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul5
-http-response ^https?:\/\/api-chat\.soulapp\.cn\/chat\/aigc\/privilege\/info script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul6
-http-response ^https?:\/\/api-chat\.soulapp\.cn\/chat\/aigc\/charge\/page\/v2 script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul7
-http-response ^https?:\/\/api-chat\.soulapp\.cn\/chat\/aigc\/preCheckConfig script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul8
-http-response ^https?:\/\/api-chat\.soulapp\.cn\/chat\/limit\/friendly\/check script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul9
-http-response ^https?:\/\/api-chat\.soulapp\.cn\/chat\/limit\/socialGraceScore script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul10
-http-response ^https?:\/\/api-chat\.soulapp\.cn\/chat\/limit\/gift\/give script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul11
-http-response ^https?:\/\/api-chat\.soulapp\.cn\/chat\/limit\/gift\/info script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul12
-http-response ^https?:\/\/api-chat\.soulapp\.cn\/privilege\/bubble\/status\/simple script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul13
-http-response ^https?:\/\/api-chat\.soulapp\.cn\/robot\/call\/remainTimesAndSpeedCards script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul14
-http-response ^https?:\/\/api-chat\.soulapp\.cn\/chat\/mp\/(getUserInfo|pool) script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul15
-http-response ^https?:\/\/api-pay\.soulapp\.cn\/privilege\/supervip\/status script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul16
-http-response ^https?:\/\/api-pay\.soulapp\.cn\/show\/superVIP\/detail\/v2 script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul17
-http-response ^https?:\/\/api-pay\.soulapp\.cn\/soul-coin\/total script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul18
-http-response ^https?:\/\/api-pay\.soulapp\.cn\/soul-coin\/total-detail script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul19
-http-response ^https?:\/\/api-pay\.soulapp\.cn\/vip\/meet\/userInfo script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul20
-http-response ^https?:\/\/api-pay\.soulapp\.cn\/vip\/rights\/avatar\/qryMyAvatarRights script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul21
-http-response ^https?:\/\/api-user\.soulapp\.cn\/(html\/user\/userDetail|user\/userDetail|user\/soulmate\/status|user\/queryInvisibleSetting|user\/intimacyinfo) script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul22
-http-response ^https?:\/\/api-user\.soulapp\.cn\/user\/homepage\/metrics script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul23
-http-response ^https?:\/\/post\.soulapp\.cn\/(v1\/post\/highLight\/recommend\/quota|soulreal\/post\/highlight\/quota) script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul24
-http-response ^https?:\/\/post\.soulapp\.cn\/v3\/rec\/square\/header\/tabs script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul25
+http-response ^https?:\/\/api-a\.soulapp\.cn\/(loveBell\/queryMatchSpeedupConf|videoMatch\/getConfig|probability\/match\/entrance|meet\/my\/count|MeasureResult\/New) script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul1
+http-response ^https?:\/\/api-a\.soulapp\.cn\/v6\/planet\/config script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul2
+http-response ^https?:\/\/api-chat\.soulapp\.cn\/chat\/user\/info script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul3
+http-response ^https?:\/\/api-chat\.soulapp\.cn\/chat\/limitInfo script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul4
+http-response ^https?:\/\/api-chat\.soulapp\.cn\/chat\/session\/protect\/status\/get script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul5
+http-response ^https?:\/\/api-chat\.soulapp\.cn\/chat\/aigc\/privilege\/info script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul6
+http-response ^https?:\/\/api-chat\.soulapp\.cn\/chat\/aigc\/charge\/page\/v2 script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul7
+http-response ^https?:\/\/api-chat\.soulapp\.cn\/chat\/aigc\/preCheckConfig script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul8
+http-response ^https?:\/\/api-chat\.soulapp\.cn\/chat\/limit\/friendly\/check script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul9
+http-response ^https?:\/\/api-chat\.soulapp\.cn\/chat\/limit\/socialGraceScore script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul10
+http-response ^https?:\/\/api-chat\.soulapp\.cn\/chat\/limit\/gift\/give script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul11
+http-response ^https?:\/\/api-chat\.soulapp\.cn\/chat\/limit\/gift\/info script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul12
+http-response ^https?:\/\/api-chat\.soulapp\.cn\/privilege\/bubble\/status\/simple script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul13
+http-response ^https?:\/\/api-chat\.soulapp\.cn\/robot\/call\/remainTimesAndSpeedCards script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul14
+http-response ^https?:\/\/api-chat\.soulapp\.cn\/chat\/mp\/(getUserInfo|pool) script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul15
+http-response ^https?:\/\/api-pay\.soulapp\.cn\/privilege\/supervip\/status script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul16
+http-response ^https?:\/\/api-pay\.soulapp\.cn\/show\/superVIP\/detail\/v2 script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul17
+http-response ^https?:\/\/api-pay\.soulapp\.cn\/soul-coin\/total script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul18
+http-response ^https?:\/\/api-pay\.soulapp\.cn\/soul-coin\/total-detail script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul19
+http-response ^https?:\/\/api-pay\.soulapp\.cn\/vip\/meet\/userInfo script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul20
+http-response ^https?:\/\/api-pay\.soulapp\.cn\/vip\/rights\/avatar\/qryMyAvatarRights script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul21
+http-response ^https?:\/\/api-user\.soulapp\.cn\/(html\/user\/userDetail|user\/userDetail|user\/soulmate\/status|user\/queryInvisibleSetting|user\/intimacyinfo) script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul22
+http-response ^https?:\/\/api-user\.soulapp\.cn\/user\/homepage\/metrics script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul23
+http-response ^https?:\/\/post\.soulapp\.cn\/(v1\/post\/highLight\/recommend\/quota|soulreal\/post\/highlight\/quota) script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul24
+http-response ^https?:\/\/post\.soulapp\.cn\/v3\/rec\/square\/header\/tabs script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js, requires-body=true, tag=Soul25
 
 [MITM]
 hostname = api-a.soulapp.cn, api-chat.soulapp.cn, api-pay.soulapp.cn, api-user.soulapp.cn, post.soulapp.cn

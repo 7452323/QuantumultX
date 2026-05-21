@@ -2,7 +2,7 @@
 #!desc=解锁vip
 
 [Script]
-intolive = type=http-response, pattern=^https:\/\/buy\.itunes\.apple\.com\/verifyReceipt$, script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/intolive.js, requires-body=true, max-size=-1, timeout=60
+intolive = type=http-response, pattern=^https:\/\/buy\.itunes\.apple\.com\/verifyReceipt$, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/intolive.js, requires-body=true, max-size=-1, timeout=60
 
 [MITM]
 hostname = %APPEND% buy.itunes.apple.com

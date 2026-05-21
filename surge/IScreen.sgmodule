@@ -2,7 +2,7 @@
 #!desc=解锁vip 4.2.17
 
 [Script]
-IScreen = type=http-response, pattern=^https:\/\/buy\.itunes\.apple\.com\/verifyReceipt, script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/IScreen.js, requires-body=true, max-size=-1, timeout=60
+IScreen = type=http-response, pattern=^https:\/\/buy\.itunes\.apple\.com\/verifyReceipt, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/IScreen.js, requires-body=true, max-size=-1, timeout=60
 
 [MITM]
 hostname = %APPEND% buy.itunes.apple.com

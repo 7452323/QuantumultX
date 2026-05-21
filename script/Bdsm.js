@@ -1,6 +1,6 @@
 /*
 [rewrite_local]
-^https:\/\/api\.budingscan\.com\/user\/info url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Bdsm.js
+^https:\/\/api\.budingscan\.com\/user\/info url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js
 
 [mitm]
 hostname = api.budingscan.com

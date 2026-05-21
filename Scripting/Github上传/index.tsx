@@ -354,7 +354,7 @@ function UploadPage() {
             onChanged={(v) => { setOwner(v); saveField(STORAGE_KEYS.owner, v) }}
             prompt="填写你的 GitHub 用户名"
           />
-          <Text>Owner 是仓库所属的用户或组织名，例如 Reviewa</Text>
+          <Text>Owner 是仓库所属的用户或组织名，例如 7452323</Text>
 
           <TextField
             title="Repo"

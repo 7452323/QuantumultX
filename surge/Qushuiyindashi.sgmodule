@@ -1,10 +1,10 @@
 #!name=Qushuiyindashi
 #!desc=Qushuiyindashi 解锁
-#!author=Reviewa
-#!homepage=https://github.com/Reviewa/QuantumultX
+#!author=7452323
+#!homepage=https://github.com/7452323/QuantumultX
 
 [Script]
-Qushuiyindashi = type=http-response,pattern=^https://wx\.520gyh\.com/Unmark/Login/wxUserInfo,script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Qushuiyindashi.js,requires-body=true
+Qushuiyindashi = type=http-response,pattern=^https://wx\.520gyh\.com/Unmark/Login/wxUserInfo,script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Qushuiyindashi.js,requires-body=true
 
 [MITM]
 hostname = wx.520gyh.com

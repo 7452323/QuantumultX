@@ -2,7 +2,7 @@
 
 [rewrite_local]
 
-^https?://iap\.etm\.tech/v1/products.*atlasv\.speedtestlite url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Wscs.js
+^https?://iap\.etm\.tech/v1/products.*atlasv\.speedtestlite url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Wscs.js
 
 [mitm]
 hostname = iap.etm.tech

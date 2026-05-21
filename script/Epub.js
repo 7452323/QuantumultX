@@ -5,7 +5,7 @@
 https://apps.apple.com/cn/app/%E7%94%B5%E5%AD%90%E4%B9%A6-%E6%A0%BC%E5%BC%8F%E8%BD%AC%E6%8D%A2/id6443983103
 
 [rewrite_local]
-^https://buy\.itunes\.apple\.com/verifyReceipt$ url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Epub.js
+^https://buy\.itunes\.apple\.com/verifyReceipt$ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Epub.js
 
 [mitm]
 hostname = buy.itunes.apple.com

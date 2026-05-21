@@ -2,9 +2,9 @@
 
 [rewrite_local]
 # 拦截 product_entitlement_mapping 接口
-^https:\/\/api\.rc-backup\.com\/v1\/product_entitlement_mapping$ url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/PicSeed.js
+^https:\/\/api\.rc-backup\.com\/v1\/product_entitlement_mapping$ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/PicSeed.js
 # 拦截 receipts 接口
-^https:\/\/api\.rc-backup\.com\/v1\/receipts$ url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/PicSeed.js
+^https:\/\/api\.rc-backup\.com\/v1\/receipts$ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/PicSeed.js
 
 [mitm]
 hostname = api.rc-backup.com

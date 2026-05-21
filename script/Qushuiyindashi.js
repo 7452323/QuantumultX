@@ -5,10 +5,10 @@
 https://apps.apple.com/cn/app/%E5%8E%BB%E6%B0%B4%E5%8D%B0%E5%A4%A7%E5%B8%88-%E7%9F%AD%E8%A7%86%E9%A2%91%E7%BC%96%E8%BE%91%E5%8A%A9%E6%89%8B/id1424012935
 
 [rewrite_local]
-^https:\/\/wx\.520gyh\.com\/Unmark\/Login\/wxUserInfo url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Qushuiyindashi.js
-^https:\/\/wx\.520gyh\.com\/Unmark\/Login\/wxLoginMarking url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Qushuiyindashi.js
-^https:\/\/wx\.520gyh\.com\/Unmark\/Login\/deviceLogin url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Qushuiyindashi.js
-^https:\/\/wx\.520gyh\.com\/Unmark\/Index\/appCfg url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Qushuiyindashi.js
+^https:\/\/wx\.520gyh\.com\/Unmark\/Login\/wxUserInfo url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Qushuiyindashi.js
+^https:\/\/wx\.520gyh\.com\/Unmark\/Login\/wxLoginMarking url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Qushuiyindashi.js
+^https:\/\/wx\.520gyh\.com\/Unmark\/Login\/deviceLogin url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Qushuiyindashi.js
+^https:\/\/wx\.520gyh\.com\/Unmark\/Index\/appCfg url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Qushuiyindashi.js
 
 [mitm]
 hostname = wx.520gyh.com

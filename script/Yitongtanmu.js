@@ -6,7 +6,7 @@
 https://apps.apple.com/cn/app/%E4%B8%80%E5%90%8C%E5%BC%B9%E5%B9%95/id6747804932
 
 [rewrite_local]
-^https?:\/\/ytbarrage\.sky808\.com\/api\/(user\?method=user_info|index\?method=login_phone) url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Yitongtanmu.js
+^https?:\/\/ytbarrage\.sky808\.com\/api\/(user\?method=user_info|index\?method=login_phone) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Yitongtanmu.js
 
 [mitm]
 hostname = ytbarrage.sky808.com

@@ -1,15 +1,15 @@
 #!name=RevenueCat 通杀（终极版）
 #!desc=通杀所有使用 RevenueCat 的 App，伪造完整订阅响应
-#!author=Reviewa
-#!homepage=https://github.com/Reviewa/QuantumultX
+#!author=7452323
+#!homepage=https://github.com/7452323/QuantumultX
 
 [Script]
 # *.revenuecat.com
-http-response ^https:\/\/([a-z0-9-]+\.)*revenuecat\.com\/(v[12]\/)?(receipts|subscribers\/.+) requires-body=true, script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/RevenueCat.js, tag=RevenueCat通杀
+http-response ^https:\/\/([a-z0-9-]+\.)*revenuecat\.com\/(v[12]\/)?(receipts|subscribers\/.+) requires-body=true, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/RevenueCat.js, tag=RevenueCat通杀
 # api.rc-backup.com (PicSeed等)
-http-response ^https:\/\/api\.rc-backup\.com\/(v[12]\/)?(receipts|subscribers\/.+) requires-body=true, script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/RevenueCat.js, tag=RC-Backup通杀
+http-response ^https:\/\/api\.rc-backup\.com\/(v[12]\/)?(receipts|subscribers\/.+) requires-body=true, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/RevenueCat.js, tag=RC-Backup通杀
 # rc.visionarytech.ltd / revenue.cuto.app
-http-response ^https:\/\/(rc\.visionarytech\.ltd|revenue\.cuto\.app)\/(v[12]\/)?(receipts|subscribers\/.+) requires-body=true, script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/RevenueCat.js, tag=RC其他通杀
+http-response ^https:\/\/(rc\.visionarytech\.ltd|revenue\.cuto\.app)\/(v[12]\/)?(receipts|subscribers\/.+) requires-body=true, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/RevenueCat.js, tag=RC其他通杀
 
 [MITM]
 hostname = %APPEND% *.revenuecat.com, api.rc-backup.com, rc.visionarytech.ltd, revenue.cuto.app

@@ -1,8 +1,8 @@
 #!name=🍎 App Store 解锁
 #!desc=伪装 iTunes 订阅状态，解锁大多数基于 buy.itunes.apple.com / Apple 内购的 App
-#!author=Reviewa
-#!icon=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/icon/itunes.png
-#!homepage=https://github.com/Reviewa/QuantumultX
+#!author=7452323
+#!icon=https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/itunes.png
+#!homepage=https://github.com/7452323/QuantumultX
 #!tag=内购解锁,订阅解锁,工具
 #!system=iOS
 #!loon_version=3.3.3(883)
@@ -11,7 +11,7 @@
 enableUnlock = switch,true,tag=启用解锁脚本,desc=关闭后将停止订阅功能
 
 [script]
-http-response ^https:\/\/buy\.itunes\.apple\.com\/verifyReceipt script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/itunes.js, requires-body=true, tag=🍎 iTunes 解锁, enable={enableUnlock}
+http-response ^https:\/\/buy\.itunes\.apple\.com\/verifyReceipt script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/itunes.js, requires-body=true, tag=🍎 iTunes 解锁, enable={enableUnlock}
 
 [mitm]
 buy.itunes.apple.com

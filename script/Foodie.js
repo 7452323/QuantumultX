@@ -1,6 +1,6 @@
 /*
 [rewrite_local]
-^https:\/\/purchase-foodie-api\.snow\.me\/v1\/purchase\/subscription\/subscriber\/status url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Foodie.js
+^https:\/\/purchase-foodie-api\.snow\.me\/v1\/purchase\/subscription\/subscriber\/status url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Foodie.js
 
 [mitm]
 hostname = purchase-foodie-api.snow.me

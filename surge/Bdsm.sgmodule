@@ -2,7 +2,7 @@
 #!desc=纯鸡巴自慰,没吊用
 
 [Script]
-Bdsm = type=http-response, pattern=^https:\/\/api\.budingscan\.com\/user\/info, script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Bdsm.js, requires-body=true, max-size=-1, timeout=60
+Bdsm = type=http-response, pattern=^https:\/\/api\.budingscan\.com\/user\/info, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js, requires-body=true, max-size=-1, timeout=60
 
 [MITM]
 hostname = %APPEND% api.budingscan.com

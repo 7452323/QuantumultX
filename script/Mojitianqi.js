@@ -1,7 +1,7 @@
 /*
 
 [rewrite_local]
-^https?:\/\/[^\/]+\.api\.moji\.com\/(sns\/json\/profile\/get_info.*|json\/member_new\/homepage_info.*|user\/personal\/json\/profile.*|flycard\/novice|shortvideo\/.*) url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Mojitianqi.js
+^https?:\/\/[^\/]+\.api\.moji\.com\/(sns\/json\/profile\/get_info.*|json\/member_new\/homepage_info.*|user\/personal\/json\/profile.*|flycard\/novice|shortvideo\/.*) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Mojitianqi.js
 
 [mitm]
 hostname = *.api.moji.com

@@ -1,5 +1,5 @@
 /*
-^https?:\/\/api\.rawpixlive\.com\/api\/sign\/profile url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Rawpix.js
+^https?:\/\/api\.rawpixlive\.com\/api\/sign\/profile url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Rawpix.js
 [mitm]
 hostname = api.rawpixlive.com
 */

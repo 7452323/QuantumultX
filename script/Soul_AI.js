@@ -1,31 +1,31 @@
 /*
 Soul App - AI 聊天完全解锁 v8
 [rewrite_local]
-^https?://api-chat\.soulapp\.cn/chat/aigc/privilege/info url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js
-^https?://api-chat\.soulapp\.cn/chat/aigc/charge/page/v2 url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js
-^https?://api-chat\.soulapp\.cn/chat/aigc/preCheckConfig url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js
-^https?://api-chat\.soulapp\.cn/chat/limitInfo url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js
-^https?://api-chat\.soulapp\.cn/chat/user/info url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js
-^https?://api-chat\.soulapp\.cn/chat/session/protect/status/get url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js
-^https?://api-chat\.soulapp\.cn/chat/limit/friendly/check url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js
-^https?://api-chat\.soulapp\.cn/chat/limit/socialGraceScore url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js
-^https?://api-chat\.soulapp\.cn/chat/limit/gift/give url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js
-^https?://api-chat\.soulapp\.cn/chat/limit/gift/info url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js
-^https?://api-chat\.soulapp\.cn/chat/session/quickButtonCheck url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js
-^https?://api-chat\.soulapp\.cn/chat/config/rounds url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js
-^https?://api-chat\.soulapp\.cn/chat/check/privilegeExpireRemind url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js
-^https?://api-chat\.soulapp\.cn/robot/call/remainTimesAndSpeedCards url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js
-^https?://api-pay\.soulapp\.cn/privilege/supervip/status url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js
-^https?://api-pay\.soulapp\.cn/show/superVIP/detail/v2 url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js
-^https?://api-pay\.soulapp\.cn/soul-coin/total url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js
-^https?://api-pay\.soulapp\.cn/soul-coin/total-detail url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js
-^https?://api-pay\.soulapp\.cn/vip/show/info url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js
-^https?://api-pay\.soulapp\.cn/vip/meet/userInfo url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js
-^https?://api-pay\.soulapp\.cn/vip/rights/avatar/qryMyAvatarRights url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js
-^https?://api-pay\.soulapp\.cn/super-vip-day/ url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js
-^https?://api-user\.soulapp\.cn/user/userDetail url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js
-^https?://api-user\.soulapp\.cn/html/user/userDetail url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js
-^https?://api-user\.soulapp\.cn/user/soulmate/status url script-response-body https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js
+^https?://api-chat\.soulapp\.cn/chat/aigc/privilege/info url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul_AI.js
+^https?://api-chat\.soulapp\.cn/chat/aigc/charge/page/v2 url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul_AI.js
+^https?://api-chat\.soulapp\.cn/chat/aigc/preCheckConfig url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul_AI.js
+^https?://api-chat\.soulapp\.cn/chat/limitInfo url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul_AI.js
+^https?://api-chat\.soulapp\.cn/chat/user/info url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul_AI.js
+^https?://api-chat\.soulapp\.cn/chat/session/protect/status/get url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul_AI.js
+^https?://api-chat\.soulapp\.cn/chat/limit/friendly/check url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul_AI.js
+^https?://api-chat\.soulapp\.cn/chat/limit/socialGraceScore url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul_AI.js
+^https?://api-chat\.soulapp\.cn/chat/limit/gift/give url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul_AI.js
+^https?://api-chat\.soulapp\.cn/chat/limit/gift/info url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul_AI.js
+^https?://api-chat\.soulapp\.cn/chat/session/quickButtonCheck url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul_AI.js
+^https?://api-chat\.soulapp\.cn/chat/config/rounds url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul_AI.js
+^https?://api-chat\.soulapp\.cn/chat/check/privilegeExpireRemind url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul_AI.js
+^https?://api-chat\.soulapp\.cn/robot/call/remainTimesAndSpeedCards url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul_AI.js
+^https?://api-pay\.soulapp\.cn/privilege/supervip/status url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul_AI.js
+^https?://api-pay\.soulapp\.cn/show/superVIP/detail/v2 url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul_AI.js
+^https?://api-pay\.soulapp\.cn/soul-coin/total url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul_AI.js
+^https?://api-pay\.soulapp\.cn/soul-coin/total-detail url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul_AI.js
+^https?://api-pay\.soulapp\.cn/vip/show/info url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul_AI.js
+^https?://api-pay\.soulapp\.cn/vip/meet/userInfo url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul_AI.js
+^https?://api-pay\.soulapp\.cn/vip/rights/avatar/qryMyAvatarRights url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul_AI.js
+^https?://api-pay\.soulapp\.cn/super-vip-day/ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul_AI.js
+^https?://api-user\.soulapp\.cn/user/userDetail url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul_AI.js
+^https?://api-user\.soulapp\.cn/html/user/userDetail url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul_AI.js
+^https?://api-user\.soulapp\.cn/user/soulmate/status url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul_AI.js
 
 [mitm]
 hostname = api-chat.soulapp.cn, api-pay.soulapp.cn, api-user.soulapp.cn

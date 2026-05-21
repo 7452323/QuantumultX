@@ -2,7 +2,7 @@
 #!desc=专业拍美食_你值得拥有
 
 [Script]
-Foodie = type=http-response, pattern=^https:\/\/purchase-foodie-api\.snow\.me\/v1\/purchase\/subscription\/subscriber\/status, script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Foodie.js, requires-body=true, max-size=-1, timeout=60
+Foodie = type=http-response, pattern=^https:\/\/purchase-foodie-api\.snow\.me\/v1\/purchase\/subscription\/subscriber\/status, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Foodie.js, requires-body=true, max-size=-1, timeout=60
 
 [MITM]
 hostname = %APPEND% purchase-foodie-api.snow.me

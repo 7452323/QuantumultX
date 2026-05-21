@@ -1,10 +1,10 @@
 #!name=PicSeed
 #!desc=PicSeed 解锁
-#!author=Reviewa
-#!homepage=https://github.com/Reviewa/QuantumultX
+#!author=7452323
+#!homepage=https://github.com/7452323/QuantumultX
 
 [Script]
-http-response ^https://api\.rc-backup\.com/v1/product_entitlement_mapping script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/PicSeed.js, requires-body=true, tag=PicSeed
+http-response ^https://api\.rc-backup\.com/v1/product_entitlement_mapping script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/PicSeed.js, requires-body=true, tag=PicSeed
 
 [MITM]
 hostname = api.rc-backup.com

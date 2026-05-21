@@ -2,7 +2,7 @@
 #!desc=墨迹天气VIP
 
 [Script]
-Mojitianqi = type=http-response, pattern=^https?:\/\/[^\/]+\.api\.moji\.com\/(sns\/json\/profile\/get_info.*|json\/member_new\/homepage_info.*|user\/personal\/json\/profile.*|flycard\/novice|shortvideo\/.*), script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Mojitianqi.js, requires-body=true, max-size=-1, timeout=60
+Mojitianqi = type=http-response, pattern=^https?:\/\/[^\/]+\.api\.moji\.com\/(sns\/json\/profile\/get_info.*|json\/member_new\/homepage_info.*|user\/personal\/json\/profile.*|flycard\/novice|shortvideo\/.*), script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Mojitianqi.js, requires-body=true, max-size=-1, timeout=60
 
 [MITM]
 hostname = %APPEND% *.api.moji.com
