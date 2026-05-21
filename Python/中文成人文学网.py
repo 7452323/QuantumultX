@@ -33,39 +33,46 @@ def safe_fn(name,ext=".txt"):
     name=unicodedata.normalize("NFKD",name); name=re.sub(r"[^\w\s-]","",name).strip().replace(" ","_")
     return name+ext if name else "novel"+ext
 
-def get_articles(label_url):
-    """从搜索标签页提取所有真实文章链接"""
+def get_articles(label_url, depth=0):
+    """递归从标签页提取所有真实文章链接"""
+    if depth > 3: return []
     articles=[]
     for domain in ["book.xbookcn.net","blog.xbookcn.net"]:
         url=label_url.replace("book.xbookcn.net",domain)
-        print(f"📄 {url[:80]}...")
+        if depth == 0: print(f"📄 标签页: {url[:80]}...")
         html=fetch(url)
         if not html: continue
         soup=BeautifulSoup(html,"html.parser")
+        sub_labels=[]
         for a in soup.find_all("a",href=True):
             h=a["href"]; t=a.get_text(strip=True)
             if not h or not t or len(t)<5 or len(t)>50: continue
-            if "/search/label/" in h or "/2000/01/" in h: continue
+            # 如果是子标签页，递归
+            if "/search/label/" in h:
+                if t not in [s[1] for s in sub_labels]:
+                    sub_labels.append((t,h))
+                continue
+            # 真实文章URL
             if "xbookcn.net/20" in h or re.search(r'/20[0-9][0-9]/[0-9][0-9]/',h):
-                articles.append((t,h))
-        if articles:
-            break
-    print(f"  ✅ {len(articles)} 篇文章")
+                if (t,h) not in articles:
+                    articles.append((t,h))
+        # 递归采集子标签
+        if sub_labels:
+            seen_labels=set()
+            for st,su in sub_labels:
+                if st in seen_labels: continue
+                seen_labels.add(st)
+                print(f"  📂 子标签: {st[:30]}...")
+                subs=get_articles(su, depth+1)
+                for item in subs:
+                    if item not in articles:
+                        articles.append(item)
+        if articles: break
+    if depth==0: print(f"  📊 共 {len(articles)} 篇文章")
     return articles
 
 def extract_text(url):
-    """提取正文：如果是标签页则递归采集子文章"""
-    if "/search/label/" in url:
-        subs=get_articles(url)
-        if not subs: return "标签页下无文章"
-        parts=[]
-        for t,u in subs:
-            print(f"  📄 {t[:35]}")
-            c=extract_text(u)
-            if "提取失败" not in c and len(re.findall(r'[\u4e00-\u9fff]',c))>10:
-                parts.append(f"\n\n=== {t} ===\n\n{c}")
-        return "\n".join(parts) if parts else "无有效内容"
-
+    """提取文章正文"""
     print(f"🔍 {url[:70]}...")
     html=fetch(url)
     if not html: return "提取失败"
