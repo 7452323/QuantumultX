@@ -1,0 +1,39 @@
+#!name=Soul AI 完全解锁 v8
+#!desc=Soul超级VIP+AI聊天无限电量+聊天送礼限制全解锁
+#!author=Reviewa
+#!homepage=https://github.com/Reviewa/QuantumultX
+
+[Script]
+# === AI 聊天特权 ===
+Soul_AIGC_Privilege = type=http-response,pattern=^https?:\/\/api-chat\.soulapp\.cn\/chat\/aigc\/privilege\/info,script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js,requires-body=true
+Soul_AIGC_Charge = type=http-response,pattern=^https?:\/\/api-chat\.soulapp\.cn\/chat\/aigc\/charge\/page\/v2,script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js,requires-body=true
+Soul_AIGC_Config = type=http-response,pattern=^https?:\/\/api-chat\.soulapp\.cn\/chat\/aigc\/preCheckConfig,script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js,requires-body=true
+
+# === 聊天限制 ===
+Soul_Chat_Limit = type=http-response,pattern=^https?:\/\/api-chat\.soulapp\.cn\/chat\/limitInfo,script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js,requires-body=true
+Soul_Chat_UserInfo = type=http-response,pattern=^https?:\/\/api-chat\.soulapp\.cn\/chat\/user\/info,script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js,requires-body=true
+Soul_Chat_Protect = type=http-response,pattern=^https?:\/\/api-chat\.soulapp\.cn\/chat\/session\/protect\/status\/get,script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js,requires-body=true
+Soul_Chat_Friendly = type=http-response,pattern=^https?:\/\/api-chat\.soulapp\.cn\/chat\/limit\/friendly\/check,script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js,requires-body=true
+Soul_Chat_GraceScore = type=http-response,pattern=^https?:\/\/api-chat\.soulapp\.cn\/chat\/limit\/socialGraceScore,script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js,requires-body=true
+Soul_Chat_GiftGive = type=http-response,pattern=^https?:\/\/api-chat\.soulapp\.cn\/chat\/limit\/gift\/give,script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js,requires-body=true
+Soul_Chat_GiftInfo = type=http-response,pattern=^https?:\/\/api-chat\.soulapp\.cn\/chat\/limit\/gift\/info,script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js,requires-body=true
+Soul_Chat_QuickBtn = type=http-response,pattern=^https?:\/\/api-chat\.soulapp\.cn\/chat\/session\/quickButtonCheck,script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js,requires-body=true
+Soul_Chat_Rounds = type=http-response,pattern=^https?:\/\/api-chat\.soulapp\.cn\/chat\/config\/rounds,script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js,requires-body=true
+Soul_Chat_ExpireRemind = type=http-response,pattern=^https?:\/\/api-chat\.soulapp\.cn\/chat\/check\/privilegeExpireRemind,script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js,requires-body=true
+Soul_Chat_Robot = type=http-response,pattern=^https?:\/\/api-chat\.soulapp\.cn\/robot\/call\/remainTimesAndSpeedCards,script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js,requires-body=true
+
+# === 支付/会员 ===
+Soul_Pay_SuperVIP = type=http-response,pattern=^https?:\/\/api-pay\.soulapp\.cn\/privilege\/supervip\/status,script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js,requires-body=true
+Soul_Pay_VIPDetail = type=http-response,pattern=^https?:\/\/api-pay\.soulapp\.cn\/show\/superVIP\/detail\/v2,script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js,requires-body=true
+Soul_Pay_CoinTotal = type=http-response,pattern=^https?:\/\/api-pay\.soulapp\.cn\/soul\-coin\/total,script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js,requires-body=true
+Soul_Pay_CoinDetail = type=http-response,pattern=^https?:\/\/api-pay\.soulapp\.cn\/soul\-coin\/total\-detail,script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js,requires-body=true
+Soul_Pay_VIPShow = type=http-response,pattern=^https?:\/\/api-pay\.soulapp\.cn\/vip\/show\/info,script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js,requires-body=true
+Soul_Pay_MeetUser = type=http-response,pattern=^https?:\/\/api-pay\.soulapp\.cn\/vip\/meet\/userInfo,script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js,requires-body=true
+Soul_Pay_Avatar = type=http-response,pattern=^https?:\/\/api-pay\.soulapp\.cn\/vip\/rights\/avatar\/qryMyAvatarRights,script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js,requires-body=true
+Soul_Pay_SuperVIPDay = type=http-response,pattern=^https?:\/\/api-pay\.soulapp\.cn\/super\-vip\-day\/,script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js,requires-body=true
+
+# === 用户 ===
+Soul_User_Detail = type=http-response,pattern=^https?:\/\/api-user\.soulapp\.cn\/(html\/user\/userDetail|user\/userDetail|user\/soulmate\/status),script-path=https://raw.githubusercontent.com/Reviewa/QuantumultX/main/script/Soul_AI.js,requires-body=true
+
+[MITM]
+hostname = %APPEND% api-chat.soulapp.cn, api-pay.soulapp.cn, api-user.soulapp.cn
