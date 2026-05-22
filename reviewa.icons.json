@@ -3,6 +3,10 @@
   "description": "收集一些自己脚本用到的图标",
   "icons": [
     {
+      "name": "角色扮演.png",
+      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/角色扮演.png"
+    },
+    {
       "name": "QuantumultX.png",
       "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/QuantumultX.png"
     },
