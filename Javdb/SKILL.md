@@ -23,12 +23,12 @@ metadata:
 ### Step 1: 调用查询脚本
 
 ```bash
-node scripts/javdb_lookup.mjs <番号>
+node scripts/javdb_lookup.js <番号>
 ```
 
 **示例：**
 ```bash
-node scripts/javdb_lookup.mjs SONE-001
+node scripts/javdb_lookup.js SONE-001
 ```
 
 **返回 JSON 格式：**
