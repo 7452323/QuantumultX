@@ -4,6 +4,13 @@
 
 一键查询番号详细信息，自动翻译标签为简体中文。
 
+**支持三种使用方式：**
+1. 🖥️ **命令行** — 服务器上直接跑
+2. 🤖 **Telegram Bot** — 发 `/av 番号` 秒查
+3. 🦞 **OpenClaw Agent** — 跟 AI 说一声就查
+
+---
+
 ## ✨ 功能
 
 - 🔍 输入番号，秒查详情
@@ -14,30 +21,26 @@
 
 ---
 
-## 🚀 快速开始（命令行使用）
+## 🚀 方式一：命令行使用
 
 ### 第1步：安装 Node.js
 
 **Ubuntu / Debian：**
-
 ```bash
 sudo apt update && sudo apt install -y nodejs curl
 ```
 
 **CentOS / Rocky / Alma：**
-
 ```bash
 sudo yum install -y nodejs curl
 ```
 
 **macOS：**
-
 ```bash
 brew install node
 ```
 
 **Windows：**
-
 去 https://nodejs.org 下载安装包，一路下一步安装。
 
 ---
@@ -45,13 +48,8 @@ brew install node
 ### 第2步：下载脚本和翻译表
 
 ```bash
-# 创建文件夹
 mkdir -p ~/javdb && cd ~/javdb
-
-# 下载脚本
 wget https://raw.githubusercontent.com/7452323/QuantumultX/main/Javdb/av.mjs
-
-# 下载翻译表
 wget https://raw.githubusercontent.com/7452323/QuantumultX/main/Javdb/tags.json
 ```
 
@@ -71,87 +69,56 @@ cd ~/javdb && node av.mjs /av SONE-763
 
 ### 第4步（可选）：设置快捷命令
 
-每次都要打 `cd ~/javdb && node av.mjs` 太长了，设置一个别名：
-
 ```bash
 echo "alias av='node ~/javdb/av.mjs'" >> ~/.bashrc && source ~/.bashrc
 ```
 
 之后只需：
-
 ```bash
 av /av SONE-763
 ```
 
 ---
 
-## 🤖 接入 Telegram Bot（傻瓜式教程）
+## 🤖 方式二：接入 Telegram Bot
 
 按照下面的步骤一步步做，就能在 Telegram 里用 `/av 番号` 查了。
 
-### 第1步：创建一个 Telegram Bot
+### 第1步：创建 Bot
 
-1. 打开 Telegram，搜索 **[@BotFather](https://t.me/BotFather)**
+1. 打开 Telegram，搜索 [@BotFather](https://t.me/BotFather)
 2. 发送 `/newbot`
-3. 按提示给你的 Bot 取个名字（比如 `番号查询机器人`）
-4. 再取一个用户名（必须以 `bot` 结尾，比如 `myavbot`）
-5. 创建成功后，**BotFather 会给你一个 Token**，像这样：
-
-```
-1234567890:ABCdefGHIJklmNOPqrstUVwxyz-1234567
-```
-
-**把这个 Token 复制下来，后面要用。**
+3. 取名字 → 取用户名（以 `bot` 结尾）
+4. BotFather 给你一个 **Token**，像这样：
+   ```
+   1234567890:ABCdefGHIJklmNOPqrstUVwxyz-1234567
+   ```
 
 ---
 
-### 第2步：登录服务器
-
-先用 SSH 登录到你的服务器：
+### 第2步：装环境和下载文件
 
 ```bash
-ssh 用户名@你的服务器IP
-```
-
----
-
-### 第3步：安装 Node.js（如果没装过）
-
-```bash
+# 装 Node.js
 sudo apt update && sudo apt install -y nodejs curl
-```
 
----
-
-### 第4步：创建项目文件夹并下载文件
-
-```bash
+# 创建项目文件夹
 mkdir -p ~/javdb && cd ~/javdb
+
+# 下载文件
 wget https://raw.githubusercontent.com/7452323/QuantumultX/main/Javdb/av.mjs
 wget https://raw.githubusercontent.com/7452323/QuantumultX/main/Javdb/tags.json
+
+# 初始化项目
+npm init -y
+
+# 安装 Bot 框架
+npm install telegraf
 ```
 
 ---
 
-### 第5步：初始化 Node 项目
-
-```bash
-cd ~/javdb && npm init -y
-```
-
----
-
-### 第6步：安装 Telegraf（Bot 框架）
-
-```bash
-cd ~/javdb && npm install telegraf
-```
-
----
-
-### 第7步：创建 Bot 启动脚本
-
-执行下面这条命令，一键创建 `bot.mjs`：
+### 第3步：创建 Bot 启动脚本
 
 ```bash
 cat > ~/javdb/bot.mjs << 'BOTEOF'
@@ -193,107 +160,133 @@ BOTEOF
 
 ---
 
-### 第8步：修改 Token
-
-用下面命令打开 `bot.mjs`，把第14行的 Token 换成你自己的：
+### 第4步：修改 Token
 
 ```bash
 nano ~/javdb/bot.mjs
 ```
 
-找到这一行：
-
-```javascript
-const BOT_TOKEN = "1234567890:ABCdefGHIJklmNOPqrstUVwxyz-1234567";
-```
-
-改成 BotFather 给你的 Token，然后按：
-- `Ctrl + X` → `Y` → `回车` 保存退出
-
-> 不会用 nano？也可以用 `vi` 或 `vim`，或者用 WinSCP 等工具直接编辑。
+找到 `BOT_TOKEN` 那一行，换成你自己的 Token。
+`Ctrl + X` → `Y` → `回车` 保存退出。
 
 ---
 
-### 第9步：启动 Bot
+### 第5步：启动
 
 ```bash
 cd ~/javdb && node bot.mjs
 ```
 
-看到 `🤖 Bot 已启动` 就说明成功了！
-
-**保持这个终端窗口不要关**，或者用 `screen` / `tmux` / `pm2` 让它后台运行。
+看到 `🤖 Bot 已启动` 就成功了！
 
 ---
 
-### 第10步：后台运行（关掉终端也不停）
+### 第6步：后台运行（关掉终端也不停）
 
-**方法一：使用 screen（推荐）**
-
+**方法一：screen**
 ```bash
-# 安装 screen
 sudo apt install -y screen
-
-# 创建后台会话
 screen -dmS javbot bash -c "cd ~/javdb && node bot.mjs"
+screen -r javbot  # 查看日志，Ctrl+A 然后 D 退出查看
 ```
 
-以后要查看日志：
-
+**方法二：pm2（更稳定，支持开机自启）**
 ```bash
-screen -r javbot
-```
-
-按 `Ctrl + A` 然后 `D` 可以退出查看但不停止。
-
-**方法二：使用 pm2（更稳定）**
-
-```bash
-# 安装 pm2
 sudo npm install -g pm2
-
-# 启动
 cd ~/javdb && pm2 start bot.mjs --name javbot
-
-# 设置开机自启
 pm2 save && pm2 startup
-```
-
-常用命令：
-
-```bash
-pm2 logs javbot    # 查看日志
-pm2 restart javbot # 重启
-pm2 stop javbot    # 停止
+pm2 logs javbot     # 查看日志
+pm2 restart javbot  # 重启
+pm2 stop javbot     # 停止
 ```
 
 ---
 
-### 第11步：在 Telegram 中使用
+### 第7步：在 Telegram 中使用
 
-打开 Telegram，找到你刚创建的 Bot，发送：
+打开你的 Bot，发送 `/av SONE-763`，就会收到查询结果！
 
-```
-/av SONE-763
-```
+---
 
-就会收到回复：
+## 🦞 方式三：OpenClaw Agent 使用
 
-```
-🎬 SONE-763
+如果你是 OpenClaw 用户（龙虾），可以直接让 AI 助手帮你查番号。
 
-标题: SONE-763
-导演: 宝瀬博教
-片商: S1 NO.1 STYLE
-日期: 2025-06-24
-评分: ★★★★☆
-演员: 河北彩花、フランクフルト林
-标签: 各种职业、荡妇、单体作品、女上位、戏剧、淫语
-播放: https://javdb.com/v/a8yV0p
-封面: https://c0.jdbstatic.com/covers/a8/a8yV0p.jpg
+### 安装方法一：从 ClawHub 安装（推荐）
+
+```bash
+openclaw skills install javdb-lookup
 ```
 
-**搞定！🎉**
+> 如果 ClawHub 上没有，可以用方法二。
+
+### 安装方法二：手动克隆到技能目录
+
+```bash
+# 进入 OpenClaw 技能目录
+cd ~/.openclaw/workspace/skills
+
+# 克隆仓库或直接下载
+git clone https://github.com/7452323/QuantumultX.git tmp_javdb
+cp -r tmp_javdb/Javdb ./javdb-lookup
+rm -rf tmp_javdb
+
+# 或者直接下载 Javdb 文件夹
+wget -O ~/.openclaw/workspace/skills/javdb-lookup/SKILL.md \
+  https://raw.githubusercontent.com/7452323/QuantumultX/main/Javdb/SKILL.md
+```
+
+### 安装方法三：QuantumultX 仓库已有，直接引用
+
+如果你已经 clone 了 `7452323/QuantumultX` 仓库：
+```bash
+# 量子里的 Javdb 文件夹已经包含全部文件
+ls ~/QuantumultX/Javdb/
+# → av.mjs  README.md  scripts/  tags.json
+```
+
+### 使用方式
+
+装好后，直接对 AI 说：
+
+> 帮我查一下番号 SONE-763
+> 
+> 查番号 IPX-999
+> 
+> javdb 搜一下 ABW-334
+
+AI 会自动运行脚本查询并返回结果，包括标题、评分、演员、标签、封面链接等。
+
+### 依赖检查
+
+首次使用前确保以下依赖已安装：
+
+```bash
+# Node.js（已有则跳过）
+node --version
+
+# Python 翻译库（用于日文→中文）
+pip install googletrans==4.0.0-rc1
+pip install opencc-python-reimplemented
+
+# curl
+curl --version
+```
+
+### 文件结构说明
+
+```
+Javdb/
+├── README.md           ← 本文件（使用说明）
+├── SKILL.md            ← OpenClaw 技能定义（Agent 读取用）
+├── av.mjs              ← 主查询脚本（支持 CLI 和 Agent 调用）
+├── tags.json           ← 翻译对照表（勿修改）
+└── scripts/
+    └── javdb_lookup.js ← Agent 专用查询脚本（JSON 格式输出，供程序解析）
+```
+
+- **av.mjs**：命令行和 Telegram Bot 使用，输出人类可读的文字
+- **scripts/javdb_lookup.js**：OpenClaw Agent 使用，输出 JSON 供程序解析
 
 ---
 
@@ -345,6 +338,6 @@ pm2 stop javbot    # 停止
 
 ---
 
-## 📄 许可证
+## 📄 许可
 
 MIT
