@@ -1,40 +1,44 @@
 {
-  "iconImage" : null,
-  "entry" : "index.tsx",
-  "description" : null,
-  "author" : null,
+  "iconImage" : "https:\/\/raw.githubusercontent.com\/7452323\/QuantumultX\/main\/icon\/GitHub.png",
   "remoteResource" : null,
+  "description" : "",
   "color" : "rgba(128, 138, 148,1)",
-  "version" : "1.0.0",
   "icon" : "level.fill",
-  "intentInputTypes" : [
-
-  ],
-  "name" : "Github上传",
   "runInApp" : false,
+  "entry" : "index.tsx",
+  "localizedDescriptions" : {
+    "fr" : "",
+    "it" : "",
+    "es" : "",
+    "pt" : "",
+    "zh" : "",
+    "de" : "",
+    "ja" : "",
+    "en" : "",
+    "ru" : ""
+  },
+  "localizedNames" : {
+    "pt" : "",
+    "zh" : "",
+    "it" : "",
+    "en" : "",
+    "de" : "",
+    "ru" : "",
+    "fr" : "",
+    "ja" : "",
+    "es" : ""
+  },
   "contributors" : [
 
   ],
-  "localizedNames" : {
-    "de" : "",
-    "ja" : "",
-    "es" : "",
-    "en" : "",
-    "fr" : "",
-    "ru" : "",
-    "it" : "",
-    "zh" : "",
-    "pt" : ""
-  },
-  "localizedDescriptions" : {
-    "de" : "",
-    "ja" : "",
-    "es" : "",
-    "en" : "",
-    "fr" : "",
-    "ru" : "",
-    "it" : "",
-    "zh" : "",
-    "pt" : ""
+  "version" : "1.0.0",
+  "name" : "Github上传",
+  "intentInputTypes" : [
+
+  ],
+  "author" : {
+    "homepage" : null,
+    "email" : null,
+    "name" : "7452323"
   }
 }
