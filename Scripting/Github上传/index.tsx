@@ -8,6 +8,7 @@
 import {
   Button,
   HStack,
+  Image,
   List,
   Navigation,
   NavigationStack,
@@ -17,6 +18,8 @@ import {
   Spacer,
   Text,
   TextField,
+  Toolbar,
+  ToolbarItem,
   VStack,
   Divider,
   useState,
@@ -125,6 +128,7 @@ function UploadPage() {
   const [uploadHistory, setUploadHistory] = useState<UploadRecord[]>(Storage.get<UploadRecord[]>(STORAGE_KEYS.history) ?? [])
   const [userInfo, setUserInfo] = useState('')
   const [savedToast, setSavedToast] = useState('')
+  const [showSettings, setShowSettings] = useState(false)
 
   // ── Load user info ──
   useEffect(() => {
@@ -332,90 +336,171 @@ function UploadPage() {
       <List
         navigationTitle="GitHub 上传"
         navigationBarTitleDisplayMode="inline"
-        toolbar={{
-          cancellationAction: <Button title="关闭" action={dismiss} />,
+        glassEffect={true}
+        toolbar={
+          <Toolbar>
+            <ToolbarItem placement="cancellationAction">
+              <Button title="关闭" action={dismiss} />
+            </ToolbarItem>
+            <ToolbarItem placement="topBarTrailing">
+              <Button
+                action={() => setShowSettings(true)}
+              >
+                <Image systemName="gearshape.fill" font={20} />
+              </Button>
+            </ToolbarItem>
+          </Toolbar>
+        }
+        sheet={{
+          isPresented: showSettings,
+          onChanged: setShowSettings,
+          content: (
+            <NavigationStack>
+              <List
+                navigationTitle="设置"
+                navigationBarTitleDisplayMode="inline"
+                toolbar={{
+                  cancellationAction: (
+                    <Button title="完成" action={() => setShowSettings(false)} />
+                  ),
+                }}
+              >
+                {/* ── Repository Config ── */}
+                <Section
+                  header={
+                    <HStack>
+                      <Image
+                        systemName="tray.full.fill"
+                        foregroundStyle="systemBlue"
+                        font={14}
+                      />
+                      <Text fontWeight="semibold">仓库配置</Text>
+                    </HStack>
+                  }
+                >
+                  <TextField
+                    title="Owner"
+                    value={owner}
+                    onChanged={(v) => { setOwner(v); saveField(STORAGE_KEYS.owner, v) }}
+                    prompt="GitHub 用户名"
+                  />
+                  <TextField
+                    title="Repo"
+                    value={repo}
+                    onChanged={(v) => { setRepo(v); saveField(STORAGE_KEYS.repo, v) }}
+                    prompt="仓库名称"
+                  />
+                  <TextField
+                    title="Branch"
+                    value={branch}
+                    onChanged={(v) => { setBranch(v); saveField(STORAGE_KEYS.branch, v) }}
+                    prompt="分支名，留空默认 main"
+                  />
+                  <TextField
+                    title="仓库内路径"
+                    value={uploadPath}
+                    onChanged={(v) => { setUploadPath(v); saveField(STORAGE_KEYS.uploadPath, v) }}
+                    prompt="例如 Scripting/"
+                  />
+                </Section>
+
+                {/* ── Auto Folder ── */}
+                <Section
+                  header={
+                    <HStack>
+                      <Image
+                        systemName="folder.badge.plus"
+                        foregroundStyle="systemTeal"
+                        font={14}
+                      />
+                      <Text fontWeight="semibold">自动创建文件夹</Text>
+                    </HStack>
+                  }
+                >
+                  <TextField
+                    title="文件夹名称"
+                    value={folderName}
+                    onChanged={(v) => { setFolderName(v); saveField(STORAGE_KEYS.folderName, v) }}
+                    prompt="例如 生日、壁纸、备份"
+                  />
+                  {folderName.trim() || uploadPath.trim() ? (
+                    <HStack padding={{ top: 4 }}>
+                      <Image
+                        systemName="arrow.turn.down.right"
+                        foregroundStyle="secondaryLabel"
+                        font={12}
+                      />
+                      <Text font={12} foregroundStyle="secondaryLabel">
+                        {exampleDest}
+                      </Text>
+                    </HStack>
+                  ) : null}
+                </Section>
+
+                {/* ── Commit Message ── */}
+                <Section
+                  header={
+                    <HStack>
+                      <Image
+                        systemName="pencil.and.list.clipboard"
+                        foregroundStyle="systemOrange"
+                        font={14}
+                      />
+                      <Text fontWeight="semibold">提交信息</Text>
+                    </HStack>
+                  }
+                >
+                  <TextField
+                    title="Commit 信息"
+                    value={commitMsg}
+                    onChanged={(v) => { setCommitMsg(v); saveField(STORAGE_KEYS.commitMessage, v) }}
+                    prompt="提交说明文字"
+                  />
+                  <HStack padding={{ top: 8 }}>
+                    <Button
+                      title="保存设置"
+                      action={() => { saveSettings(); setShowSettings(false) }}
+                      tint="systemBlue"
+                    />
+                    {savedToast ? (
+                      <Text font={12} foregroundStyle="secondaryLabel">
+                        {savedToast}
+                      </Text>
+                    ) : null}
+                  </HStack>
+                </Section>
+              </List>
+            </NavigationStack>
+          ),
         }}
       >
         {/* ── User Info ── */}
         {userInfo ? (
           <Section>
-            <HStack>
-              <Text>{userInfo}</Text>
+            <HStack padding={{ vertical: 4 }}>
+              <Image
+                systemName="person.circle.fill"
+                foregroundStyle="systemBlue"
+                font={20}
+              />
+              <Text fontWeight="medium" foregroundStyle="secondaryLabel">
+                {userInfo.replace('👤 ', '')}
+              </Text>
               <Spacer />
             </HStack>
           </Section>
         ) : null}
 
-        {/* ── Repository Config ── */}
-        <Section header={<Text>📦 仓库配置</Text>}>
-          <TextField
-            title="Owner"
-            value={owner}
-            onChanged={(v) => { setOwner(v); saveField(STORAGE_KEYS.owner, v) }}
-            prompt="填写你的 GitHub 用户名"
-          />
-          <Text>Owner 是仓库所属的用户或组织名，例如 7452323</Text>
-
-          <TextField
-            title="Repo"
-            value={repo}
-            onChanged={(v) => { setRepo(v); saveField(STORAGE_KEYS.repo, v) }}
-            prompt="填写仓库名称"
-          />
-          <Text>Repo 是要上传到的目标仓库名，例如 QuantumultX</Text>
-
-          <TextField
-            title="Branch"
-            value={branch}
-            onChanged={(v) => { setBranch(v); saveField(STORAGE_KEYS.branch, v) }}
-            prompt="填写分支名，留空默认为 main"
-          />
-          <Text>Branch 是仓库的分支，不填则使用默认分支（通常是 main）</Text>
-
-          <TextField
-            title="仓库内路径"
-            value={uploadPath}
-            onChanged={(v) => { setUploadPath(v); saveField(STORAGE_KEYS.uploadPath, v) }}
-            prompt="例如 Scripting/"
-          />
-          <Text>仓库内路径是文件存放的固定目录，例如 Scripting/，留空则传到仓库根目录</Text>
-        </Section>
-
-        {/* ── Auto Folder ── */}
-        <Section header={<Text>📁 自动创建文件夹</Text>}>
-          <TextField
-            title="文件夹名称"
-            value={folderName}
-            onChanged={(v) => { setFolderName(v); saveField(STORAGE_KEYS.folderName, v) }}
-            prompt="输入本次上传的文件夹名，例如 生日"
-          />
-          <Text>在此输入文件夹名称（如 生日、壁纸、备份），系统会自动在该路径下创建文件夹并将文件放入其中</Text>
-
-          {folderName.trim() || uploadPath.trim() ? (
-            <Text>
-              文件将上传到：{exampleDest}
-            </Text>
-          ) : null}
-        </Section>
-
-        {/* ── Commit Message ── */}
-        <Section header={<Text>📝 提交信息</Text>}>
-          <TextField
-            title="Commit 信息"
-            value={commitMsg}
-            onChanged={(v) => { setCommitMsg(v); saveField(STORAGE_KEYS.commitMessage, v) }}
-            prompt="填写本次提交的描述信息"
-          />
-          <Text>Commit 信息是 Git 提交时附带的说明文字，描述本次上传的内容或原因</Text>
-          <Button title="💾 保存设置" action={saveSettings} />
-          {savedToast ? <Text>{savedToast}</Text> : null}
-        </Section>
-
         {/* ── File Selection ── */}
         <Section
           header={
             <HStack>
-              <Text>📎 选择文件</Text>
+              <Image
+                systemName="doc.badge.plus"
+                foregroundStyle="systemGreen"
+                font={14}
+              />
+              <Text fontWeight="semibold">选择文件</Text>
               <Spacer />
               {files.length > 0 ? (
                 <Button title="清除全部" action={clearFiles} />
@@ -423,52 +508,80 @@ function UploadPage() {
             </HStack>
           }
         >
-          <Button title="📂 从文件选择" action={pickFiles} />
-          <Text>点击上方按钮从 iPhone「文件」App 中选择要上传的文件，可多选</Text>
+          <Button title="从文件选择" action={pickFiles} />
 
           {files.length === 0 ? (
-            <Text>尚未选择文件</Text>
-          ) : (
-            files.map((file, index) => (
-              <HStack key={index}>
-                <VStack>
-                  <Text>{file.name}</Text>
-                  <Text>{formatSize(file.size)}</Text>
-                </VStack>
-                <Spacer />
-                <Button title="✕" action={() => removeFile(index)} />
-              </HStack>
-            ))
-          )}
-
-          {files.length > 0 ? (
-            <Text>
-              共 {files.length} 个文件，总计 {formatSize(totalSize)}，点击 ✕ 可移除
+            <Text font={12} foregroundStyle="tertiaryLabel">
+              尚未选择文件
             </Text>
-          ) : null}
+          ) : (
+            <VStack>
+              {files.map((file, index) => (
+                <HStack key={index} padding={{ vertical: 4 }}>
+                  <Image
+                    systemName="doc.fill"
+                    foregroundStyle="secondaryLabel"
+                    font={18}
+                  />
+                  <VStack>
+                    <Text lineLimit={1}>
+                      {file.name}
+                    </Text>
+                    <Text font={12} foregroundStyle="secondaryLabel">
+                      {formatSize(file.size)}
+                    </Text>
+                  </VStack>
+                  <Spacer />
+                  <Button
+                    title="移除"
+                    action={() => removeFile(index)}
+                  />
+                </HStack>
+              ))}
+              <Text font={12} foregroundStyle="secondaryLabel" padding={{ top: 2 }}>
+                共 {files.length} 个文件，总计 {formatSize(totalSize)}
+              </Text>
+            </VStack>
+          )}
         </Section>
 
         {/* ── Upload ── */}
-        <Section header={<Text>🚀 上传</Text>}>
-          <Text>确认以上配置无误后，点击下方按钮开始上传到 GitHub</Text>
-
+        <Section
+          header={
+            <HStack>
+              <Image
+                systemName="arrow.up.doc.fill"
+                foregroundStyle="systemBlue"
+                font={14}
+              />
+              <Text fontWeight="semibold">上传</Text>
+            </HStack>
+          }
+        >
           <Button
-            title={uploading ? '上传中...' : '⬆️ 上传到 GitHub'}
+            title={uploading ? '上传中...' : '上传到 GitHub'}
             action={doUpload}
             disabled={uploading}
+            tint={uploading ? undefined : 'systemBlue'}
           />
 
           {uploading ? (
-            <VStack>
+            <VStack padding={{ top: 8 }}>
               <ProgressView />
-              <Text>{uploadProgress}</Text>
-              <Text>
+              <Text font={12} foregroundStyle="secondaryLabel">
+                {uploadProgress}
+              </Text>
+              <Text font={12} foregroundStyle="secondaryLabel">
                 {uploadedCount} / {totalCount}
               </Text>
             </VStack>
           ) : null}
 
-          {resultMessage ? <Text>{resultMessage}</Text> : null}
+          {resultMessage ? (
+            <Text font={12} padding={{ top: 4 }}>
+              {resultMessage}
+            </Text>
+          ) : null}
         </Section>
 
         {/* ── Upload History ── */}
@@ -476,7 +589,12 @@ function UploadPage() {
           <Section
             header={
               <HStack>
-                <Text>📜 上传历史</Text>
+                <Image
+                  systemName="clock.arrow.circlepath"
+                  foregroundStyle="systemIndigo"
+                  font={14}
+                />
+                <Text fontWeight="semibold">上传历史</Text>
                 <Spacer />
                 <Button title="清空" action={clearHistory} />
               </HStack>
@@ -484,16 +602,22 @@ function UploadPage() {
           >
             {uploadHistory.slice(0, 10).map((record, index) => (
               <VStack key={index}>
-                <HStack>
-                  <Text>
-                    {record.status === 'success' ? '✅' : '❌'}
-                  </Text>
-                  <Text>{record.fileName}</Text>
+                <HStack padding={{ vertical: 2 }}>
+                  <Image
+                    systemName={record.status === 'success' ? 'checkmark.circle.fill' : 'xmark.circle.fill'}
+                    foregroundStyle={record.status === 'success' ? 'systemGreen' : 'systemRed'}
+                    font={16}
+                  />
+                  <Text lineLimit={1}>{record.fileName}</Text>
                   <Spacer />
-                  <Text>{record.time}</Text>
+                  <Text font={11} foregroundStyle="tertiaryLabel">
+                    {record.time}
+                  </Text>
                 </HStack>
                 {record.status === 'error' ? (
-                  <Text>{record.message}</Text>
+                  <Text font={12} foregroundStyle="systemRed">
+                    {record.message}
+                  </Text>
                 ) : null}
                 <Divider />
               </VStack>
@@ -502,14 +626,30 @@ function UploadPage() {
         ) : null}
 
         {/* ── Info ── */}
-        <Section header={<Text>ℹ️ 说明</Text>}>
-          <Text>使用 GitHub API 将文件上传到指定仓库。</Text>
-          <Text>1. 在「设置 → GitHub」中配置 Personal Access Token</Text>
-          <Text>2. 填写仓库信息（Owner / Repo / Branch）+ 仓库内路径</Text>
-          <Text>3. 输入文件夹名称，系统自动创建并上传文件到该目录</Text>
-          <Text>4. 选择文件并上传</Text>
-          <Text>5. 同名文件自动检测并更新（🔄），新文件自动创建（🆕）</Text>
-          <Text>支持所有文件类型，单文件不超过 GitHub API 限制（~25MB）。</Text>
+        <Section
+          header={
+            <HStack>
+              <Image
+                systemName="info.circle"
+                foregroundStyle="secondaryLabel"
+                font={14}
+              />
+              <Text fontWeight="semibold">说明</Text>
+            </HStack>
+          }
+        >
+          <VStack foregroundStyle="secondaryLabel">
+            <Text font={12}>
+              使用 GitHub API 将文件上传到指定仓库。
+            </Text>
+            <Text font={12}>1. 在「设置 → GitHub」中配置 Personal Access Token</Text>
+            <Text font={12}>2. 在右上角「设置」中填写仓库信息</Text>
+            <Text font={12}>3. 选择文件并上传</Text>
+            <Text font={12}>4. 同名文件自动更新，新文件自动创建</Text>
+            <Text font={12} foregroundStyle="tertiaryLabel">
+              支持所有文件类型，单文件 ≤ 25MB
+            </Text>
+          </VStack>
         </Section>
       </List>
     </NavigationStack>
