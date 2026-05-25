@@ -43,7 +43,32 @@ function loadTagMap() {
   } catch { tagMap = {}; }
 }
 
-function t(text) { return tagMap[text] || text; }
+// 自动积累待翻译词
+let pendingDict = {};
+try {
+  if (existsSync(join(__dirname, 'pending.json')))
+    pendingDict = JSON.parse(readFileSync(join(__dirname, 'pending.json'), 'utf-8'));
+} catch { pendingDict = {}; }
+
+function savePending() {
+  try { writeFileSync(join(__dirname, 'pending.json'), JSON.stringify(pendingDict, null, 2), 'utf-8'); } catch {}
+}
+
+async function t(text) {
+  if (tagMap[text]) return tagMap[text];
+  // 用 opencc 做简繁转换兜底
+  const fallback = await t2s(text);
+  if (fallback !== text) {
+    // 积累待翻译
+    if (!pendingDict[text]) {
+      pendingDict[text] = { suggested: fallback, count: 1 };
+      savePending();
+    } else {
+      pendingDict[text].count++;
+    }
+  }
+  return fallback;
+}
 
 // 演员翻译
 let actressMap = {};
@@ -105,10 +130,21 @@ const charMap = {
   "畑":"田","畠":"田","辻":"辻","込":"入",
 };
 
+// 该函数后面会拼入 final 步骤做 async t2s，所以此处不做任何异步，保持同步
+// 后续在 main() 里对 actors 统一处理 t2s
 function translateActress(name) {
   if (actressMap[name]) return actressMap[name];
   let r = '';
   for (const ch of name) r += charMap[ch] || ch;
+  // 如果 charMap 转换后跟原文一样，演员名可能含没映射的字符，积累到 pending
+  if (r === name) {
+    if (!pendingDict['actress:' + name]) {
+      pendingDict['actress:' + name] = { count: 1 };
+      savePending();
+    } else {
+      pendingDict['actress:' + name].count++;
+    }
+  }
   return r;
 }
 
@@ -213,7 +249,7 @@ async function searchAndDetail(code) {
     reviewCount: info.reviewCount || '',
     wantCount: wantCount || '',
     actors: actors.map(translateActress),
-    tags: tags.map(t),
+    tags: await Promise.all(tags.map(tag => t(tag))),
     series: info.series || '',
     detailUrl: `https://javdb.com${item.href}`,
     coverImage: coverRaw,
@@ -251,11 +287,12 @@ async function main() {
     ];
     if (movie.reviewCount) lines.push(`评价: ${movie.reviewCount}`);
     if (movie.wantCount) lines.push(`想看: ${movie.wantCount}`);
+    // 演员和标签已在 searchAndDetail 中经过 translateActress / t() 翻译，此处只做繁简兜底
     const actorsJoined = movie.actors.length ? (await Promise.all(movie.actors.map(a => t2s(a)))).join('、') : '-';
     lines.push(`演员: ${actorsJoined}`);
     if (movie.series) lines.push(`系列: ${await t2s(movie.series)}`);
-    const tagsJoined = movie.tags.length ? (await Promise.all(movie.tags.map(t => t2s(t)))).join('、') : '-';
-    lines.push(`标签: ${tagsJoined}`);
+    // 标签已在 searchAndDetail 中经过 t() 翻译（含 opencc 兜底），此处 t2s 做二次安全转换
+    lines.push(`标签: ${movie.tags.join('、')}`);
     lines.push(`封面: [查看封面](${movie.coverImage || '无'})`);
     lines.push(`播放: [打开页面](${movie.detailUrl})`);
 
