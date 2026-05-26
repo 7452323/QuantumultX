@@ -1,0 +1,44 @@
+{
+  "description" : "",
+  "version" : "1.0.0",
+  "author" : {
+    "name" : "7452323",
+    "email" : null,
+    "homepage" : null
+  },
+  "entry" : "index.tsx",
+  "contributors" : [
+
+  ],
+  "localizedNames" : {
+    "fr" : "",
+    "de" : "",
+    "en" : "",
+    "it" : "",
+    "es" : "",
+    "pt" : "",
+    "zh" : "",
+    "ru" : "",
+    "ja" : ""
+  },
+  "iconImage" : "",
+  "intentInputTypes" : [
+
+  ],
+  "localizedDescriptions" : {
+    "fr" : "",
+    "de" : "",
+    "en" : "",
+    "it" : "",
+    "es" : "",
+    "pt" : "",
+    "zh" : "",
+    "ru" : "",
+    "ja" : ""
+  },
+  "icon" : "square.2.layers.3d.fill",
+  "runInApp" : false,
+  "name" : "Hegre",
+  "color" : "rgba(71, 102, 194,1)",
+  "remoteResource" : null
+}
