@@ -1,0 +1,15 @@
+#!name=ClearMark 抖音去水印
+#!desc=抖音视频无水印 + 下载解锁 + 画质增强。App 内直接保存无水印视频。
+#!author=宝宝
+#!homepage=https://github.com/7452323/ClearMark
+#!icon=https://raw.githubusercontent.com/7452323/ClearMark/main/icon.png
+
+[Script]
+http-response ^https?:\/\/[\w-]+\.(douyin|iesdouyin)\.com\/aweme\/v1\/(web\/)?aweme\/detail\/ requires-body=1, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/clearmark_douyin.js
+http-response ^https?:\/\/[\w-]+\.(douyin|iesdouyin)\.com\/aweme\/v1\/(web\/)?(feed|follow\/feed|homepage\/feed|recommend\/feed|nearby\/feed)\/ requires-body=1, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/clearmark_douyin.js
+http-response ^https?:\/\/[\w-]+\.(douyin|iesdouyin)\.com\/aweme\/v1\/(web\/)?(search|general\/search)\/ requires-body=1, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/clearmark_douyin.js
+http-response ^https?:\/\/[\w-]+\.(douyin|iesdouyin)\.com\/aweme\/v1\/web\/profile\/(post|like|collect)\/ requires-body=1, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/clearmark_douyin.js
+http-response ^https?:\/\/[\w-]+\.(douyin|iesdouyin)\.com\/aweme\/v1\/(web\/)?note\/ requires-body=1, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/clearmark_douyin.js
+
+[MITM]
+hostname = *.douyin.com, *.iesdouyin.com
