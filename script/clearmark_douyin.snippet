@@ -1,5 +1,5 @@
 #!name=抖音去水印 ClearMark
-#!desc=抖音视频无水印 + 下载解锁 + 画质增强。支持 App 内直接保存无水印视频。安装后请清除抖音缓存或重装。
+#!desc=抖音视频无水印 + 下载解锁 + 画质增强。基于2026新版API: watermark=1→0 + has_watermark=false。安装后请清除抖音缓存或重装。
 #!author=宝宝
 #!homepage=https://github.com/7452323/QuantumultX
 #!icon=https://raw.githubusercontent.com/7452323/ClearMark/main/icon.png
@@ -7,50 +7,34 @@
 #!date=2026-05-29
 
 #############################################
-# 🐣 ClearMark 抖音去水印
+# 🐣 ClearMark 抖音去水印 v2
+# 原理: 拦截 API 响应 → watermark=1→0 → has_watermark=false
 #############################################
 
-# 📺 视频详情 & 合集
-^https?:\\/\\/[\w-]+\\.(douyin|iesdouyin)\\.com\\/aweme\\/v1\\/web\\/aweme\\/detail\\/ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/clearmark_douyin.js
-^https?:\\/\\/[\w-]+\\.(douyin|iesdouyin)\\.com\\/aweme\\/v1\\/aweme\\/detail\\/ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/clearmark_douyin.js
-^https?:\\/\\/[\w-]+\\.(douyin|iesdouyin)\\.com\\/aweme\\/v1\\/web\\/mix\\/aweme\\/ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/clearmark_douyin.js
+# 📺 视频详情 (Web)
+^https?:\/\/[\w-]+\.douyin\.com\/aweme\/v1\/web\/aweme\/detail\/ url script-response-body clearmark_douyin.js
 
-# 📱 关注 & 推荐 & 同城 Feed
-^https?:\\/\\/[\w-]+\\.(douyin|iesdouyin)\\.com\\/aweme\\/v1\\/web\\/feed\\/ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/clearmark_douyin.js
-^https?:\\/\\/[\w-]+\\.(douyin|iesdouyin)\\.com\\/aweme\\/v1\\/feed\\/ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/clearmark_douyin.js
-^https?:\\/\\/[\w-]+\\.(douyin|iesdouyin)\\.com\\/aweme\\/v1\\/web\\/follow\\/feed\\/ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/clearmark_douyin.js
-^https?:\\/\\/[\w-]+\\.(douyin|iesdouyin)\\.com\\/aweme\\/v1\\/web\\/homepage\\/feed\\/ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/clearmark_douyin.js
-^https?:\\/\\/[\w-]+\\.(douyin|iesdouyin)\\.com\\/aweme\\/v1\\/web\\/recommend\\/feed\\/ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/clearmark_douyin.js
-^https?:\\/\\/[\w-]+\\.(douyin|iesdouyin)\\.com\\/aweme\\/v1\\/web\\/nearby\\/feed\\/ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/clearmark_douyin.js
+# 📺 视频详情 (App)
+^https?:\/\/[\w-]+\.(douyin|iesdouyin|snssdk)\.com\/aweme\/v1\/aweme\/detail\/ url script-response-body clearmark_douyin.js
 
-# 🔍 搜索结果
-^https?:\\/\\/[\w-]+\\.(douyin|iesdouyin)\\.com\\/aweme\\/v1\\/web\\/search\\/item\\/ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/clearmark_douyin.js
-^https?:\\/\\/[\w-]+\\.(douyin|iesdouyin)\\.com\\/aweme\\/v1\\/web\\/general\\/search\\/single\\/ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/clearmark_douyin.js
-^https?:\\/\\/[\w-]+\\.(douyin|iesdouyin)\\.com\\/aweme\\/v1\\/search\\/ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/clearmark_douyin.js
+# 📱 Feed流 (Web + App)
+^https?:\/\/[\w-]+\.(douyin|iesdouyin|snssdk)\.com\/aweme\/v1\/(web\/)?(feed|follow\/feed|homepage\/feed|recommend\/feed|nearby\/feed)\/ url script-response-body clearmark_douyin.js
+
+# 🔍 搜索
+^https?:\/\/[\w-]+\.(douyin|iesdouyin|snssdk)\.com\/aweme\/v1\/(web\/)?(search|general\/search)\/ url script-response-body clearmark_douyin.js
 
 # 👤 用户主页
-^https?:\\/\\/[\w-]+\\.(douyin|iesdouyin)\\.com\\/aweme\\/v1\\/web\\/profile\\/post\\/ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/clearmark_douyin.js
-^https?:\\/\\/[\w-]+\\.(douyin|iesdouyin)\\.com\\/aweme\\/v1\\/web\\/profile\\/like\\/ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/clearmark_douyin.js
-^https?:\\/\\/[\w-]+\\.(douyin|iesdouyin)\\.com\\/aweme\\/v1\\/web\\/profile\\/collect\\/ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/clearmark_douyin.js
-
-# 📥 下载相关 (app端)
-^https?:\\/\\/[\w-]+\\.(douyin|iesdouyin)\\.com\\/aweme\\/v1\\/web\\/aweme\\/save\\/ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/clearmark_douyin.js
-^https?:\\/\\/[\w-]+\\.(douyin|iesdouyin)\\.com\\/aweme\\/v1\\/aweme\\/save\\/ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/clearmark_douyin.js
+^https?:\/\/[\w-]+\.(douyin|iesdouyin|snssdk)\.com\/aweme\/v1\/web\/profile\/(post|like|collect)\/ url script-response-body clearmark_douyin.js
 
 # 🖼️ 图文笔记
-^https?:\\/\\/[\w-]+\\.(douyin|iesdouyin)\\.com\\/aweme\\/v1\\/web\\/note\\/ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/clearmark_douyin.js
-^https?:\\/\\/[\w-]+\\.(douyin|iesdouyin)\\.com\\/aweme\\/v1\\/note\\/ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/clearmark_douyin.js
+^https?:\/\/[\w-]+\.(douyin|iesdouyin|snssdk)\.com\/aweme\/v1\/(web\/)?note\/ url script-response-body clearmark_douyin.js
 
-# 🚫 广告拦截
-^https?:\\/\\/[\w-]+\\.(douyin|iesdouyin)\\.com\\/aweme\\/v1\\/web\\/ad\\/ url reject
-^https?:\\/\\/[\w-]+\\.(douyin|iesdouyin)\\.com\\/aweme\\/v1\\/web\\/advertiser url reject
-^https?:\\/\\/[\w-]+\\.(douyin|iesdouyin)\\.com\\/aweme\\/v1\\/web\\/live\\/ad url reject
+# 🎬 视频播放/下载 (Play URL)
+^https?:\/\/[\w-]+\.(douyin|iesdouyin|snssdk)\.com\/aweme\/v1\/play\/ url script-response-body clearmark_douyin.js
 
 # 🌐 host 拦截
 host, *.ad.xiaoshua.com, reject
-host, *.ad.douyin.com, reject
-host, *.ads.cn, reject
 host, *.ads.douyin.com, reject
 
 # ===== hostname =====
-hostname = *.douyin.com, *.iesdouyin.com, *.ad.xiaoshua.com, *.ads.cn
+hostname = *.douyin.com, *.iesdouyin.com, *.snssdk.com, *.ad.xiaoshua.com
