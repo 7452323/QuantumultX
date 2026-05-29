@@ -1,133 +1,80 @@
 /**
- * 🐣 ClearMark 抖音去水印脚本 v3
+ * 🐣 ClearMark 抖音去水印 - QX Rewrite 脚本
  * 
- * 原理:
- *   - play_addr.url_list[0] → CDN 原生无水印视频
- *   - download_addr.url_list[0] → 带 watermark=1 的水印版
- *   - App 保存视频用 download_addr, 所以替换为 play_addr 的 CDN URL
+ * 拦截抖音 API → 替换 download_addr 为 CDN 无水印 URL
+ * 
+ * 如果未生效, 请检查:
+ *   1. QX 开启 MitM + 信任证书
+ *   2. 在 QX 日志中搜 "ClearMark" 看有没有触发
+ *   3. 如果没任何日志 → 没拦截到 → 抖音可能证书锁定
  * 
  * @repo https://github.com/7452323/QuantumultX
  */
 
 try {
-  let body = $response.body;
-  if (!body) { $done({}); return; }
+  const body = $response.body;
+  if (!body) { console.log('⏭️ ClearMark: 空响应: ' + ($request.url || '').substring(0, 80)); $done({}); return; }
 
-  let obj = JSON.parse(body);
-  let modified = false;
+  const url = ($request.url || '').substring(0, 120);
+  console.log('🐣 ClearMark 触发: ' + url);
 
-  // ===== JSON 树遍历, 处理每个 video 对象 =====
-  function processVideo(video) {
-    if (!video || typeof video !== 'object') return false;
-    let changed = false;
-
-    // 1. 去水印标记
-    if (video.has_watermark === true) {
-      video.has_watermark = false;
-      changed = true;
-    }
-
-    // 2. 下载限制解锁
-    if (video.download_status === -1) {
-      video.download_status = 0;
-      changed = true;
-    }
-    if (video.prevent_download === true) {
-      video.prevent_download = false;
-      changed = true;
-    }
-    if (video.forbid_save === true) {
-      video.forbid_save = false;
-      changed = true;
-    }
-
-    // 3. ★ 核心: 把 download_addr 的 URL 换成 play_addr 的 CDN URL
-    const playUrls = video.play_addr?.url_list;
-    const downloadUrls = video.download_addr?.url_list;
-    if (playUrls && playUrls.length > 0 && downloadUrls && downloadUrls.length > 0) {
-      const cdnUrl = playUrls[0];  // CDN URL (无水印)
-      const oldUrl = downloadUrls[0];
-      if (oldUrl !== cdnUrl) {
-        if (oldUrl.indexOf('watermark=1') !== -1 || oldUrl.indexOf('logo_name=') !== -1) {
-          // 把 download_addr 直接换成 play_addr
-          video.download_addr = JSON.parse(JSON.stringify(video.play_addr));
-          changed = true;
-          console.log('✅ download_addr 替换为 CDN URL');
-        }
-      }
-    }
-
-    // 4. 替换任意 URL 字符串中的 watermark=1 → 0
-    const walk = (o) => {
-      if (!o || typeof o === 'string') return;
-      if (Array.isArray(o)) {
-        for (let i = 0; i < o.length; i++) {
-          if (typeof o[i] === 'string' && o[i].indexOf('watermark=1') !== -1) {
-            o[i] = o[i].replace(/watermark=1/g, 'watermark=0');
-            changed = true;
-          }
-          if (typeof o[i] === 'string' && o[i].indexOf('logo_name=') !== -1) {
-            o[i] = o[i].replace(/&logo_name=[^&]+/g, '');
-            changed = true;
-          }
-          if (typeof o[i] === 'object') walk(o[i]);
-        }
-      } else {
-        for (const key of Object.keys(o)) {
-          const v = o[key];
-          if (typeof v === 'string') {
-            if (v.indexOf('watermark=1') !== -1) {
-              o[key] = v.replace(/watermark=1/g, 'watermark=0');
-              changed = true;
-            }
-            if (v.indexOf('logo_name=') !== -1) {
-              o[key] = v.replace(/&logo_name=[^&]+/g, '');
-              changed = true;
-            }
-          } else if (typeof v === 'object') {
-            walk(v);
-          }
-        }
-      }
-    };
-    walk(video);
-
-    return changed;
+  // 检查响应类型
+  const ct = $response.headers?.['content-type'] || $response.headers?.['Content-Type'] || '';
+  if (ct.indexOf('json') === -1 && ct.indexOf('javascript') === -1 && body.charAt(0) !== '{' && body.charAt(0) !== '[') {
+    console.log('⏭️ ClearMark: 非JSON响应');
+    $done({});
+    return;
   }
 
-  // ===== 遍历对象查找 video 对象 =====
-  function traverse(obj) {
-    if (!obj || typeof obj !== 'object') return false;
-    let changed = false;
+  let obj;
+  try { obj = JSON.parse(body); } catch (e) { console.log('⏭️ ClearMark: JSON解析失败'); $done({}); return; }
 
-    if (Array.isArray(obj)) {
-      for (const item of obj) {
-        if (traverse(item)) changed = true;
-      }
-    } else {
-      for (const key of Object.keys(obj)) {
-        const val = obj[key];
-        if (key === 'video') {
-          if (processVideo(val)) changed = true;
-        } else if (typeof val === 'object') {
-          if (traverse(val)) changed = true;
+  // 检查是否包含 video 对象
+  let videoFound = false;
+  function traverse(o) {
+    if (!o || typeof o !== 'object') return;
+    if (Array.isArray(o)) { o.forEach(traverse); return; }
+    for (const k of Object.keys(o)) {
+      if (k === 'video' && o[k] && typeof o[k] === 'object') {
+        videoFound = true;
+        const v = o[k];
+        let ch = false;
+
+        // download_addr 替换
+        if (v.play_addr?.url_list?.length > 0 && v.download_addr?.url_list?.length > 0) {
+          const dlUrl = v.download_addr.url_list[0] || '';
+          if (dlUrl.indexOf('watermark=') !== -1 || dlUrl.indexOf('logo_name=') !== -1 || dlUrl.indexOf('/play/') !== -1) {
+            v.download_addr = JSON.parse(JSON.stringify(v.play_addr));
+            ch = true;
+            console.log('✅ download_addr → CDN');
+          }
         }
+
+        // has_watermark
+        if (v.has_watermark === true) { v.has_watermark = false; ch = true; console.log('✅ has_watermark→false'); }
+        if (v.watermark === 1) { v.watermark = 0; ch = true; }
+
+        // 下载锁
+        if (v.download_status === -1) { v.download_status = 0; ch = true; }
+        if (v.prevent_download === true) { v.prevent_download = false; ch = true; }
+        if (v.forbid_save === true) { v.forbid_save = false; ch = true; }
+
+        if (ch) console.log('✅ ClearMark 修改完成');
+      } else if (typeof o[k] === 'object') {
+        traverse(o[k]);
       }
     }
-    return changed;
   }
+  traverse(obj);
 
-  modified = traverse(obj);
-
-  if (modified) {
+  if (videoFound) {
+    console.log('🎬 ClearMark: 找到 video 对象');
     $done({ body: JSON.stringify(obj) });
-    console.log('✅ ClearMark v3 抖音去水印生效');
   } else {
-    console.log('⏭️ 无需修改');
+    console.log('⏭️ ClearMark: 未找到 video, 跳过');
     $done({});
   }
-
 } catch (e) {
-  console.log('❌ ClearMark 抖音错误: ' + (e.message || e));
+  console.log('❌ ClearMark 错误: ' + (e && e.message ? e.message : String(e)));
   $done({});
 }
