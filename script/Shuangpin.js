@@ -1,6 +1,6 @@
 /*
  * @name 试试双拼 PRO
- * @description 试试双拼 Shuangpin PRO解锁（需关闭X-Signature验证）
+ * @description 试试双拼 Shuangpin PRO解锁
  * @compatible QuantumultX, Loon, Surge
 
  [rewrite_local]
@@ -18,59 +18,32 @@ if (!body) { $done({}); }
 
 try {
   let obj = JSON.parse(body);
+  let pro = {
+    expires_date: "2099-12-31T23:59:59Z",
+    product_identifier: "ulpb_lifetime_personal",
+    purchase_date: "2026-01-01T00:00:00Z"
+  };
 
-  // For offerings endpoint
+  // offerings endpoint - inject subscriber with PRO
   if (url.includes('/offerings')) {
-    // Inject subscriber with pro into offerings response
     obj.subscriber = {
-      entitlements: {
-        pro: {
-          expires_date: "2099-12-31T23:59:59Z",
-          product_identifier: "ulpb_lifetime_personal",
-          purchase_date: "2026-01-01T00:00:00Z"
-        }
-      },
-      subscriptions: {
-        ulpb_lifetime_personal: {
-          expires_date: "2099-12-31T23:59:59Z",
-          period_type: "normal",
-          purchase_date: "2026-01-01T00:00:00Z",
-          store: "app_store"
-        }
-      },
+      entitlements: { pro: pro },
+      subscriptions: { ulpb_lifetime_personal: { ...pro, period_type: "normal", store: "app_store" } },
       non_subscriptions: {},
       entitlements_by_product_ids: {}
     };
     $done({body: JSON.stringify(obj)});
   }
-
-  // For subscriber endpoint
+  // subscriber endpoint
   else if (url.includes('/subscribers/') && !url.includes('/attributes')) {
     if (obj.subscriber) {
-      obj.subscriber.entitlements = {
-        pro: {
-          expires_date: "2099-12-31T23:59:59Z",
-          product_identifier: "ulpb_lifetime_personal",
-          purchase_date: "2026-01-01T00:00:00Z"
-        }
-      };
-      obj.subscriber.subscriptions = {
-        ulpb_lifetime_personal: {
-          expires_date: "2099-12-31T23:59:59Z",
-          period_type: "normal",
-          purchase_date: "2026-01-01T00:00:00Z",
-          store: "app_store"
-        }
-      };
+      obj.subscriber.entitlements = { pro: pro };
+      obj.subscriber.subscriptions = { ulpb_lifetime_personal: { ...pro, period_type: "normal", store: "app_store" } };
       obj.subscriber.non_subscriptions = {};
       obj.subscriber.entitlements_by_product_ids = {};
     }
-    // Remove x-signature so SDK doesn't reject modified body
-    var h = $response.headers || {};
-    h['x-signature'] = '';
-    h['X-Signature'] = '';
-    $done({body: JSON.stringify(obj), headers: h});
-    return;
+    // QX can't modify headers in response-body type, body rewrite only
+    $done({body: JSON.stringify(obj)});
   }
 
   $done({});
