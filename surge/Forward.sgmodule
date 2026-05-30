@@ -1,8 +1,0 @@
-#!name=ForwardPRO
-#!desc=Forward Twitter客户端PRO解锁
-
-[MITM]
-hostname = %APPEND% fluxapi.vvebo.vip
-
-[Script]
-ForwardPRO = type=http-response, requires-body=true, pattern=^https?:\/\/fluxapi\.vvebo\.vip\/(v1\/)?(purchase|vip|user|membership|subscribe)\/, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Forward.js
