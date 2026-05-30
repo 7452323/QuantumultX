@@ -1,6 +1,6 @@
 /*
  * @name 懒饭 PRO
- * @description 懒饭会员解锁 - is_prime + is_purchased + unlocked
+ * @description 懒饭会员解锁 - 全文替换模式
  * @compatible QuantumultX
 
  [rewrite_local]
@@ -11,36 +11,13 @@
 
 */
 
-var url = $request.url;
 var body = $response.body;
 if (!body) { $done({}); }
 
-try {
-  var obj = JSON.parse(body);
+// 全文正则替换 - 和Surge的Body Rewrite等效
+body = body.replace(/"is_purchased":\w+/g, '"is_purchased":true');
+body = body.replace(/"is_prime":\w+/g, '"is_prime":true');
+body = body.replace(/"unlocked":\w+/g, '"unlocked":true');
+body = body.replace(/"watch_type":\d+/g, '"watch_type":1');
 
-  // 工具函数：递归遍历所有字段
-  function fixVip(obj) {
-    if (!obj || typeof obj !== 'object') return;
-    for (var k in obj) {
-      var v = obj[k];
-      if (k === 'is_prime' || k === 'is_purchased') {
-        obj[k] = true;
-      } else if (k === 'unlocked') {
-        obj[k] = true;
-      } else if (k === 'watch_type') {
-        obj[k] = 1;
-      } else if (typeof v === 'object') {
-        fixVip(v);
-      }
-    }
-  }
-
-  fixVip(obj);
-
-  // 用户页面 - is_prime
-  if (obj.content && obj.content.user) {
-    obj.content.user.is_prime = true;
-  }
-
-  $done({body: JSON.stringify(obj)});
-} catch(e) { $done({}); }
+$done({body: body});
