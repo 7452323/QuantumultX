@@ -24,6 +24,9 @@ body = body.replace(/"is_enjoy_discount":\w+/g, '"is_enjoy_discount":true');
 // ── 过期时间 → 2099 ──
 body = body.replace(/"expires_time":"[^"]+"/g, '"expires_time":"2099-12-31 23:59:59"');
 
+// ── 视频URL：v.0_10000. → v.（10秒预览→完整版）──
+body = body.replace(/v\.0_10000\./g, 'v.');
+
 // ── 去掉tips（服务器用了Unicode转义，中文正则匹配不到）──
 // App可能根据tips非空来判断是否非会员
 body = body.replace(/"tips":"[^"]+"/g, '"tips":""');
