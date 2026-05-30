@@ -3,8 +3,8 @@
  * @description RevenueCat 4.x 永久解锁
 
  [rewrite_local]
-^https?:\/\/api\.(revenuecat|rc-backup)\.com\/v1\/(subscribers\/[^?#]+|receipts) url script-response-body Shuangpin.js
-^https?:\/\/api\.(revenuecat|rc-backup)\.com\/v1\/ url script-response-header Shuangpin.js
+^https?:\/\/api\.(revenuecat|rc-backup)\.com\/v1\/(subscribers\/[^?#]+|receipts) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Shuangpin.js
+^https?:\/\/api\.(revenuecat|rc-backup)\.com\/v1\/ url script-response-header https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Shuangpin.js
 
  [mitm]
  hostname = api.revenuecat.com, api.rc-backup.com
