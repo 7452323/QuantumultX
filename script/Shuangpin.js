@@ -4,7 +4,6 @@
  * @compatible QuantumultX, Loon, Surge
 
  [rewrite_local]
-# QX
 ^https?:\/\/api\.rc-backup\.com\/v1\/subscribers\/[^?]+ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Shuangpin.js
 
  [mitm]
