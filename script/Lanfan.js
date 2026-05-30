@@ -1,6 +1,6 @@
 /*
  * @name 懒饭 PRO
- * @description 懒饭会员解锁 v2.1 - 全端点覆盖
+ * @description 懒饭会员解锁 2.4.3
  * @compatible QuantumultX Surge Loon
 
  [rewrite_local]
