@@ -1,7 +1,7 @@
 /*
  * @name 懒饭 PRO
- * @description 懒饭会员解锁 - 全端点覆盖
- * @compatible QuantumultX
+ * @description 懒饭会员解锁 v2.1 - 全端点覆盖
+ * @compatible QuantumultX Surge Loon
 
  [rewrite_local]
 ^https?:\/\/lanfanapp\.com\/api\/v1\/.* url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Lanfan.js
@@ -14,16 +14,21 @@
 var body = $response.body;
 if (!body) { $done({}); }
 
-// 会员字段
+// ── 核心会员字段 ──
 body = body.replace(/"is_purchased":\w+/g, '"is_purchased":true');
 body = body.replace(/"is_prime":\w+/g, '"is_prime":true');
 body = body.replace(/"unlocked":\w+/g, '"unlocked":true');
 body = body.replace(/"watch_type":\d+/g, '"watch_type":1');
+body = body.replace(/"is_enjoy_discount":\w+/g, '"is_enjoy_discount":true');
 
-// 过期时间 - 2099年
+// ── 过期时间 → 2099 ──
 body = body.replace(/"expires_time":"[^"]+"/g, '"expires_time":"2099-12-31 23:59:59"');
 
-// 10秒限制
+// ── 去掉购买提示（app可能根据tips判断解锁状态）──
+body = body.replace(/"tips":"[^"]*购买懒饭会员[^"]*"/g, '"tips":""');
+body = body.replace(/"tips":"[^"]*解锁更多[^"]*"/g, '"tips":""');
+
+// ── 猜测的时间限制字段（兜底无副作用）──
 body = body.replace(/"watch_time_limit":\d+/g, '"watch_time_limit":99999999');
 body = body.replace(/"duration_limit":\d+/g, '"duration_limit":99999999');
 body = body.replace(/"max_preview":\d+/g, '"max_preview":99999999');
@@ -33,6 +38,15 @@ body = body.replace(/"trial_duration":\d+/g, '"trial_duration":99999999');
 body = body.replace(/"max_watch_time":\d+/g, '"max_watch_time":99999999');
 body = body.replace(/"limit_seconds":\d+/g, '"limit_seconds":99999999');
 body = body.replace(/"preview_seconds":\d+/g, '"preview_seconds":99999999');
+
+// ── 去水印 ──
 body = body.replace(/"watermark":.+?[,\\}]/g, '"watermark":false,');
+
+// ── 去掉 user_homepage_prime_banner（会员不应有购买横幅）──
+body = body.replace(/,"user_homepage_prime_banner":\{[^}]+\}/g, '');
+body = body.replace(/"user_homepage_prime_banner":\{[^}]+\},/g, '');
+
+// ── prime_contract 改为完整会员合同对象 ──
+body = body.replace(/"prime_contract":null/g, '"prime_contract":{"is_prime":true,"expires_time":"2099-12-31 23:59:59"}');
 
 $done({body: body});
