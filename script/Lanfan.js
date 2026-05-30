@@ -24,9 +24,9 @@ body = body.replace(/"is_enjoy_discount":\w+/g, '"is_enjoy_discount":true');
 // ── 过期时间 → 2099 ──
 body = body.replace(/"expires_time":"[^"]+"/g, '"expires_time":"2099-12-31 23:59:59"');
 
-// ── 去掉购买提示（app可能根据tips判断解锁状态）──
-body = body.replace(/"tips":"[^"]*购买懒饭会员[^"]*"/g, '"tips":""');
-body = body.replace(/"tips":"[^"]*解锁更多[^"]*"/g, '"tips":""');
+// ── 去掉tips（服务器用了Unicode转义，中文正则匹配不到）──
+// App可能根据tips非空来判断是否非会员
+body = body.replace(/"tips":"[^"]+"/g, '"tips":""');
 
 // ── 猜测的时间限制字段（兜底无副作用）──
 body = body.replace(/"watch_time_limit":\d+/g, '"watch_time_limit":99999999');
