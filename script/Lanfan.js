@@ -1,6 +1,6 @@
 /*
  * @name 懒饭 PRO
- * @description 懒饭会员解锁 - 含10秒限制解除
+ * @description 懒饭会员解锁 - 全端点覆盖
  * @compatible QuantumultX
 
  [rewrite_local]
@@ -20,7 +20,10 @@ body = body.replace(/"is_prime":\w+/g, '"is_prime":true');
 body = body.replace(/"unlocked":\w+/g, '"unlocked":true');
 body = body.replace(/"watch_type":\d+/g, '"watch_type":1');
 
-// 10秒限制解除 - 尝试各种可能的时限字段
+// 过期时间 - 2099年
+body = body.replace(/"expires_time":"[^"]+"/g, '"expires_time":"2099-12-31 23:59:59"');
+
+// 10秒限制
 body = body.replace(/"watch_time_limit":\d+/g, '"watch_time_limit":99999999');
 body = body.replace(/"duration_limit":\d+/g, '"duration_limit":99999999');
 body = body.replace(/"max_preview":\d+/g, '"max_preview":99999999');
@@ -30,6 +33,6 @@ body = body.replace(/"trial_duration":\d+/g, '"trial_duration":99999999');
 body = body.replace(/"max_watch_time":\d+/g, '"max_watch_time":99999999');
 body = body.replace(/"limit_seconds":\d+/g, '"limit_seconds":99999999');
 body = body.replace(/"preview_seconds":\d+/g, '"preview_seconds":99999999');
-body = body.replace(/"watermark":/.+?[,\}]/g, '"watermark":false,');
+body = body.replace(/"watermark":.+?[,\\}]/g, '"watermark":false,');
 
 $done({body: body});
