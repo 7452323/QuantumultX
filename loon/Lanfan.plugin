@@ -1,6 +1,6 @@
 #!name=懒饭PRO
 [MITM]
-hostname = api.xiachufang.com
+hostname = lanfanapp.com
 
 [Script]
-http-response ^https?:\/\/api\.xiachufang\.com\/v\/[a-z]\/(member|user|subscribe|order|vip)\/ script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Lanfan.js, requires-body=true, tag=LanfanPRO
+http-response ^https?:\/\/api\.lanfanapp\.com\/v\/[a-z]\/(member|user|subscribe|order|vip)\/ script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Lanfan.js, requires-body=true, tag=LanfanPRO
