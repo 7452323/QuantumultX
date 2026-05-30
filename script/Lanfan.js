@@ -49,4 +49,10 @@ body = body.replace(/"user_homepage_prime_banner":\{[^}]+\},/g, '');
 // ── prime_contract 改为完整会员合同对象 ──
 body = body.replace(/"prime_contract":null/g, '"prime_contract":{"is_prime":true,"expires_time":"2099-12-31 23:59:59"}');
 
+// ── 去掉加入计划/会员相关的错误码 ──
+body = body.replace(/"errcode":1132/g, '"errcode":0');
+body = body.replace(/"errcode":1[0-9]{3}/g, '"errcode":0');
+body = body.replace(/"errmsg":"[^"]*"/g, '"errmsg":""');
+body = body.replace(/"error":"[^"]*"/g, '"error":""');
+
 $done({body: body});
