@@ -1,6 +1,6 @@
 /*
  * @name Forward PRO
- * @description Forward Twitter客户端PRO解锁
+ * @description Forward 客户端PRO解锁
  * @compatible QuantumultX, Loon, Surge
 
  [rewrite_local]
