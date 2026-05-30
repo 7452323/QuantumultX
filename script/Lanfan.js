@@ -4,7 +4,7 @@
  * @compatible QuantumultX
 
  [rewrite_local]
-^https?:\/\/api\.xiachufang\.com\/v\/[a-z]\/(member|user|subscribe|order|vip)\/ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Lanfan.js
+^https?:\/\/api\.xiachufang\.com\/(v[12]\/)?(member|user|subscribe|order|vip)\/ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Lanfan.js
 
  [mitm]
  hostname = api.xiachufang.com
