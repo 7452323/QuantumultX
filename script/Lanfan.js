@@ -1,6 +1,6 @@
 /*
  * @name 懒饭 PRO
- * @description 懒饭会员解锁 - 全文替换模式
+ * @description 懒饭会员解锁
  * @compatible QuantumultX
 
  [rewrite_local]
@@ -14,7 +14,6 @@
 var body = $response.body;
 if (!body) { $done({}); }
 
-// 全文正则替换 - 和Surge的Body Rewrite等效
 body = body.replace(/"is_purchased":\w+/g, '"is_purchased":true');
 body = body.replace(/"is_prime":\w+/g, '"is_prime":true');
 body = body.replace(/"unlocked":\w+/g, '"unlocked":true');
