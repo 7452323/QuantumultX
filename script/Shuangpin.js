@@ -66,10 +66,10 @@ try {
       obj.subscriber.entitlements_by_product_ids = {};
     }
     // Remove x-signature so SDK doesn't reject modified body
-    var headers = $response.headers;
-    if (headers['x-signature']) delete headers['x-signature'];
-    if (headers['X-Signature']) delete headers['X-Signature'];
-    $done({body: JSON.stringify(obj), headers: headers});
+    var h = $response.headers || {};
+    h['x-signature'] = '';
+    h['X-Signature'] = '';
+    $done({body: JSON.stringify(obj), headers: h});
     return;
   }
 
