@@ -5,4 +5,4 @@
 hostname = api.rc-backup.com
 
 [Script]
-http-response ^https?:\/\/api\.rc-backup\.com\/v1\/subscribers\/ script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/shuangpin.js, requires-body=true, tag=ShuangpinPRO
+http-response ^https?:\/\/api\.rc-backup\.com\/v1\/subscribers\/ script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Shuangpin.js, requires-body=true, tag=ShuangpinPRO
