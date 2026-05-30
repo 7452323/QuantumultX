@@ -1,78 +1,71 @@
 /*
  * @name 试试双拼 PRO
- * @description 试试双拼 Shuangpin PRO解锁（RevenueCat 4.x）
+ * @description 试试双拼 永久买断解锁
  * @compatible QuantumultX, Loon, Surge
 
  [rewrite_local]
-# QX - 拦截subscribers和offerings双端点
-^https?:\/\/api\.rc-backup\.com\/v1\/subscribers\/[^?#]+ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Shuangpin.js
+# QX - 覆盖revenuecat.com + rc-backup.com 双域名
+^https?:\/\/api\.(revenuecat|rc-backup)\.com\/v1\/(subscribers\/[^?#]+|receipts) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Shuangpin.js
 
  [mitm]
- hostname = api.rc-backup.com
+ hostname = api.revenuecat.com, api.rc-backup.com
 
 */
 
-const url = $request.url;
-const body = $response.body;
+var url = $request.url;
+var body = $response.body;
 if (!body) { $done({}); }
 
 try {
-  let obj = JSON.parse(body);
-
-  // 构造PRO权益
+  var obj = JSON.parse(body);
   var now = new Date();
-  var expire = new Date(now.getTime() + 365 * 50 * 86400000); // 50年后
+
+  // 永久买断：expires_date = null
   var pro = {
-    expires_date: expire.toISOString(),
+    expires_date: null,
     product_identifier: "ulpb_lifetime_personal",
     purchase_date: now.toISOString()
   };
 
-  // ===== 1. 订阅状态端点 =====
-  // GET /v1/subscribers/{app_user_id}
-  if (url.includes('/subscribers/') && !url.includes('/attributes') && !url.includes('/offerings')) {
+  var lifetime_sub = {
+    expires_date: null,
+    period_type: "normal",
+    purchase_date: now.toISOString(),
+    store: "app_store",
+    is_sandbox: false
+  };
+
+  // 1. 订阅状态 /v1/subscribers/{id}
+  if (url.indexOf('/subscribers/') !== -1 && url.indexOf('/attributes') === -1 && url.indexOf('/offerings') === -1) {
     if (obj.subscriber) {
       obj.subscriber.entitlements = { pro: pro };
-      obj.subscriber.subscriptions = {
-        ulpb_lifetime_personal: {
-          expires_date: expire.toISOString(),
-          period_type: "normal",
-          purchase_date: now.toISOString(),
-          store: "app_store",
-          is_sandbox: false,
-          unsubscribe_detected_at: null
-        }
-      };
+      obj.subscriber.subscriptions = { ulpb_lifetime_personal: lifetime_sub };
       obj.subscriber.non_subscriptions = {};
       obj.subscriber.entitlements_by_product_ids = {};
-      obj.subscriber.original_purchase_date = now.toISOString();
-      obj.subscriber.first_seen = now.toISOString();
-      obj.subscriber.management_url = null;
     }
     $done({body: JSON.stringify(obj)});
   }
 
-  // ===== 2. 付费墙端点 =====
-  // GET /v1/subscribers/{app_user_id}/offerings
-  else if (url.includes('/offerings')) {
-    // 注入subscriber信息（部分SDK版本从offerings读权益）
+  // 2. 付费墙 /v1/subscribers/{id}/offerings
+  else if (url.indexOf('/offerings') !== -1) {
     obj.subscriber = {
       entitlements: { pro: pro },
-      subscriptions: {
-        ulpb_lifetime_personal: {
-          expires_date: expire.toISOString(),
-          period_type: "normal",
-          purchase_date: now.toISOString(),
-          store: "app_store"
-        }
-      },
+      subscriptions: { ulpb_lifetime_personal: lifetime_sub },
       non_subscriptions: {},
       entitlements_by_product_ids: {}
     };
     $done({body: JSON.stringify(obj)});
   }
 
-  // ===== 3. 其他（attributes等）- 不改 =====
+  // 3. 收据验证 /v1/receipts
+  else if (url.indexOf('/receipts') !== -1) {
+    if (obj.subscriber) {
+      obj.subscriber.entitlements = { pro: pro };
+      obj.subscriber.subscriptions = { ulpb_lifetime_personal: lifetime_sub };
+    }
+    $done({body: JSON.stringify(obj)});
+  }
+
   else {
     $done({});
   }
