@@ -1,16 +1,16 @@
 /*
  * @name RevenueCat 通杀（终极版）
- * @description 通杀 api.revenuecat.com + api.rc-backup.com
+ * @description 通杀 api.revenuecat.com，覆盖 v1/v2 全部端点
  * @compatible QuantumultX, Loon, Surge, Stash, Shadowrocket
  * @author Qiq
  * @github https://github.com/7452323/QuantumultX
 
  [rewrite_local]
 # QX — 通配子域名 + v1/v2 全部端点 + 带尾部斜杠/query参数
-^https?:\/\/([a-z0-9-]+\.)*(revenuecat|rc-backup)\.com\/(v[12]\/)?(receipts|subscribers\/[^?#]+) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/RevenueCat.js
+^https?:\/\/([a-z0-9-]+\.)*revenuecat\.com\/(v[12]\/)?(receipts|subscribers\/[^?#]+) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/RevenueCat.js
 
 [mitm]
-hostname = *.revenuecat.com, *.rc-backup.com
+hostname = *.revenuecat.com
 
 */
 
