@@ -14,31 +14,73 @@
 var body = $response.body;
 if (!body) { $done({}); }
 
-// ── 通用收据验证字段 ──
-body = body.replace(/"status":\d+/g, '"status":0');
-body = body.replace(/"code":\d+/g, '"code":0');
-body = body.replace(/"success":\w+/g, '"success":true');
-body = body.replace(/"is_valid":\w+/g, '"is_valid":true');
-body = body.replace(/"error_code":\d+/g, '"error_code":0');
-body = body.replace(/"error":\w+/g, '"error":null');
-body = body.replace(/"errno":\d+/g, '"errno":0');
-body = body.replace(/"errmsg":"[^"]*"/g, '"errmsg":""');
-body = body.replace(/"result":"[^"]*"/g, '"result":"ok"');
-body = body.replace(/"message":"[^"]*"/g, '"message":"ok"');
-body = body.replace(/"expires_date":"[^"]*"/g, '"expires_date":"2099-12-31 23:59:59"');
-body = body.replace(/"expires_time":"[^"]*"/g, '"expires_time":"2099-12-31 23:59:59"');
-body = body.replace(/"is_subscribed":\w+/g, '"is_subscribed":true');
-
-// ── 会员相关字段 ──
-body = body.replace(/"vip":\d+/g, '"vip":1');
-body = body.replace(/"vip":\w+/g, '"vip":true');
-body = body.replace(/"is_vip":\d+/g, '"is_vip":1');
-body = body.replace(/"is_vip":\w+/g, '"is_vip":true');
-body = body.replace(/"level":\d+/g, '"level":99');
-body = body.replace(/"is_pro":\w+/g, '"is_pro":true');
-body = body.replace(/"pro":\w+/g, '"pro":true');
-body = body.replace(/"is_purchased":\w+/g, '"is_purchased":true');
-body = body.replace(/"purchased":\w+/g, '"purchased":true');
-body = body.replace(/"unlocked":\w+/g, '"unlocked":true');
+try {
+    var obj = JSON.parse(body);
+    
+    if (obj.Receipt) {
+        // Decode the nested receipt JSON string
+        var receipt = JSON.parse(obj.Receipt);
+        
+        // Add a fake in-app purchase
+        var now = new Date();
+        var nowMs = now.getTime();
+        var futureMs = nowMs + 31536000000; // +1 year
+        
+        var fakePurchase = {
+            "quantity": "1",
+            "product_id": "com.logcg.loginput.pro",
+            "transaction_id": "1000000" + Math.floor(Math.random() * 9000000),
+            "original_transaction_id": "1000000" + Math.floor(Math.random() * 9000000),
+            "purchase_date": now.toISOString().replace('Z', '').replace('T', ' ') + ' Etc/GMT',
+            "purchase_date_ms": nowMs + "",
+            "purchase_date_pst": now.toLocaleString('en-US', {timeZone:'America/Los_Angeles'}) + ' America/Los_Angeles',
+            "original_purchase_date": now.toISOString().replace('Z', '').replace('T', ' ') + ' Etc/GMT',
+            "original_purchase_date_ms": nowMs + "",
+            "original_purchase_date_pst": now.toLocaleString('en-US', {timeZone:'America/Los_Angeles'}) + ' America/Los_Angeles',
+            "expires_date": new Date(futureMs).toISOString().replace('Z', '').replace('T', ' ') + ' Etc/GMT',
+            "expires_date_ms": futureMs + "",
+            "expires_date_pst": new Date(futureMs).toLocaleString('en-US', {timeZone:'America/Los_Angeles'}) + ' America/Los_Angeles',
+            "is_trial_period": "false",
+            "is_in_intro_offer_period": "false",
+            "in_app_ownership_type": "PURCHASED"
+        };
+        
+        // Ensure in_app array exists and add the fake purchase
+        if (!receipt.receipt.in_app) {
+            receipt.receipt.in_app = [];
+        }
+        receipt.receipt.in_app.push(fakePurchase);
+        
+        // Also try additional product IDs just in case
+        var additionalProductIds = [
+            "com.logcg.loginput.pro",
+            "com.logcg.loginput.pro.yearly",
+            "com.logcg.loginput.pro.monthly",
+            "com.logcg.loginput.unlock",
+            "com.logcg.loginput.premium",
+            "com.logcg.loginput.full_version",
+            "com.logcg.loginput.vip",
+            "com.logcg.loginput.remove_ads"
+        ];
+        
+        for (var i = 0; i < additionalProductIds.length; i++) {
+            var extraPurchase = JSON.parse(JSON.stringify(fakePurchase));
+            extraPurchase.product_id = additionalProductIds[i];
+            extraPurchase.transaction_id = "1000000" + Math.floor(Math.random() * 9000000);
+            receipt.receipt.in_app.push(extraPurchase);
+        }
+        
+        // Set receipt status to 0 (valid)
+        receipt.status = 0;
+        
+        // Re-serialize
+        obj.Receipt = JSON.stringify(receipt);
+        
+        body = JSON.stringify(obj);
+    }
+} catch(e) {
+    // Fallback: simple text replacements
+    body = body.replace(/"in_app":\[([^\]]*)\]/g, '"in_app":[{"product_id":"com.logcg.loginput.pro","quantity":"1","transaction_id":"100000000001","original_transaction_id":"100000000001","purchase_date":"2099-01-01 00:00:00 Etc/GMT","purchase_date_ms":"4070908800000","original_purchase_date":"2099-01-01 00:00:00 Etc/GMT","original_purchase_date_ms":"4070908800000","expires_date":"2099-12-31 23:59:59 Etc/GMT","expires_date_ms":"4102444799000","is_trial_period":"false","is_in_intro_offer_period":"false","in_app_ownership_type":"PURCHASED"}]');
+}
 
 $done({body: body});
