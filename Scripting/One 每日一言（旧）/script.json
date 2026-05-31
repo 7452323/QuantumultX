@@ -1,0 +1,44 @@
+{
+  "version" : "1.0.0",
+  "intentInputTypes" : [
+
+  ],
+  "runInApp" : false,
+  "localizedNames" : {
+    "fr" : "",
+    "de" : "",
+    "ja" : "",
+    "zh" : "",
+    "es" : "",
+    "ru" : "",
+    "en" : "",
+    "it" : "",
+    "pt" : ""
+  },
+  "author" : {
+    "email" : null,
+    "homepage" : null,
+    "name" : "7452323"
+  },
+  "color" : "rgba(102, 196, 235,1)",
+  "contributors" : [
+
+  ],
+  "description" : "本人作用于中组件负一屏顶部来用",
+  "icon" : "text.alignleft",
+  "iconImage" : "",
+  "remoteResource" : null,
+  "localizedDescriptions" : {
+    "fr" : "",
+    "de" : "",
+    "ja" : "",
+    "zh" : "",
+    "es" : "",
+    "ru" : "",
+    "en" : "",
+    "it" : "",
+    "pt" : ""
+  },
+  "entry" : "index.tsx",
+  "name" : "One 每日一言（旧）"
+}
