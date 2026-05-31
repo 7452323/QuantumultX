@@ -7,7 +7,10 @@
 ^https?:\/\/lanfanapp\.com\/api\/v1\/.* url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Lanfan.js
 
  [mitm]
- hostname = lanfanapp.com
+ hostname = lanfanapp.com, video5.chuimg.com
+
+ [URL-rewrite]
+v\.0_10000\. v.
 
 */
 
