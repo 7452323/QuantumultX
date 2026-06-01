@@ -1,9 +1,9 @@
 /*
-布丁扫描 解锁VIP + 去广告
+布丁扫描 解锁VIP + 去广告 + 无限次数
 
 [rewrite_local]
 ^https:\/\/www\.budingscan\.com\/server\/ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js
-^https:\/\/bd-aiart\.vivo\.com\.cn\/ai_painting\/(get_remain_paint_count|self_homepage) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js
+^https:\/\/bd-aiart\.vivo\.com\.cn\/ai_painting\/(get_remain_paint_count|self_homepage|create_paint_task) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js
 ^https:\/\/art\.budingscan\.com\/ai_painting\/get_remain_photo_shoot_count url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js
 
 [mitm]
@@ -69,6 +69,15 @@ try {
 
   } else if (url.includes('/get_remain_photo_shoot_count')) {
     obj.data = { "count": 99999, "history_count": 0 };
+    body = JSON.stringify(obj);
+
+  } else if (url.includes('/create_paint_task')) {
+    // VIVO后台限制次数，伪装成功响应
+    obj.code = 0;
+    obj.desc = "success";
+    delete obj.desc;
+    obj.desc = "success";
+    obj.data = { "status": "queued" };
     body = JSON.stringify(obj);
   }
 
