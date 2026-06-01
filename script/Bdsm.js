@@ -30,7 +30,7 @@ try {
       "renewal_status": 1,
       "subscribe_plan_validity": 3,
       "subscribe_plan_name": "终身会员",
-      "end_time": "2099-12-31 23:59:59",
+      "end_time": null,
       "total_storage": 999999999,
       "vip_storage": 999999999,
       "used_storage": 0,
