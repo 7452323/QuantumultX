@@ -1,3 +1,4 @@
+/*
 new Env("布丁扫描签到");
 cron 30 9 * * * buding_checkin.js
 
@@ -12,28 +13,24 @@ cron 30 9 * * * buding_checkin.js
 hostname = www.budingscan.com
 
 ⚠️ 免责声明:
-1、此脚本仅用于学习研究...
+1、此脚本仅用于学习研究，请于下载后24小时内删除。
+2、使用本脚本所造成的一切后果由使用者自行承担。
 */
 
 const $ = new Env("布丁扫描");
-// 存储key
 const STORAGE_KEY = 'buding_checkin';
 const SEP = '###BUDING###';
 
-// 主入口
 !(async () => {
     if (typeof $request != "undefined") {
         await captureHeaders();
     } else {
         await doCheckin();
     }
-})()
-.catch(e => $.logErr(e))
-.finally(() => $.done());
+})().catch(e => $.logErr(e)).finally(() => $.done());
 
 /**
  * 抓取完整请求 headers（Rewrite 模式）
- * 触发条件：布丁扫描 App 发起任何 server 域请求时
  */
 async function captureHeaders() {
     if ($request.method === 'OPTIONS') return;
@@ -57,7 +54,6 @@ async function captureHeaders() {
     const uid = raw['x-uid'] || '';
     const phoneId = raw['x-phone-id'] || '';
 
-    // 从body提取phone_id（用于签到接口）
     let phone_id = '';
     if ($request.body) {
         const m = $request.body.match(/request_id=([a-f0-9]+)/);
@@ -68,11 +64,10 @@ async function captureHeaders() {
     }
 
     if (!uid && !phoneId) {
-        $.log('⛔️ 未找到关键标识，跳过抓取');
+        $.log('⛔️ 未找到关键标识，跳过');
         return;
     }
 
-    // 去重存储
     let list = ($.getdata(STORAGE_KEY) || '').split(SEP).filter(Boolean);
     const dedupKey = uid || phone_id;
     list = list.filter(item => {
@@ -105,18 +100,12 @@ async function doCheckin() {
     for (let i = 0; i < list.length; i++) {
         try {
             const { headers, phone_id } = JSON.parse(list[i]);
-            if (!headers || !phone_id) {
-                msgs.push(`账号${i + 1}: ⛔️ 数据不完整`);
-                fail++;
-                continue;
-            }
+            if (!headers || !phone_id) { fail++; continue; }
 
             $.log(`📱 账号${i + 1} 开始签到...`);
 
-            // 1. 检查今日是否已签
             const ts = Math.floor(Date.now() / 1000);
-            const donateUrl =
-                `https://www.budingscan.com/cloud_storage/get_donate_record` +
+            const donateUrl = `https://www.budingscan.com/cloud_storage/get_donate_record` +
                 `?phone_id=${phone_id}&request_id=${phone_id}-${ts}&request_time=${ts}&rtype=0`;
 
             const donateBody = await http(donateUrl, 'GET', headers);
@@ -124,11 +113,9 @@ async function doCheckin() {
 
             if (donateData?.data?.daily_status === 1) {
                 msgs.push(`账号${i + 1}: ✅ 今日已签`);
-                succ++;
-                continue;
+                succ++; continue;
             }
 
-            // 2. 签到
             const ts2 = Math.floor(Date.now() / 1000);
             const postBody = `request_id=${phone_id}-${ts2}&request_time=${ts2}`;
             const respBody = await http(
@@ -138,11 +125,10 @@ async function doCheckin() {
             const data = safeJSON(respBody);
 
             if (data && data.code === 0) {
-                msgs.push(`账号${i + 1}: ✅ 签到成功 +5MB`);
+                msgs.push(`账号${i + 1}: ✅ +5MB`);
                 succ++;
             } else {
-                const msg = data?.msg || `HTTP ${respBody?.status}`;
-                msgs.push(`账号${i + 1}: ❌ ${msg}`);
+                msgs.push(`账号${i + 1}: ❌ ${data?.msg || '失败'}`);
                 fail++;
             }
         } catch (e) {
@@ -157,10 +143,7 @@ async function doCheckin() {
         msgs.slice(0, 5).join('\n'));
 }
 
-// ═══════════════════════════════════
-//  工具函数
-// ═══════════════════════════════════
-
+// ── 工具 ──
 function safeJSON(str) {
     try { return JSON.parse(str); } catch { return null; }
 }
@@ -170,34 +153,19 @@ function http(url, method, headers, body) {
         const opts = { url, headers, method };
         if (body) opts.body = body;
 
-        // QX 优先
         if (typeof $task !== 'undefined') {
             $task.fetch(opts)
                 .then(r => resolve(r.body), e => reject(e));
-        }
-        // Surge/Loon
-        else if (typeof $httpClient !== 'undefined') {
-            const cb = (err, resp, data) => {
-                if (err) reject(err);
-                else resolve(data);
-            };
-            if (method === 'GET') $httpClient.get(opts, cb);
-            else $httpClient.post(opts, cb);
-        }
-        // Node.js
-        else {
+        } else if (typeof $httpClient !== 'undefined') {
+            const cb = (err, resp, data) => err ? reject(err) : resolve(data);
+            method === 'GET' ? $httpClient.get(opts, cb) : $httpClient.post(opts, cb);
+        } else {
             const mod = url.startsWith('https') ? require('https') : require('http');
             const parsed = require('url').parse(url);
-            const req = mod.request({
-                hostname: parsed.hostname,
-                path: parsed.path,
-                method,
-                headers
-            }, resp => {
-                let d = '';
-                resp.on('data', c => d += c);
-                resp.on('end', () => resolve(d));
-            });
+            const req = mod.request(
+                { hostname: parsed.hostname, path: parsed.path, method, headers },
+                resp => { let d = ''; resp.on('data', c => d += c); resp.on('end', () => resolve(d)); }
+            );
             req.on('error', reject);
             if (body) req.write(body);
             req.end();
@@ -205,9 +173,7 @@ function http(url, method, headers, body) {
     });
 }
 
-// ═══════════════════════════════════
-//  chavyleung's Env
-// ═══════════════════════════════════
+// ── Env ──
 function Env(t, e) {
     return new class {
         constructor(t, e) {
@@ -264,15 +230,10 @@ function Env(t, e) {
 
         msg(title, subtitle, content) {
             switch (this.getEnv()) {
-                case 'Quantumult X':
-                    $notify(title, subtitle || '', content || '');
-                    break;
+                case 'Quantumult X': $notify(title, subtitle || '', content || ''); break;
                 case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket':
-                    $notification.post(title, subtitle || '', content || '');
-                    break;
-                case 'Node.js':
-                    console.log(`${title}: ${subtitle} - ${content}`);
-                    break;
+                    $notification.post(title, subtitle || '', content || ''); break;
+                case 'Node.js': console.log(`${title}: ${subtitle} - ${content}`); break;
             }
         }
 
@@ -281,11 +242,8 @@ function Env(t, e) {
             this.log(`结束! ${elapsed}s`);
             switch (this.getEnv()) {
                 case 'Quantumult X': case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket':
-                    $done({});
-                    break;
-                case 'Node.js':
-                    process.exit(0);
-                    break;
+                    $done({}); break;
+                case 'Node.js': process.exit(0); break;
             }
         }
     }(t, e);
