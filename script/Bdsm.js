@@ -38,7 +38,7 @@ try {
       "renewal_status": 0,             // 0=无需续费
       "subscribe_plan_validity": 36500, // 36500天=100年
       "subscribe_plan_name": "终身会员",
-      "end_time": null,
+      "end_time": "2099-12-31 23:59:59",
       "total_storage": 999999999,
       "vip_storage": 999999999,
       "used_storage": 0,
