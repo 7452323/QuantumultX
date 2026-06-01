@@ -1,13 +1,13 @@
 /*
 new Env("布丁扫描签到");
-cron 30 9 * * * buding_checkin.js
+cron 30 9 * * * https://raw.githubusercontent.com/7452323/QuantumultX/main/task/buding_checkin.js
 
 脚本兼容: Surge, Quantumult X, Loon, Shadowrocket, Node.js
 
 布丁扫描每日签到，可获 5MB 云空间
 
 [rewrite_local]
-^https?:\/\/www\.budingscan\.com\/server\/(get_user_config|get_dynamic_config|invitation_code|coupon\/create) url script-request-body buding_checkin.js
+^https?:\/\/www\.budingscan\.com\/server\/(get_user_config|get_dynamic_config|invitation_code|coupon\/create) url script-request-body https://raw.githubusercontent.com/7452323/QuantumultX/main/task/buding_checkin.js
 
 [MITM]
 hostname = www.budingscan.com
