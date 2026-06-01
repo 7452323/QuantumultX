@@ -7,7 +7,7 @@ cron 30 9 * * * https://raw.githubusercontent.com/7452323/QuantumultX/main/task/
 布丁扫描每日签到，可获 5MB 云空间
 
 [rewrite_local]
-^https?:\/\/www\.budingscan\.com url script-request-body https://raw.githubusercontent.com/7452323/QuantumultX/main/task/buding_checkin.js
+^https?:\/\/www\.budingscan\.com url script-request-header https://raw.githubusercontent.com/7452323/QuantumultX/main/task/buding_checkin.js
 
 [MITM]
 hostname = www.budingscan.com
@@ -34,6 +34,7 @@ const SEP = '###BUDING###';
  * 打开布丁扫描 App 时自动触发
  */
 async function captureHeaders() {
+    // script-request-header 模式下没有 body，但所有请求（GET/POST）都会触发
     if ($request.method === 'OPTIONS') return;
 
     const raw = $request.headers || {};
@@ -58,16 +59,10 @@ async function captureHeaders() {
         return;
     }
 
-    // 从 URL query 或 body 中提取 phone_id
+    // 从 URL query 中提取 phone_id（GET 请求如 get_donate_record?phone_id=xxx）
     let phone_id = '';
-    // URL 里有 phone_id=xxxx
     const urlMatch = $request.url.match(/phone_id=([a-f0-9]+)/);
     if (urlMatch) phone_id = urlMatch[1];
-    // body 里有 request_id=xxxx-...
-    if (!phone_id && $request.body) {
-        const bodyMatch = $request.body.match(/request_id=([a-f0-9]+)/);
-        if (bodyMatch) phone_id = bodyMatch[1];
-    }
 
     let list = ($.getdata(STORAGE_KEY) || '').split(SEP).filter(Boolean);
     list = list.filter(item => {
