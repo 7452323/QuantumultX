@@ -1,0 +1,15 @@
+#!name=UnlockCore 通用解锁
+#!desc=RevenueCat + AppleReceipt + 多App一键解锁框架
+#!author=7452323
+#!icon=https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/QuantumultX.png
+
+[Script]
+http-response ^https:\/\/api\.revenuecat\.com\/v1\/(receipts|subscribers) script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/UnlockCore.js, requires-body=true
+http-request ^https:\/\/api\.revenuecat\.com\/v1\/(receipts|subscribers) script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/UnlockCore.js, requires-body=true
+http-response ^https:\/\/buy\.itunes\.apple\.com\/verifyReceipt script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/UnlockCore.js, requires-body=true
+http-response ^https:\/\/www\.budingscan\.com\/server\/ script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/UnlockCore.js, requires-body=true
+http-response ^https:\/\/bd-aiart\.vivo\.com\.cn\/ai_painting\/(get_remain_paint_count|self_homepage) script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/UnlockCore.js, requires-body=true
+http-response ^https:\/\/art\.budingscan\.com\/ai_painting\/get_remain_photo_shoot_count script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/UnlockCore.js, requires-body=true
+
+[MITM]
+hostname = api.revenuecat.com, buy.itunes.apple.com, www.budingscan.com, bd-aiart.vivo.com.cn, art.budingscan.com
