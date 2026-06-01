@@ -1,13 +1,16 @@
 /*
-布丁扫描 解锁VIP - 真正解锁版
+布丁扫描 解锁VIP + 去广告
 
 [rewrite_local]
 ^https:\/\/www\.budingscan\.com\/server\/get_user_config url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js
 ^https:\/\/www\.budingscan\.com\/server\/payment\/paid_modules url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js
 ^https:\/\/www\.budingscan\.com\/server\/payment\/paid_module_usage url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js
+^https:\/\/www\.budingscan\.com\/server\/backend\/dashboardBanner\/online_banners url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js
+^https:\/\/art\.budingscan\.com\/backend\/dashboardBanner\/online_ai_photo_banners url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js
+^https:\/\/bd-aiart\.vivo\.com\.cn\/backend\/dashboardBanner\/online_painting_banners url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js
 
 [mitm]
-hostname = www.budingscan.com
+hostname = www.budingscan.com, art.budingscan.com, bd-aiart.vivo.com.cn
 */
 
 const url = $request.url;
@@ -17,16 +20,16 @@ try {
   const obj = JSON.parse(body);
 
   if (url.includes('/get_user_config')) {
-    // 关键：改成VIP会员 + 终身 + 无限
+    // 终身会员
     obj.result = {
       ...obj.result,
-      "user_type": 3,              // 会员
-      "subscribe_pay_type": 3,     // 支付类型
-      "renewal_status": 1,         // 续费中
-      "subscribe_plan_validity": 3,// 长期有效
+      "user_type": 3,
+      "subscribe_pay_type": 3,
+      "renewal_status": 1,
+      "subscribe_plan_validity": 3,
       "subscribe_plan_name": "终身会员",
-      "end_time": 4092643200,      // 未来
-      "total_storage": 999999999,  // 无限空间
+      "end_time": 4092643200,
+      "total_storage": 999999999,
       "vip_storage": 999999999,
       "used_storage": 0,
       "oral": 1
@@ -47,12 +50,17 @@ try {
     body = JSON.stringify(obj);
 
   } else if (url.includes('/payment/paid_module_usage')) {
-    // 替换加密响应为"未使用"状态（0次已用）
-    // 注意：不同模块需要不同的加密响应，这里用一个通用值
-    // 如果显示不准但功能可用，后续再优化
+    // 返回"已用0次"的加密数据
     obj.result = {
       "encrypt_text": "UKbYMD/VGPnmM59QTWNWjmEAScQt5gcYQgf7jBjBW5YttGqvabvEyIpd35CRhN4Aeq1pNDki8Sp0K++5S20GbZqyGFZCqyZIuMfDanWWLWY="
     };
+    body = JSON.stringify(obj);
+
+  } else if (url.includes('/dashboardBanner/online_banners') || 
+             url.includes('/dashboardBanner/online_ai_photo_banners') || 
+             url.includes('/dashboardBanner/online_painting_banners')) {
+    // 去广告
+    obj.result = { "banners": [] };
     body = JSON.stringify(obj);
   }
 
