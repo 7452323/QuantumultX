@@ -15,7 +15,7 @@ hostname = www.budingscan.com, art.budingscan.com, bd-aiart.vivo.com.cn
 
 const url = $request.url;
 
-// banner广告——直接返回404，让app不渲染容器
+// banner广告——直接返回404
 if (url.includes('/dashboardBanner/')) {
   $done({
     status: "HTTP/1.1 404 Not Found",
@@ -30,12 +30,13 @@ try {
   const obj = JSON.parse(body);
 
   if (url.includes('/get_user_config')) {
+    // 终身会员参数：plan_type=0, plan_renewal_status=0, validity=36500
     obj.result = {
       ...obj.result,
       "user_type": 3,
-      "subscribe_pay_type": 3,
-      "renewal_status": 1,
-      "subscribe_plan_validity": 3,
+      "subscribe_pay_type": 0,         // 0=一次性购买
+      "renewal_status": 0,             // 0=无需续费
+      "subscribe_plan_validity": 36500, // 36500天=100年
       "subscribe_plan_name": "终身会员",
       "end_time": null,
       "total_storage": 999999999,
