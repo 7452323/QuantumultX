@@ -1,14 +1,15 @@
 /*
-布丁扫描 解锁VIP + 去广告 + 无限次数
+布丁扫描 解锁VIP + 去广告 + 无限次数 + 去续费
 
 [rewrite_local]
 ^https:\/\/www\.budingscan\.com\/server\/get_user_config url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js
 ^https:\/\/www\.budingscan\.com\/server\/payment\/paid_modules url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js
 ^https:\/\/www\.budingscan\.com\/server\/payment\/paid_module_usage url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js
+^https:\/\/www\.budingscan\.com\/server\/payment\/plans url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js
+^https:\/\/www\.budingscan\.com\/server\/payment\/questions url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js
 ^https:\/\/www\.budingscan\.com\/server\/backend\/dashboardBanner\/online_banners url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js
 ^https:\/\/art\.budingscan\.com\/backend\/dashboardBanner\/online_ai_photo_banners url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js
 ^https:\/\/bd-aiart\.vivo\.com\.cn\/backend\/dashboardBanner\/online_painting_banners url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js
-
 ^https:\/\/bd-aiart\.vivo\.com\.cn\/ai_painting\/get_remain_paint_count url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js
 ^https:\/\/bd-aiart\.vivo\.com\.cn\/ai_painting\/self_homepage url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js
 ^https:\/\/art\.budingscan\.com\/ai_painting\/get_remain_photo_shoot_count url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js
@@ -19,7 +20,7 @@ hostname = www.budingscan.com, art.budingscan.com, bd-aiart.vivo.com.cn
 
 const url = $request.url;
 
-// banner广告——直接返回404
+// banner广告——直接返回404，尝试消容器
 if (url.includes('/dashboardBanner/')) {
   $done({
     status: "HTTP/1.1 404 Not Found",
@@ -69,19 +70,34 @@ try {
     };
     body = JSON.stringify(obj);
 
+  } else if (url.includes('/payment/plans')) {
+    // 只保留终身会员，删掉续费订阅计划
+    if (obj.result && Array.isArray(obj.result)) {
+      obj.result = obj.result.filter(plan => 
+        plan.plan_renewal_status !== 1  // 去掉自动续费的计划
+      );
+    }
+    body = JSON.stringify(obj);
+
+  } else if (url.includes('/payment/questions')) {
+    // 去掉续费相关的FAQ
+    if (obj.result && Array.isArray(obj.result)) {
+      obj.result = obj.result.filter(q => 
+        q.plan_renewal_status !== 1  // 去掉连续包月/续费相关问题
+      );
+    }
+    body = JSON.stringify(obj);
+
   } else if (url.includes('/get_remain_paint_count')) {
-    // AI绘画无限次
     obj.data = { "count": 99999 };
     body = JSON.stringify(obj);
 
   } else if (url.includes('/self_homepage')) {
-    // AI绘画个人主页无限次
     obj.data.count_remain = 99999;
     obj.data.count_used = 0;
     body = JSON.stringify(obj);
 
   } else if (url.includes('/get_remain_photo_shoot_count')) {
-    // AI写真无限次
     obj.data = { "count": 99999, "history_count": 0 };
     body = JSON.stringify(obj);
   }
