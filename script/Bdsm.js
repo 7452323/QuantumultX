@@ -2,13 +2,8 @@
 布丁扫描 解锁VIP + 去广告
 
 [rewrite_local]
-^https:\/\/www\.budingscan\.com\/server\/get_user_config url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js
-^https:\/\/www\.budingscan\.com\/server\/payment\/paid_modules url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js
-^https:\/\/www\.budingscan\.com\/server\/payment\/plans url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js
-^https:\/\/www\.budingscan\.com\/server\/payment\/questions url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js
-^https:\/\/www\.budingscan\.com\/server\/backend\/dashboardBanner\/online_banners url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js
-^https:\/\/bd-aiart\.vivo\.com\.cn\/ai_painting\/get_remain_paint_count url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js
-^https:\/\/bd-aiart\.vivo\.com\.cn\/ai_painting\/self_homepage url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js
+^https:\/\/www\.budingscan\.com\/server\/ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js
+^https:\/\/bd-aiart\.vivo\.com\.cn\/ai_painting\/(get_remain_paint_count|self_homepage) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js
 ^https:\/\/art\.budingscan\.com\/ai_painting\/get_remain_photo_shoot_count url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js
 
 [mitm]
