@@ -1,5 +1,5 @@
 /*
-布丁扫描 解锁VIP + 去广告 + 无限次数 + 去续费
+布丁扫描 解锁VIP + 去广告 + 无限次数 + 去续费 + 永久会员
 
 [rewrite_local]
 ^https:\/\/www\.budingscan\.com\/server\/get_user_config url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js
@@ -35,7 +35,7 @@ try {
   const obj = JSON.parse(body);
 
   if (url.includes('/get_user_config')) {
-    // 终身会员
+    // 永久会员 - end_time设为空让APP显示计划名
     obj.result = {
       ...obj.result,
       "user_type": 3,
@@ -43,7 +43,7 @@ try {
       "renewal_status": 0,
       "subscribe_plan_validity": 36500,
       "subscribe_plan_name": "终身会员",
-      "end_time": "2099-12-31 23:59:59",
+      "end_time": "",
       "total_storage": 999999999,
       "vip_storage": 999999999,
       "used_storage": 0,
@@ -65,6 +65,7 @@ try {
     body = JSON.stringify(obj);
 
   } else if (url.includes('/payment/paid_module_usage')) {
+    // 返回未使用的加密数据
     obj.result = {
       "encrypt_text": "UKbYMD/VGPnmM59QTWNWjmEAScQt5gcYQgf7jBjBW5YttGqvabvEyIpd35CRhN4Aeq1pNDki8Sp0K++5S20GbZqyGFZCqyZIuMfDanWWLWY="
     };
@@ -74,7 +75,7 @@ try {
     // 只保留终身会员，删掉续费订阅计划
     if (obj.result && Array.isArray(obj.result)) {
       obj.result = obj.result.filter(plan => 
-        plan.plan_renewal_status !== 1  // 去掉自动续费的计划
+        plan.plan_renewal_status !== 1
       );
     }
     body = JSON.stringify(obj);
@@ -83,7 +84,7 @@ try {
     // 去掉续费相关的FAQ
     if (obj.result && Array.isArray(obj.result)) {
       obj.result = obj.result.filter(q => 
-        q.plan_renewal_status !== 1  // 去掉连续包月/续费相关问题
+        q.plan_renewal_status !== 1
       );
     }
     body = JSON.stringify(obj);
