@@ -43,7 +43,6 @@ try {
       "renewal_status": 0,
       "subscribe_plan_validity": 36500,
       "subscribe_plan_name": "终身会员",
-      "end_time": "",
       "total_storage": 999999999,
       "vip_storage": 999999999,
       "used_storage": 0,
