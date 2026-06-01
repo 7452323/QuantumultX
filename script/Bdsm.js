@@ -14,6 +14,16 @@ hostname = www.budingscan.com, art.budingscan.com, bd-aiart.vivo.com.cn
 */
 
 const url = $request.url;
+
+// banner广告——直接返回404，让app不渲染容器
+if (url.includes('/dashboardBanner/')) {
+  $done({
+    status: "HTTP/1.1 404 Not Found",
+    headers: { "Content-Type": "text/plain" },
+    body: ""
+  });
+}
+
 let body = $response.body;
 
 try {
@@ -51,11 +61,6 @@ try {
     obj.result = {
       "encrypt_text": "UKbYMD/VGPnmM59QTWNWjmEAScQt5gcYQgf7jBjBW5YttGqvabvEyIpd35CRhN4Aeq1pNDki8Sp0K++5S20GbZqyGFZCqyZIuMfDanWWLWY="
     };
-    body = JSON.stringify(obj);
-
-  } else if (url.includes('/dashboardBanner/')) {
-    // 去广告 - 不让容器出现
-    delete obj.result;
     body = JSON.stringify(obj);
   }
 
