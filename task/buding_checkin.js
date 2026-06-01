@@ -7,7 +7,7 @@ cron 30 9 * * * https://raw.githubusercontent.com/7452323/QuantumultX/main/task/
 布丁扫描每日签到，可获 5MB 云空间
 
 [rewrite_local]
-^https?:\/\/www\.budingscan\.com\/server\/(get_user_config|get_dynamic_config|invitation_code|coupon\/create) url script-request-body https://raw.githubusercontent.com/7452323/QuantumultX/main/task/buding_checkin.js
+^https?:\/\/www\.budingscan\.com url script-request-body https://raw.githubusercontent.com/7452323/QuantumultX/main/task/buding_checkin.js
 
 [MITM]
 hostname = www.budingscan.com
@@ -31,6 +31,7 @@ const SEP = '###BUDING###';
 
 /**
  * 抓取完整请求 headers（Rewrite 模式）
+ * 打开布丁扫描 App 时自动触发
  */
 async function captureHeaders() {
     if ($request.method === 'OPTIONS') return;
@@ -52,32 +53,31 @@ async function captureHeaders() {
     }
 
     const uid = raw['x-uid'] || '';
-    const phoneId = raw['x-phone-id'] || '';
-
-    let phone_id = '';
-    if ($request.body) {
-        const m = $request.body.match(/request_id=([a-f0-9]+)/);
-        if (m) phone_id = m[1];
-    }
-    if (!phone_id && phoneId) {
-        phone_id = phoneId.replace(/-/g, '').toLowerCase();
-    }
-
-    if (!uid && !phoneId) {
-        $.log('⛔️ 未找到关键标识，跳过');
+    if (!uid) {
+        $.log('⛔️ 未找到 x-uid，跳过抓取');
         return;
     }
 
+    // 从 URL query 或 body 中提取 phone_id
+    let phone_id = '';
+    // URL 里有 phone_id=xxxx
+    const urlMatch = $request.url.match(/phone_id=([a-f0-9]+)/);
+    if (urlMatch) phone_id = urlMatch[1];
+    // body 里有 request_id=xxxx-...
+    if (!phone_id && $request.body) {
+        const bodyMatch = $request.body.match(/request_id=([a-f0-9]+)/);
+        if (bodyMatch) phone_id = bodyMatch[1];
+    }
+
     let list = ($.getdata(STORAGE_KEY) || '').split(SEP).filter(Boolean);
-    const dedupKey = uid || phone_id;
     list = list.filter(item => {
         try {
             const h = JSON.parse(item);
-            return h.uid !== dedupKey && h.phoneId !== dedupKey;
+            return h.uid !== uid;
         } catch { return false; }
     });
 
-    list.push(JSON.stringify({ headers, uid: dedupKey, phone_id }));
+    list.push(JSON.stringify({ headers, uid, phone_id }));
     $.setdata(list.join(SEP), STORAGE_KEY);
     $.msg($.name, `✅ 抓取成功 (${list.length})`,
         `UID: ${uid.slice(0, 16)}...`);
@@ -99,8 +99,14 @@ async function doCheckin() {
 
     for (let i = 0; i < list.length; i++) {
         try {
-            const { headers, phone_id } = JSON.parse(list[i]);
-            if (!headers || !phone_id) { fail++; continue; }
+            const entry = JSON.parse(list[i]);
+            const headers = entry.headers;
+            let phone_id = entry.phone_id;
+            if (!headers) { fail++; continue; }
+            if (!phone_id) {
+                msgs.push(`账号${i + 1}: ⛔️ 无 phone_id，请重新打开 App 获取`);
+                fail++; continue;
+            }
 
             $.log(`📱 账号${i + 1} 开始签到...`);
 
