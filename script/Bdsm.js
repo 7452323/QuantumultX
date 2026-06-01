@@ -1,10 +1,10 @@
 /*
-布丁扫描 解锁VIP
+布丁扫描 解锁VIP - 真正解锁版
 
 [rewrite_local]
-^https:\/\/www\.budingscan\.com\/server\/get_user_config url script-response-body https:\/\/raw.githubusercontent.com\/7452323\/QuantumultX\/main\/script\/Bdsm.js
-^https:\/\/www\.budingscan\.com\/server\/payment\/paid_modules url script-response-body https:\/\/raw.githubusercontent.com\/7452323\/QuantumultX\/main\/script\/Bdsm.js
-^https:\/\/www\.budingscan\.com\/server\/payment\/paid_module_usage url script-response-body https:\/\/raw.githubusercontent.com\/7452323\/QuantumultX\/main\/script\/Bdsm.js
+^https:\/\/www\.budingscan\.com\/server\/get_user_config url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js
+^https:\/\/www\.budingscan\.com\/server\/payment\/paid_modules url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js
+^https:\/\/www\.budingscan\.com\/server\/payment\/paid_module_usage url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js
 
 [mitm]
 hostname = www.budingscan.com
@@ -17,44 +17,41 @@ try {
   const obj = JSON.parse(body);
 
   if (url.includes('/get_user_config')) {
-    // 伪装VIP
+    // 关键：改成VIP会员 + 终身 + 无限
     obj.result = {
       ...obj.result,
-      "user_type": 3,
-      "subscribe_pay_type": 3,
-      "renewal_status": 1,
-      "subscribe_plan_validity": 3,
+      "user_type": 3,              // 会员
+      "subscribe_pay_type": 3,     // 支付类型
+      "renewal_status": 1,         // 续费中
+      "subscribe_plan_validity": 3,// 长期有效
       "subscribe_plan_name": "终身会员",
-      "end_time": 4092643200,
-      "next_pay_price": null,
-      "next_pay_time": null,
-      "total_storage": 999999999,
+      "end_time": 4092643200,      // 未来
+      "total_storage": 999999999,  // 无限空间
       "vip_storage": 999999999,
       "used_storage": 0,
       "oral": 1
     };
-    obj.code = 0;
-    obj.msg = "ok";
     body = JSON.stringify(obj);
 
   } else if (url.includes('/payment/paid_modules')) {
-    // 全部模块无限制
-    const unlimitedModules = (obj.result || []).map(mod => ({
-      ...mod,
-      "usage_limit": -1,
-      "vip_usage_limit": -1,
-      "storage_limit": 999999,
-      "vip_storage_limit": 999999
-    }));
-    obj.result = unlimitedModules;
+    // 所有模块无限使用
+    if (obj.result && Array.isArray(obj.result)) {
+      obj.result = obj.result.map(mod => ({
+        ...mod,
+        "usage_limit": -1,
+        "vip_usage_limit": -1,
+        "storage_limit": 999999,
+        "vip_storage_limit": 999999
+      }));
+    }
     body = JSON.stringify(obj);
 
   } else if (url.includes('/payment/paid_module_usage')) {
-    // 替换为"0使用"的加密数据
-    // encrypt_text 来自抓包：3个未使用模块返回相同的80字节加密数据
-    const zeroUsage = "UKbYMD/VGPnmM59QTWNWjmEAScQt5gcYQgf7jBjBW5YttGqvabvEyIpd35CRhN4Aeq1pNDki8Sp0K++5S20GbZqyGFZCqyZIuMfDanWWLWY=";
+    // 替换加密响应为"未使用"状态（0次已用）
+    // 注意：不同模块需要不同的加密响应，这里用一个通用值
+    // 如果显示不准但功能可用，后续再优化
     obj.result = {
-      "encrypt_text": zeroUsage
+      "encrypt_text": "UKbYMD/VGPnmM59QTWNWjmEAScQt5gcYQgf7jBjBW5YttGqvabvEyIpd35CRhN4Aeq1pNDki8Sp0K++5S20GbZqyGFZCqyZIuMfDanWWLWY="
     };
     body = JSON.stringify(obj);
   }
