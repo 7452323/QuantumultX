@@ -1,5 +1,7 @@
 /*
-布丁扫描 解锁VIP + 去广告
+布丁扫描 2.5.7 解锁VIP + 去广告
+
+https://apps.apple.com/cn/app/%E5%B8%83%E4%B8%81%E6%89%AB%E6%8F%8F/id1626815079
 
 [rewrite_local]
 ^https:\/\/www\.budingscan\.com\/server\/get_user_config url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js
