@@ -15,6 +15,4 @@ body = body.replace(/"unlocked":\w+/g, '"unlocked":true');
 body = body.replace(/"expires_time":"[^"]+"/g, '"expires_time":"2099-12-31 23:59:59"');
 body = body.replace(/"watermark":\w+/g, '"watermark":false');
 body = body.replace(/"is_purchased":\w+/g, '"is_purchased":true');
-body = body.replace(/v\.0_10000\./g, 'v.');
-
 $done({body: body});
