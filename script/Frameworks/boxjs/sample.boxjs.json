@@ -1,0 +1,26 @@
+{
+  "id": "sample_app",
+  "name": "示例 App 配置",
+  "keys": [
+    {
+      "id": "sample_enabled",
+      "name": "启用签到",
+      "type": "boolean",
+      "default": true
+    },
+    {
+      "id": "sample_notify",
+      "name": "推送通知",
+      "type": "boolean",
+      "default": true
+    }
+  ],
+  "settings": [
+    {
+      "id": "sample_interval",
+      "name": "签到间隔(小时)",
+      "val": "6",
+      "type": "number"
+    }
+  ]
+}
