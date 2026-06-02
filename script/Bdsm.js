@@ -1,14 +1,13 @@
-/* ═══════════════════════════════════════════════════════
-   布丁扫描 解锁VIP + 去广告 + 无限次数
-   v2.0 — 完全重写，覆盖所有付费校验点
+/* 
+布丁扫描 解锁VIP
 
-   [rewrite_local]
-   ^https:\/\/www\.budingscan\.com\/server\/(get_user_config|payment\/(paid_modules|paid_module_used|paid_module_usage|plans|questions)|get_dynamic_config) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js
-   ^https:\/\/www\.budingscan\.com\/server\/backend\/dashboardBanner\/ online_banners url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js
+[rewrite_local]
+^https:\/\/www\.budingscan\.com\/server\/(get_user_config|payment\/(paid_modules|paid_module_used|paid_module_usage|plans|questions)|get_dynamic_config) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js
+^https:\/\/www\.budingscan\.com\/server\/backend\/dashboardBanner\/ online_banners url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js
 
-   [mitm]
-   hostname = www.budingscan.com
-   ═══════════════════════════════════════════════════════ */
+[mitm]
+hostname = www.budingscan.com
+ */
 
 const url = $request.url;
 let body = $response.body;
