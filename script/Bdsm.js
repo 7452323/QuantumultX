@@ -1,4 +1,4 @@
-/* 
+/*
 布丁扫描 解锁VIP + 去广告 + 无限次数
 
 [rewrite_local]
@@ -45,7 +45,7 @@ try {
     delete obj.result;
 
   } else if (url.includes('/payment/paid_module_usage')) {
-    // pass through
+    // pass
 
   } else if (url.includes('/payment/plans')) {
     if (Array.isArray(obj.result)) {
@@ -61,7 +61,7 @@ try {
     obj.result = { banners: [] };
 
   } else if (url.includes('/get_dynamic_config')) {
-    // pass through
+    // pass
   }
 
   body = JSON.stringify(obj);
