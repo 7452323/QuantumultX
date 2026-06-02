@@ -1,6 +1,6 @@
 /*
  * @name Shuangpin PRO
- * @description RevenueCat 4.x 永久解锁 - 拦截全API
+ * @description 永久解锁 - 拦截全API
 
  [rewrite_local]
 ^https?:\/\/api\.(revenuecat|rc-backup)\.com\/v1\/.* url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Shuangpin.js
