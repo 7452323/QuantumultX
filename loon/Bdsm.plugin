@@ -1,12 +1,11 @@
 #!name=布丁扫描
-#!desc=纯鸡巴自慰,没吊用,当前版本 2.4.5
-#!author=Qiq
-#!tag=会员破解
-#!homepage=https://github.com/7452323/QuantumultX
+#!desc=解锁VIP + 去广告 + 无限次数
+#!author=7452323
 #!icon=https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Budingsaomiao.png
 
 [Script]
-http-response ^https:\/\/api\.budingscan\.com\/user\/info script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js, requires-body=true, timeout=60, tag=Bdsm
+http-response ^https:\/\/www\.budingscan\.com\/server\/(get_user_config|payment\/(paid_modules|paid_module_used|paid_module_usage|plans|questions)|get_dynamic_config) script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js, requires-body=true, timeout=60, tag=Bdsm
+http-response ^https:\/\/www\.budingscan\.com\/server\/backend\/dashboardBanner\/ online_banners script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js, requires-body=true, timeout=60, tag=Bdsm-ad
 
 [MITM]
-hostname = api.budingscan.com
+hostname = www.budingscan.com

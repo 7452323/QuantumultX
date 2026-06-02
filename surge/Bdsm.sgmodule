@@ -1,8 +1,9 @@
-#!name=布丁扫描-2.4.5
-#!desc=纯鸡巴自慰,没吊用
+#!name=布丁扫描
+#!desc=解锁VIP + 去广告 + 无限次数
 
 [Script]
-Bdsm = type=http-response, pattern=^https:\/\/api\.budingscan\.com\/user\/info, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js, requires-body=true, max-size=-1, timeout=60
+Bdsm = type=http-response, pattern=^https:\/\/www\.budingscan\.com\/server\/(get_user_config|payment\/(paid_modules|paid_module_used|paid_module_usage|plans|questions)|get_dynamic_config), script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js, requires-body=true, max-size=-1, timeout=60
+Bdsm-ad = type=http-response, pattern=^https:\/\/www\.budingscan\.com\/server\/backend\/dashboardBanner\/ online_banners, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Bdsm.js, requires-body=true, max-size=-1, timeout=60
 
 [MITM]
-hostname = %APPEND% api.budingscan.com
+hostname = %APPEND% www.budingscan.com
