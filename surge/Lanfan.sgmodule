@@ -1,12 +1,10 @@
 #!name=懒饭 PRO
-#!desc=会员解锁 + 高清视频 + 去会员提示
+#!desc=会员解锁 + 去广告
 #!author=7452323
+#!icon=
 
 [Script]
-Lanfan = type=http-response, pattern=^https?:\/\/lanfanapp\.com\/api\/v1\/(user\/prime|prime\/promotion_banner|recipe\/page_detail|homepage\/feed|story\/get_v2|plan\/(paged|get_quiz|group\/get_all)), script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Lanfan.js, requires-body=true, max-size=-1, timeout=60
-
-[URL Rewrite]
-^https?:\/\/video5?\.chuimg\.com\/.+\/v\.0_10000\. https://$1/307 v.
+Lanfan = type=http-response, pattern=^https?:\/\/lanfanapp\.com\/api\/v1, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Lanfan.js, requires-body=true, max-size=-1, timeout=60
 
 [MITM]
-hostname = %APPEND% lanfanapp.com, *.chuimg.com
+hostname = %APPEND% lanfanapp.com
