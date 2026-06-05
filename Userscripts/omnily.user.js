@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         网页翻译 · 多引擎
 // @namespace    http://tampermonkey.net/
-// @version      1.5
+// @version      1.6
 // @description  点击翻译整个页面/恢复原文。支持Google(免费)/百度通用(极速)/百度大模型(AI)/DeepSeek(高质量)，双语/单语模式，翻译结果缓存。长按进入配置。
 // @author       you
 // @match        *://*/*
@@ -627,16 +627,26 @@
   function callBaiduLLM(text) {
     return new Promise((resolve, reject) => {
       const appid = cfg.baiduLlmAppId;
-      const salt = Date.now() + Math.random();
+      const salt = Math.floor(Date.now() + Math.random());
       const sign = md5(appid + text + salt + appid);
-      const url = `https://fanyi-api.baidu.com/api/trans/llm/translate?q=${encodeURIComponent(text)}&from=auto&to=zh&appid=${appid}&salt=${salt}&sign=${sign}`;
+      const body = JSON.stringify({
+        q: text,
+        from: "auto",
+        to: "zh",
+        appid: appid,
+        salt: salt,
+        sign: sign,
+        model_type: "llm",
+      });
       GM_xmlhttpRequest({
-        method: "GET", url,
+        method: "POST",
+        url: "https://fanyi-api.baidu.com/ait/api/aiTextTranslate",
+        headers: { "Content-Type": "application/json" },
+        data: body,
         onload: (res) => {
           try {
             const data = JSON.parse(res.responseText);
             if (data.trans_result) resolve(data.trans_result.map((r) => r.dst).join("\n"));
-            else if (data.result) resolve(data.result);
             else if (data.error_code) reject(new Error(`[${data.error_code}] ${data.error_msg}`));
             else reject(new Error("返回异常"));
           } catch { reject(new Error("解析失败")); }
