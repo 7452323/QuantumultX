@@ -1,9 +1,9 @@
 #!name=简讯 VIP
-#!desc=阅读App 解锁VIP + 去广告 + 付费内容
+#!desc=阅读App 解锁VIP + 去广告 + 付费内容 + 语音版
 #!author=7452323
 
 [Script]
-简讯 = type=http-response, pattern=^https:\/\/api\.tipsoon\.com\/api\/v1\/(user\/info|login\/account|top\/system|info\/unlock), script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Jx.js, requires-body=true, max-size=-1, timeout=60
+简讯 = type=http-response, pattern=^https:\/\/api\.tipsoon\.com\/api\/v1\/(user\/info|login\/account|top\/system|info\/unlock|info\/item|info\/fm), script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Jx.js, requires-body=true, max-size=-1, timeout=60
 
 [MITM]
 hostname = %APPEND% api.tipsoon.com
