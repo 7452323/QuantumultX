@@ -23,9 +23,8 @@
     // 百度通用翻译 (appid + secretKey)
     baiduAppId: GM_getValue("ds_baidu_id", ""),
     baiduKey: GM_getValue("ds_baidu_key", ""),
-    // 百度大模型翻译 (API_Key + Secret_Key)
-    baiduApiKey: GM_getValue("ds_baidu_ak", ""),
-    baiduSecretKey: GM_getValue("ds_baidu_sk", ""),
+    // 百度大模型翻译 (只有一串 APP ID)
+    baiduLlmAppId: GM_getValue("ds_baidu_llm_id", ""),
     // DeepSeek
     dsKey: GM_getValue("ds_api_key", ""),
     dsModel: GM_getValue("ds_model", "deepseek-chat"),
@@ -172,10 +171,8 @@
         <div class="hint">免费版每月 100 万字符</div>
       </div>
       <div class="cfg-section" id="ds-cfg-baidu-llm">
-        <label>API Key</label>
-        <input type="password" id="ds-baidu-ak" placeholder="API Key（管理控制台获取）" value="${cfg.baiduApiKey}">
-        <label>Secret Key</label>
-        <input type="password" id="ds-baidu-sk" placeholder="Secret Key（管理控制台获取）" value="${cfg.baiduSecretKey}">
+        <label>APP ID</label>
+        <input type="password" id="ds-baidu-llm-id" placeholder="从控制台获取的单串 APP ID" value="${cfg.baiduLlmAppId}">
         <div class="hint">免费版每月 100 万字符</div>
       </div>
       <div class="cfg-section" id="ds-cfg-ds">
@@ -276,8 +273,7 @@
   function saveConfig() {
     cfg.baiduAppId = document.getElementById("ds-baidu-id").value.trim();
     cfg.baiduKey = document.getElementById("ds-baidu-key").value.trim();
-    cfg.baiduApiKey = document.getElementById("ds-baidu-ak").value.trim();
-    cfg.baiduSecretKey = document.getElementById("ds-baidu-sk").value.trim();
+    cfg.baiduLlmAppId = document.getElementById("ds-baidu-llm-id").value.trim();
     cfg.dsKey = document.getElementById("ds-ds-key").value.trim();
     cfg.dsModel = document.getElementById("ds-ds-model").value;
 
@@ -285,8 +281,7 @@
     GM_setValue("ds_mode", cfg.mode);
     GM_setValue("ds_baidu_id", cfg.baiduAppId);
     GM_setValue("ds_baidu_key", cfg.baiduKey);
-    GM_setValue("ds_baidu_ak", cfg.baiduApiKey);
-    GM_setValue("ds_baidu_sk", cfg.baiduSecretKey);
+    GM_setValue("ds_baidu_llm_id", cfg.baiduLlmAppId);
     GM_setValue("ds_baidu_mode", baiduMode);
     GM_setValue("ds_api_key", cfg.dsKey);
     GM_setValue("ds_model", cfg.dsModel);
@@ -390,8 +385,8 @@
       if (baiduMode === "normal" && (!cfg.baiduAppId || !cfg.baiduKey)) {
         showToast("请配置百度通用翻译（APP ID + 密钥）", "err"); return;
       }
-      if (baiduMode === "llm" && (!cfg.baiduApiKey || !cfg.baiduSecretKey)) {
-        showToast("请配置百度大模型翻译（API Key + Secret Key）", "err"); return;
+      if (baiduMode === "llm" && !cfg.baiduLlmAppId) {
+        showToast("请配置百度大模型翻译 APP ID", "err"); return;
       }
     }
     if (cfg.engine === "deepseek" && !cfg.dsKey) {
@@ -604,40 +599,9 @@
     });
   }
 
-  // ====== 百度大模型翻译（API Key + Secret Key） ======
-  let baiduTokenCache = { token: null, expires: 0 };
-
-  function getBaiduAccessToken() {
-    return new Promise((resolve, reject) => {
-      if (baiduTokenCache.token && Date.now() < baiduTokenCache.expires) {
-        resolve(baiduTokenCache.token);
-        return;
-      }
-      const url = "https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=" + encodeURIComponent(cfg.baiduApiKey) + "&client_secret=" + encodeURIComponent(cfg.baiduSecretKey);
-      GM_xmlhttpRequest({
-        method: "POST", url,
-        headers: { "Content-Type": "application/json", "Accept": "application/json" },
-        onload: (res) => {
-          try {
-            const data = JSON.parse(res.responseText);
-            if (data.access_token) {
-              baiduTokenCache.token = data.access_token;
-              baiduTokenCache.expires = Date.now() + (data.expires_in - 60) * 1000;
-              resolve(data.access_token);
-            } else {
-              reject(new Error("获取token失败: " + (data.error_description || data.error || "未知错误")));
-            }
-          } catch { reject(new Error("解析token响应失败")); }
-        },
-        onerror: () => reject(new Error("获取token网络错误")),
-        timeout: 10000,
-      });
-    });
-  }
-
+  // ====== 百度大模型翻译（单 APP ID） ======
   async function translateBaiduLLM(nodes, indices) {
-    // 大模型翻译批量效率高，每次批10条
-    const batchSize = 10;
+    const batchSize = 5;
     for (let ki = 0; ki < indices.length; ki += batchSize) {
       if (stopRequested) { showToast("⏹️ 已停止", "info"); break; }
       const batchIdx = indices.slice(ki, ki + batchSize);
@@ -662,34 +626,24 @@
 
   function callBaiduLLM(text) {
     return new Promise((resolve, reject) => {
-      getBaiduAccessToken().then((token) => {
-        const url = "https://aip.baidubce.com/rpc/2.0/mt/text/v1/llm_translate?access_token=" + token;
-        GM_xmlhttpRequest({
-          method: "POST", url,
-          headers: { "Content-Type": "application/json" },
-          data: JSON.stringify({
-            q: text,
-            from: "auto",
-            to: "zh",
-          }),
-          onload: (res) => {
-            try {
-              const data = JSON.parse(res.responseText);
-              if (data.result && data.result.trans_result) {
-                resolve(data.result.trans_result.map((r) => r.dst).join("\n"));
-              } else if (data.error_code || data.error_msg) {
-                reject(new Error(`[${data.error_code}] ${data.error_msg}`));
-              } else if (data.result) {
-                resolve(data.result);
-              } else {
-                reject(new Error("返回异常"));
-              }
-            } catch { reject(new Error("解析失败")); }
-          },
-          onerror: () => reject(new Error("网络错误")),
-          timeout: 30000,
-        });
-      }).catch(reject);
+      const appid = cfg.baiduLlmAppId;
+      const salt = Date.now() + Math.random();
+      const sign = md5(appid + text + salt + appid);
+      const url = `https://fanyi-api.baidu.com/api/trans/llm/translate?q=${encodeURIComponent(text)}&from=auto&to=zh&appid=${appid}&salt=${salt}&sign=${sign}`;
+      GM_xmlhttpRequest({
+        method: "GET", url,
+        onload: (res) => {
+          try {
+            const data = JSON.parse(res.responseText);
+            if (data.trans_result) resolve(data.trans_result.map((r) => r.dst).join("\n"));
+            else if (data.result) resolve(data.result);
+            else if (data.error_code) reject(new Error(`[${data.error_code}] ${data.error_msg}`));
+            else reject(new Error("返回异常"));
+          } catch { reject(new Error("解析失败")); }
+        },
+        onerror: () => reject(new Error("网络错误")),
+        timeout: 30000,
+      });
     });
   }
 
