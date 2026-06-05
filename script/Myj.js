@@ -12,12 +12,8 @@ const url = $request.url;
 let body = JSON.parse($response.body);
 
 if (body.data) {
-  body.data.memberType = 3;
-  body.data.vipExpirationTime = "2099-12-31T00:00:00Z";
   body.data.longMemberType = 1;
-  if (body.data.starMemberType !== undefined) {
-    body.data.starMemberType = 1;
-  }
+  body.data.memberType = 3;
 }
 
 $done({ body: JSON.stringify(body) });
