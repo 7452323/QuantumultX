@@ -21,5 +21,7 @@ body = body.replace(/"is_unlock":\w+/g, '"is_unlock":true');
 body = body.replace(/"is_voice_only":\d+/g, '"is_voice_only":0');
 body = body.replace(/"voice":"[^"]*"/g, '"voice":"content"');
 body = body.replace(/"voice":\s*""/g, '"voice":"content"');
+body = body.replace(/"vip":\w+/g, '"vip":true');
+body = body.replace(/"user_stauts":\w+/g, '"user_stauts":true');
 
 $done({ body });
