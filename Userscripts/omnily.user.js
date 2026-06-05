@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         网页翻译 · 多引擎
 // @namespace    http://tampermonkey.net/
-// @version      1.3
-// @description  点击翻译整个页面/恢复原文。支持百度(极速)和DeepSeek(高质量)，双语/单语模式，翻译结果缓存。长按进入配置。
+// @version      1.4
+// @description  点击翻译整个页面/恢复原文。支持百度(极速)/Google(免费)/DeepSeek(高质量)，双语/单语模式，翻译结果缓存。长按进入配置。
 // @author       you
 // @match        *://*/*
 // @icon         data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌐</text></svg>
@@ -18,7 +18,7 @@
 
   // ====== 配置 ======
   const cfg = {
-    engine: GM_getValue("ds_engine", "baidu"),
+    engine: GM_getValue("ds_engine", "google"),
     mode: GM_getValue("ds_mode", "bilingual"),
     baiduAppId: GM_getValue("ds_baidu_id", ""),
     baiduKey: GM_getValue("ds_baidu_key", ""),
@@ -31,7 +31,7 @@
   let translating = false;
   let stopRequested = false;
   let originalTexts = null;
-  const transCache = new Map(); // 原文 → 译文
+  const transCache = new Map();
 
   // ====== 样式 ======
   GM_addStyle(`
@@ -42,7 +42,7 @@
       box-shadow: 0 2px 12px rgba(79,110,247,0.4);
       transition: transform 0.15s, background 0.3s;
       display: flex; align-items: center; justify-content: center;
-      cursor: pointer; user-select: none; -webkit-user-select: none;
+      user-select: none; -webkit-user-select: none;
     }
     #ds-fab:active { transform: scale(0.92); }
     #ds-fab.translated { background: #a6e3a1; }
@@ -129,7 +129,8 @@
 
       <label>翻译引擎</label>
       <div class="engine-tab">
-        <button data-engine="baidu" class="active">⚡ 百度翻译</button>
+        <button data-engine="google" class="active">🌍 Google</button>
+        <button data-engine="baidu">⚡ 百度翻译</button>
         <button data-engine="deepseek">🧠 DeepSeek</button>
       </div>
 
@@ -139,7 +140,10 @@
         <button data-mode="monolingual">🔤 仅译文</button>
       </div>
 
-      <div class="cfg-section show" id="ds-cfg-baidu">
+      <div class="cfg-section show" id="ds-cfg-google">
+        <div class="hint">Google 翻译免费使用，无需配置</div>
+      </div>
+      <div class="cfg-section" id="ds-cfg-baidu">
         <label>APP ID</label>
         <input id="ds-baidu-id" placeholder="从 fanyi-api.baidu.com 获取" value="${cfg.baiduAppId}">
         <label>密钥</label>
@@ -184,6 +188,7 @@
       document.querySelectorAll(".engine-tab button").forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
       cfg.engine = btn.dataset.engine;
+      document.getElementById("ds-cfg-google").classList.toggle("show", cfg.engine === "google");
       document.getElementById("ds-cfg-baidu").classList.toggle("show", cfg.engine === "baidu");
       document.getElementById("ds-cfg-ds").classList.toggle("show", cfg.engine === "deepseek");
     });
@@ -330,6 +335,9 @@
     if (cfg.engine === "deepseek" && !cfg.dsKey) {
       showToast("请先配置 DeepSeek Key（长按图标设置）", "err"); return;
     }
+    if (cfg.engine === "google") {
+      // Google 免费接口，无需配置
+    }
 
     await translatePage();
   }
@@ -366,8 +374,8 @@
       originalTexts = entries;
 
       const nodes = entries.map((e) => e.node);
-      const needApi = []; // 需要调用 API 的节点索引
-      const cached = [];  // 有缓存的节点索引
+      const needApi = [];
+      const cached = [];
 
       nodes.forEach((node, i) => {
         const key = node.textContent.trim();
@@ -378,23 +386,22 @@
         }
       });
 
-      // 有缓存的直接填充
       cached.forEach((i) => {
         const key = nodes[i].textContent.trim();
         const t = transCache.get(key);
         nodes[i].textContent = cfg.mode === "bilingual" ? key + "\n" + t : t;
       });
 
-      // 需要调 API 的
       if (needApi.length > 0) {
-        if (cfg.engine === "baidu") {
+        if (cfg.engine === "google") {
+          await translateGoogle(nodes, needApi);
+        } else if (cfg.engine === "baidu") {
           await translateBaidu(nodes, needApi);
         } else {
           await translateDeepSeek(nodes, needApi);
         }
       }
 
-      // 更新缓存计数
       cacheHint.textContent = `🗑️ 清除翻译缓存 (${transCache.size}条)`;
 
       translated = true;
@@ -408,11 +415,57 @@
     setTimeout(() => { progress.classList.remove("show"); translating = false; }, 1500);
   }
 
+  // ====== Google 翻译（免费接口） ======
+  async function translateGoogle(nodes, indices) {
+    const batchSize = 5;
+    for (let ki = 0; ki < indices.length; ki += batchSize) {
+      if (stopRequested) { showToast("⏹️ 已停止", "info"); break; }
+      const batchIdx = indices.slice(ki, ki + batchSize);
+      const pct = Math.min(100, Math.round(((ki + batchIdx.length) / indices.length) * 100));
+      setProgress(pct, `Google 翻译中 ${Math.min(ki + batchIdx.length, indices.length)}/${indices.length}...`);
+
+      for (const i of batchIdx) {
+        if (stopRequested) break;
+        const text = nodes[i].textContent.trim();
+        try {
+          const t = await callGoogle(text);
+          if (t) {
+            transCache.set(text, t);
+            nodes[i].textContent = cfg.mode === "bilingual" ? text + "\n" + t : t;
+          }
+        } catch (e) {
+          console.warn("Google翻译失败:", e.message?.slice(0, 30));
+        }
+      }
+    }
+  }
+
+  function callGoogle(text) {
+    return new Promise((resolve, reject) => {
+      const url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=zh-CN&dt=t&q=" + encodeURIComponent(text);
+      GM_xmlhttpRequest({
+        method: "GET", url,
+        onload: (res) => {
+          try {
+            const data = JSON.parse(res.responseText);
+            if (data && data[0]) {
+              const result = data[0].map((r) => r[0]).join("");
+              resolve(result || null);
+            } else {
+              reject(new Error("无结果"));
+            }
+          } catch { reject(new Error("解析失败")); }
+        },
+        onerror: () => reject(new Error("网络错误")),
+        timeout: 15000,
+      });
+    });
+  }
+
   // ====== 百度翻译 ======
   async function translateBaidu(nodes, indices) {
     const sep = "\n|||ds-sep|||\n";
     const maxBytes = 5000;
-    // 按字节长度分批
     const batches = [];
     let cur = [], curBytes = 0;
     for (let ki = 0; ki < indices.length; ki++) {
@@ -427,7 +480,6 @@
     }
     if (cur.length) batches.push(cur);
 
-    // 并发执行所有批次（最多同时3批）
     for (let b = 0; b < batches.length; b += 3) {
       if (stopRequested) { showToast("⏹️ 已停止", "info"); break; }
       const chunk = batches.slice(b, b + 3);
@@ -451,7 +503,6 @@
           }
         } catch (e) {
           console.warn("百度批量失败:", e.message.slice(0, 30));
-          // 单条重试
           for (const item of batch) {
             if (stopRequested) break;
             try {
@@ -467,31 +518,6 @@
     }
   }
 
-  // ====== DeepSeek ======
-  async function translateDeepSeek(nodes, indices) {
-    const batchSize = 20;
-    const sep = "\n---\n";
-    for (let ki = 0; ki < indices.length; ki += batchSize) {
-      if (stopRequested) { showToast("⏹️ 已停止", "info"); break; }
-      const batchIdx = indices.slice(ki, ki + batchSize);
-      const texts = batchIdx.map((i) => nodes[i].textContent.trim());
-      const pct = Math.min(100, Math.round(((ki + batchIdx.length) / indices.length) * 100));
-      setProgress(pct, `DeepSeek 翻译中 ${Math.min(ki + batchIdx.length, indices.length)}/${indices.length}...`);
-
-      const result = await callDeepSeek(texts);
-      if (result) {
-        batchIdx.forEach((i, idx) => {
-          const orig = texts[idx];
-          if (result[idx]) {
-            transCache.set(orig, result[idx]);
-            nodes[i].textContent = cfg.mode === "bilingual" ? orig + "\n" + result[idx] : result[idx];
-          }
-        });
-      }
-    }
-  }
-
-  // ====== 百度 API ======
   function callBaidu(text) {
     return new Promise((resolve, reject) => {
       const appid = cfg.baiduAppId;
@@ -516,6 +542,29 @@
   }
 
   // ====== DeepSeek API ======
+  async function translateDeepSeek(nodes, indices) {
+    const batchSize = 20;
+    const sep = "\n---\n";
+    for (let ki = 0; ki < indices.length; ki += batchSize) {
+      if (stopRequested) { showToast("⏹️ 已停止", "info"); break; }
+      const batchIdx = indices.slice(ki, ki + batchSize);
+      const texts = batchIdx.map((i) => nodes[i].textContent.trim());
+      const pct = Math.min(100, Math.round(((ki + batchIdx.length) / indices.length) * 100));
+      setProgress(pct, `DeepSeek 翻译中 ${Math.min(ki + batchIdx.length, indices.length)}/${indices.length}...`);
+
+      const result = await callDeepSeek(texts);
+      if (result) {
+        batchIdx.forEach((i, idx) => {
+          const orig = texts[idx];
+          if (result[idx]) {
+            transCache.set(orig, result[idx]);
+            nodes[i].textContent = cfg.mode === "bilingual" ? orig + "\n" + result[idx] : result[idx];
+          }
+        });
+      }
+    }
+  }
+
   function callDeepSeek(texts) {
     return new Promise((resolve) => {
       const joined = texts.map((t, i) => `[${i + 1}] ${t}`).join("\n---\n");
@@ -605,7 +654,7 @@
 
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") panel.classList.remove("show"); });
 
-  const engName = cfg.engine === "baidu" ? "百度" : "DeepSeek";
+  const engName = cfg.engine === "google" ? "Google" : cfg.engine === "baidu" ? "百度" : "DeepSeek";
   const modeName = cfg.mode === "bilingual" ? "双语" : "仅译文";
   console.log(`✅ 网页翻译已加载 | ${engName} | ${modeName} | 点击翻译/恢复，长按配置`);
 })();
