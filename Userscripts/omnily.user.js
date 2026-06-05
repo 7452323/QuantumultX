@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         网页翻译 · 多引擎
 // @namespace    http://tampermonkey.net/
-// @version      1.4
-// @description  点击翻译整个页面/恢复原文。支持百度(极速)/Google(免费)/DeepSeek(高质量)，双语/单语模式，翻译结果缓存。长按进入配置。
+// @version      1.5
+// @description  点击翻译整个页面/恢复原文。支持Google(免费)/百度通用(极速)/百度大模型(AI)/DeepSeek(高质量)，双语/单语模式，翻译结果缓存。长按进入配置。
 // @author       you
 // @match        *://*/*
 // @icon         data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌐</text></svg>
@@ -20,8 +20,13 @@
   const cfg = {
     engine: GM_getValue("ds_engine", "google"),
     mode: GM_getValue("ds_mode", "bilingual"),
+    // 百度通用翻译 (appid + secretKey)
     baiduAppId: GM_getValue("ds_baidu_id", ""),
     baiduKey: GM_getValue("ds_baidu_key", ""),
+    // 百度大模型翻译 (API_Key + Secret_Key)
+    baiduApiKey: GM_getValue("ds_baidu_ak", ""),
+    baiduSecretKey: GM_getValue("ds_baidu_sk", ""),
+    // DeepSeek
     dsKey: GM_getValue("ds_api_key", ""),
     dsModel: GM_getValue("ds_model", "deepseek-chat"),
   };
@@ -80,6 +85,15 @@
     }
     #ds-panel .engine-tab button.active { background: #4f6ef7; border-color: #4f6ef7; color: #fff; }
 
+    #ds-panel .baidu-subtab {
+      display: flex; gap: 6px; margin: 6px 0 10px 0;
+    }
+    #ds-panel .baidu-subtab button {
+      flex: 1; padding: 5px; border: 1px solid #45475a; border-radius: 6px;
+      background: #313244; color: #a6adc8; cursor: pointer; font-size: 11px; transition: all 0.2s;
+    }
+    #ds-panel .baidu-subtab button.active { background: #4f6ef7; border-color: #4f6ef7; color: #fff; }
+
     #ds-panel .mode-tab {
       display: flex; gap: 6px; margin-bottom: 12px;
     }
@@ -130,8 +144,15 @@
       <label>翻译引擎</label>
       <div class="engine-tab">
         <button data-engine="google" class="active">🌍 Google</button>
-        <button data-engine="baidu">⚡ 百度翻译</button>
+        <button data-engine="baidu">⚡ 百度</button>
         <button data-engine="deepseek">🧠 DeepSeek</button>
+      </div>
+
+      <div class="cfg-section show" id="ds-cfg-baidu-hint" style="display:none">
+        <div class="baidu-subtab">
+          <button data-baidu="normal" class="active">通用翻译</button>
+          <button data-baidu="llm">大模型翻译</button>
+        </div>
       </div>
 
       <label>显示模式</label>
@@ -143,11 +164,18 @@
       <div class="cfg-section show" id="ds-cfg-google">
         <div class="hint">Google 翻译免费使用，无需配置</div>
       </div>
-      <div class="cfg-section" id="ds-cfg-baidu">
+      <div class="cfg-section" id="ds-cfg-baidu-normal">
         <label>APP ID</label>
         <input id="ds-baidu-id" placeholder="从 fanyi-api.baidu.com 获取" value="${cfg.baiduAppId}">
         <label>密钥</label>
         <input type="password" id="ds-baidu-key" placeholder="从 fanyi-api.baidu.com 获取" value="${cfg.baiduKey}">
+        <div class="hint">免费版每月 100 万字符</div>
+      </div>
+      <div class="cfg-section" id="ds-cfg-baidu-llm">
+        <label>API Key</label>
+        <input type="password" id="ds-baidu-ak" placeholder="API Key（管理控制台获取）" value="${cfg.baiduApiKey}">
+        <label>Secret Key</label>
+        <input type="password" id="ds-baidu-sk" placeholder="Secret Key（管理控制台获取）" value="${cfg.baiduSecretKey}">
         <div class="hint">免费版每月 100 万字符</div>
       </div>
       <div class="cfg-section" id="ds-cfg-ds">
@@ -182,6 +210,26 @@
   const toast = document.getElementById("ds-toast");
   const cacheHint = document.getElementById("ds-clear-cache");
 
+  // ====== 百度子模式 ======
+  let baiduMode = GM_getValue("ds_baidu_mode", "normal");
+
+  function showBaiduConfig() {
+    document.getElementById("ds-cfg-baidu-normal").classList.toggle("show", baiduMode === "normal");
+    document.getElementById("ds-cfg-baidu-llm").classList.toggle("show", baiduMode === "llm");
+    document.querySelectorAll(".baidu-subtab button").forEach((b) => {
+      b.classList.toggle("active", b.dataset.baidu === baiduMode);
+    });
+  }
+
+  document.querySelectorAll(".baidu-subtab button").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".baidu-subtab button").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      baiduMode = btn.dataset.baidu;
+      showBaiduConfig();
+    });
+  });
+
   // ====== 引擎切换 ======
   document.querySelectorAll(".engine-tab button").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -189,10 +237,17 @@
       btn.classList.add("active");
       cfg.engine = btn.dataset.engine;
       document.getElementById("ds-cfg-google").classList.toggle("show", cfg.engine === "google");
-      document.getElementById("ds-cfg-baidu").classList.toggle("show", cfg.engine === "baidu");
+      document.getElementById("ds-cfg-baidu-hint").style.display = cfg.engine === "baidu" ? "block" : "none";
+      document.getElementById("ds-cfg-baidu-normal").classList.toggle("show", cfg.engine === "baidu" && baiduMode === "normal");
+      document.getElementById("ds-cfg-baidu-llm").classList.toggle("show", cfg.engine === "baidu" && baiduMode === "llm");
       document.getElementById("ds-cfg-ds").classList.toggle("show", cfg.engine === "deepseek");
     });
   });
+  // 初始状态：显示百度子tab
+  if (cfg.engine === "baidu") {
+    document.getElementById("ds-cfg-baidu-hint").style.display = "block";
+    showBaiduConfig();
+  }
 
   // ====== 模式切换 ======
   document.querySelectorAll(".mode-tab button").forEach((btn) => {
@@ -211,7 +266,6 @@
   document.getElementById("ds-close-btn").addEventListener("click", () => panel.classList.remove("show"));
   document.getElementById("ds-close-panel").addEventListener("click", () => panel.classList.remove("show"));
 
-  // 清除缓存
   cacheHint.addEventListener("click", () => {
     transCache.clear();
     cacheHint.textContent = `🗑️ 清除翻译缓存 (0条)`;
@@ -222,6 +276,8 @@
   function saveConfig() {
     cfg.baiduAppId = document.getElementById("ds-baidu-id").value.trim();
     cfg.baiduKey = document.getElementById("ds-baidu-key").value.trim();
+    cfg.baiduApiKey = document.getElementById("ds-baidu-ak").value.trim();
+    cfg.baiduSecretKey = document.getElementById("ds-baidu-sk").value.trim();
     cfg.dsKey = document.getElementById("ds-ds-key").value.trim();
     cfg.dsModel = document.getElementById("ds-ds-model").value;
 
@@ -229,6 +285,9 @@
     GM_setValue("ds_mode", cfg.mode);
     GM_setValue("ds_baidu_id", cfg.baiduAppId);
     GM_setValue("ds_baidu_key", cfg.baiduKey);
+    GM_setValue("ds_baidu_ak", cfg.baiduApiKey);
+    GM_setValue("ds_baidu_sk", cfg.baiduSecretKey);
+    GM_setValue("ds_baidu_mode", baiduMode);
     GM_setValue("ds_api_key", cfg.dsKey);
     GM_setValue("ds_model", cfg.dsModel);
   }
@@ -237,7 +296,6 @@
   let isDragging = false, dragStartX = 0, dragStartY = 0, dragMoved = false;
   let longPressTimer = null, longPressStart = 0, isLongPress = false;
 
-  // 鼠标拖动
   fab.addEventListener("mousedown", (e) => {
     if (e.button !== 0) return;
     isDragging = true; dragMoved = false;
@@ -274,7 +332,6 @@
     toggleTranslate();
   });
 
-  // 触屏拖动+轻点+长按
   fab.addEventListener("touchstart", (e) => {
     const t = e.touches[0];
     isDragging = true; dragMoved = false;
@@ -329,14 +386,16 @@
     }
     if (translated) { restoreOriginal(); return; }
 
-    if (cfg.engine === "baidu" && (!cfg.baiduAppId || !cfg.baiduKey)) {
-      showToast("请先配置百度翻译（长按图标设置）", "err"); return;
+    if (cfg.engine === "baidu") {
+      if (baiduMode === "normal" && (!cfg.baiduAppId || !cfg.baiduKey)) {
+        showToast("请配置百度通用翻译（APP ID + 密钥）", "err"); return;
+      }
+      if (baiduMode === "llm" && (!cfg.baiduApiKey || !cfg.baiduSecretKey)) {
+        showToast("请配置百度大模型翻译（API Key + Secret Key）", "err"); return;
+      }
     }
     if (cfg.engine === "deepseek" && !cfg.dsKey) {
       showToast("请先配置 DeepSeek Key（长按图标设置）", "err"); return;
-    }
-    if (cfg.engine === "google") {
-      // Google 免费接口，无需配置
     }
 
     await translatePage();
@@ -396,7 +455,11 @@
         if (cfg.engine === "google") {
           await translateGoogle(nodes, needApi);
         } else if (cfg.engine === "baidu") {
-          await translateBaidu(nodes, needApi);
+          if (baiduMode === "llm") {
+            await translateBaiduLLM(nodes, needApi);
+          } else {
+            await translateBaidu(nodes, needApi);
+          }
         } else {
           await translateDeepSeek(nodes, needApi);
         }
@@ -415,7 +478,7 @@
     setTimeout(() => { progress.classList.remove("show"); translating = false; }, 1500);
   }
 
-  // ====== Google 翻译（免费接口） ======
+  // ====== Google 翻译 ======
   async function translateGoogle(nodes, indices) {
     const batchSize = 5;
     for (let ki = 0; ki < indices.length; ki += batchSize) {
@@ -462,7 +525,7 @@
     });
   }
 
-  // ====== 百度翻译 ======
+  // ====== 百度通用翻译（appid + key） ======
   async function translateBaidu(nodes, indices) {
     const sep = "\n|||ds-sep|||\n";
     const maxBytes = 5000;
@@ -538,6 +601,95 @@
         onerror: () => reject(new Error("网络错误")),
         timeout: 15000,
       });
+    });
+  }
+
+  // ====== 百度大模型翻译（API Key + Secret Key） ======
+  let baiduTokenCache = { token: null, expires: 0 };
+
+  function getBaiduAccessToken() {
+    return new Promise((resolve, reject) => {
+      if (baiduTokenCache.token && Date.now() < baiduTokenCache.expires) {
+        resolve(baiduTokenCache.token);
+        return;
+      }
+      const url = "https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=" + encodeURIComponent(cfg.baiduApiKey) + "&client_secret=" + encodeURIComponent(cfg.baiduSecretKey);
+      GM_xmlhttpRequest({
+        method: "POST", url,
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        onload: (res) => {
+          try {
+            const data = JSON.parse(res.responseText);
+            if (data.access_token) {
+              baiduTokenCache.token = data.access_token;
+              baiduTokenCache.expires = Date.now() + (data.expires_in - 60) * 1000;
+              resolve(data.access_token);
+            } else {
+              reject(new Error("获取token失败: " + (data.error_description || data.error || "未知错误")));
+            }
+          } catch { reject(new Error("解析token响应失败")); }
+        },
+        onerror: () => reject(new Error("获取token网络错误")),
+        timeout: 10000,
+      });
+    });
+  }
+
+  async function translateBaiduLLM(nodes, indices) {
+    // 大模型翻译批量效率高，每次批10条
+    const batchSize = 10;
+    for (let ki = 0; ki < indices.length; ki += batchSize) {
+      if (stopRequested) { showToast("⏹️ 已停止", "info"); break; }
+      const batchIdx = indices.slice(ki, ki + batchSize);
+      const pct = Math.min(100, Math.round(((ki + batchIdx.length) / indices.length) * 100));
+      setProgress(pct, `百度大模型翻译中 ${Math.min(ki + batchIdx.length, indices.length)}/${indices.length}...`);
+
+      for (const i of batchIdx) {
+        if (stopRequested) break;
+        const text = nodes[i].textContent.trim();
+        try {
+          const t = await callBaiduLLM(text);
+          if (t) {
+            transCache.set(text, t);
+            nodes[i].textContent = cfg.mode === "bilingual" ? text + "\n" + t : t;
+          }
+        } catch (e) {
+          console.warn("百度大模型翻译失败:", e.message?.slice(0, 30));
+        }
+      }
+    }
+  }
+
+  function callBaiduLLM(text) {
+    return new Promise((resolve, reject) => {
+      getBaiduAccessToken().then((token) => {
+        const url = "https://aip.baidubce.com/rpc/2.0/mt/text/v1/llm_translate?access_token=" + token;
+        GM_xmlhttpRequest({
+          method: "POST", url,
+          headers: { "Content-Type": "application/json" },
+          data: JSON.stringify({
+            q: text,
+            from: "auto",
+            to: "zh",
+          }),
+          onload: (res) => {
+            try {
+              const data = JSON.parse(res.responseText);
+              if (data.result && data.result.trans_result) {
+                resolve(data.result.trans_result.map((r) => r.dst).join("\n"));
+              } else if (data.error_code || data.error_msg) {
+                reject(new Error(`[${data.error_code}] ${data.error_msg}`));
+              } else if (data.result) {
+                resolve(data.result);
+              } else {
+                reject(new Error("返回异常"));
+              }
+            } catch { reject(new Error("解析失败")); }
+          },
+          onerror: () => reject(new Error("网络错误")),
+          timeout: 30000,
+        });
+      }).catch(reject);
     });
   }
 
@@ -654,7 +806,7 @@
 
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") panel.classList.remove("show"); });
 
-  const engName = cfg.engine === "google" ? "Google" : cfg.engine === "baidu" ? "百度" : "DeepSeek";
+  const engName = cfg.engine === "google" ? "Google" : cfg.engine === "baidu" ? ("百度" + (baiduMode === "llm" ? "·大模型" : "·通用")) : "DeepSeek";
   const modeName = cfg.mode === "bilingual" ? "双语" : "仅译文";
   console.log(`✅ 网页翻译已加载 | ${engName} | ${modeName} | 点击翻译/恢复，长按配置`);
 })();
