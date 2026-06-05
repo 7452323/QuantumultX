@@ -4,7 +4,7 @@
 #!icon=https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Ys.png
 
 [Script]
-http-response ^https:\/\/youshiapp\.com\/api\/v1\/(users\/me|account\/oauth\/wechat|apple\/restore) script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Ys.js, requires-body=true, timeout=60, tag=有诗会员
+http-response ^https:\/\/youshiapp\.com\/api\/v1\/(users\/me|account\/oauth\/wechat|apple\/restore|poems|misc\/configure) script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Ys.js, requires-body=true, timeout=60, tag=有诗会员
 http-response ^https:\/\/youshiapp\.com\/api\/v1\/apple\/r script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Ys.js, requires-body=true, timeout=60, tag=有诗恢复购买
 
 [MITM]
