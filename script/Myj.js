@@ -10,10 +10,17 @@ hostname = ink.timerecord.cn
 
 const url = $request.url;
 let body = JSON.parse($response.body);
+const now = new Date().toISOString().slice(0, 16).replace('T', ' ');
 
 if (body.data) {
   body.data.longMemberType = 1;
+  body.data.longVipCreateTime = now;
   body.data.memberType = 3;
+  body.data.vipExpirationTime = "2099-12-31 23:59:59";
+  if (body.data.starMemberType !== undefined) {
+    body.data.starMemberType = 1;
+    body.data.starVipCreateTime = now;
+  }
 }
 
 $done({ body: JSON.stringify(body) });
