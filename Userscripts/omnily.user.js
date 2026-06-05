@@ -38,13 +38,14 @@
     #ds-fab {
       position: fixed; bottom: 24px; right: 24px; z-index: 999999;
       width: 52px; height: 52px; border-radius: 50%; background: #4f6ef7;
-      color: #fff; border: none; font-size: 24px; cursor: pointer;
+      color: #fff; border: none; font-size: 24px; cursor: grab;
       box-shadow: 0 2px 12px rgba(79,110,247,0.4);
-      transition: transform 0.15s, background 0.3s;
+      transition: background 0.3s;
       display: flex; align-items: center; justify-content: center;
-      user-select: none; -webkit-user-select: none; touch-action: manipulation;
+      user-select: none; -webkit-user-select: none; touch-action: none;
     }
-    #ds-fab:active { transform: scale(0.92); }
+    #ds-fab:active { cursor: grabbing; }
+    #ds-fab.dragging { transition: none; cursor: grabbing; box-shadow: 0 4px 20px rgba(79,110,247,0.6); }
     #ds-fab.translated { background: #a6e3a1; }
 
     #ds-panel {
@@ -228,22 +229,98 @@
     GM_setValue("ds_model", cfg.dsModel);
   }
 
-  // ====== 长按 / 点击 ======
+  // ====== 可拖动按钮 ======
+  let isDragging = false, dragStartX = 0, dragStartY = 0, dragOrigX = 0, dragOrigY = 0, dragMoved = false;
   let pressTimer = null, pressStart = 0, isLongPress = false;
 
-  fab.addEventListener("touchstart", () => {
+  // 鼠标拖动
+  fab.addEventListener("mousedown", (e) => {
+    if (e.button !== 0) return;
+    isDragging = true; dragMoved = false;
+    const rect = fab.getBoundingClientRect();
+    dragStartX = e.clientX; dragStartY = e.clientY;
+    dragOrigX = rect.left; dragOrigY = rect.top;
+    fab.classList.add("dragging");
+    fab.style.cursor = "grabbing";
+  });
+
+  document.addEventListener("mousemove", (e) => {
+    if (!isDragging) return;
+    const dx = e.clientX - dragStartX;
+    const dy = e.clientY - dragStartY;
+    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) dragMoved = true;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const fw = 52, fh = 52;
+    let nx = Math.max(0, Math.min(vw - fw, dragOrigX + dx));
+    let ny = Math.max(0, Math.min(vh - fh, dragOrigY + dy));
+    fab.style.left = nx + "px";
+    fab.style.right = "auto";
+    fab.style.top = ny + "px";
+    fab.style.bottom = "auto";
+  });
+
+  document.addEventListener("mouseup", (e) => {
+    if (!isDragging) return;
+    isDragging = false;
+    fab.classList.remove("dragging");
+    fab.style.cursor = "grab";
+    if (dragMoved) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+  });
+
+  fab.addEventListener("click", (e) => {
+    if (dragMoved) { e.stopPropagation(); e.preventDefault(); return; }
+    if ("ontouchstart" in window) return;
+    toggleTranslate();
+  });
+
+  // 触屏拖动
+  fab.addEventListener("touchstart", (e) => {
+    const t = e.touches[0];
+    isDragging = true; dragMoved = false;
+    const rect = fab.getBoundingClientRect();
+    dragStartX = t.clientX; dragStartY = t.clientY;
+    dragOrigX = rect.left; dragOrigY = rect.top;
+    fab.classList.add("dragging");
+    // 长按
     pressStart = Date.now(); isLongPress = false;
     pressTimer = setTimeout(() => {
-      isLongPress = true; navigator.vibrate?.(20); panel.classList.add("show");
+      if (!dragMoved) { isLongPress = true; navigator.vibrate?.(20); panel.classList.add("show"); }
     }, 500);
   }, { passive: true });
 
-  fab.addEventListener("touchend", (e) => {
-    clearTimeout(pressTimer);
-    if (!isLongPress && Date.now() - pressStart < 500) { e.preventDefault(); toggleTranslate(); }
+  fab.addEventListener("touchmove", (e) => {
+    if (!isDragging) return;
+    const t = e.touches[0];
+    const dx = t.clientX - dragStartX;
+    const dy = t.clientY - dragStartY;
+    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+      dragMoved = true;
+      clearTimeout(pressTimer);
+    }
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const fw = 52, fh = 52;
+    let nx = Math.max(0, Math.min(vw - fw, dragOrigX + dx));
+    let ny = Math.max(0, Math.min(vh - fh, dragOrigY + dy));
+    fab.style.left = nx + "px";
+    fab.style.right = "auto";
+    fab.style.top = ny + "px";
+    fab.style.bottom = "auto";
+    e.preventDefault();
   }, { passive: false });
 
-  fab.addEventListener("click", () => { if ("ontouchstart" in window) return; toggleTranslate(); });
+  fab.addEventListener("touchend", (e) => {
+    isDragging = false;
+    clearTimeout(pressTimer);
+    fab.classList.remove("dragging");
+    if (!dragMoved && !isLongPress && Date.now() - pressStart < 500) {
+      e.preventDefault();
+      toggleTranslate();
+    }
+  }, { passive: false });
+
   fab.addEventListener("contextmenu", (e) => { e.preventDefault(); panel.classList.toggle("show"); });
 
   // ====== 切换 ======
