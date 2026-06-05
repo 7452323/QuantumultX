@@ -1,6 +1,8 @@
 /*
 EveryTrace 解锁会员
 
+https://apps.apple.com/app/id6736608702
+
 [rewrite_local]
 ^https:\/\/ink\.timerecord\.cn\/apis\/app\/trace\/(getUserInfo|getVisitorUserInfo) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Myj.js
 
