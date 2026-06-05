@@ -1,5 +1,5 @@
 /*
-EveryTrace 解锁会员
+EveryTrace 解锁会员 1.2.12（44）
 
 https://apps.apple.com/app/id6736608702
 
