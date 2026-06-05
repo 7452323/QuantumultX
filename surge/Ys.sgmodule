@@ -3,7 +3,7 @@
 #!author=7452323
 
 [Script]
-有诗会员 = type=http-response, pattern=^https:\/\/youshiapp\.com\/api\/v1\/(users\/me|account\/oauth\/wechat|apple\/restore|poems|misc\/configure), script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Ys.js, requires-body=true, max-size=-1, timeout=60
+有诗会员 = type=http-response, pattern=^https:\/\/youshiapp\.com\/api\/v1\/(users\/me|account\/oauth\/wechat|apple\/restore|misc\/configure), script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Ys.js, requires-body=true, max-size=-1, timeout=60
 有诗恢复购买 = type=http-response, pattern=^https:\/\/youshiapp\.com\/api\/v1\/apple\/r, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Ys.js, requires-body=true, max-size=-1, timeout=60
 
 [MITM]
