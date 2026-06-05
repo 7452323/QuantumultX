@@ -1,25 +1,21 @@
 /*
-简讯 解锁VIP
+简讯 解锁VIP + 去广告
 
 [rewrite_local]
-^https:\/\/api\.tipsoon\.com\/api\/v1\/(user\/info|login\/account) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Jx.js
-^https:\/\/api\.tipsoon\.com\/api\/v1\/top\/system url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Jx.js
+^https:\/\/api\.tipsoon\.com\/api\/v1\/(user\/info|login\/account|top\/system) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Jx.js
 
 [mitm]
 hostname = api.tipsoon.com
 */
 
-const url = $request.url;
-let body = JSON.parse($response.body);
+let body = $response.body;
 
-if (url.includes('/top/system')) {
-  body.data.show_home_tips = 0;
-  body.data.ad_scale = 0;
-  body.data.open_ad_time = 0;
-  body.data.offline_normal_num = 999;
-} else if (body.data) {
-  body.data.is_vip = true;
-  body.data.vip_expire_time = "2099-12-31 23:59:59";
-}
+body = body.replace(/"is_vip":\w+/g, '"is_vip":true');
+body = body.replace(/"vip_expire_time":"[^"]+"/g, '"vip_expire_time":"2099-12-31 23:59:59"');
+body = body.replace(/"show_home_tips":\d+/g, '"show_home_tips":0');
+body = body.replace(/"ad_scale":\d+/g, '"ad_scale":0');
+body = body.replace(/"open_ad_time":\d+/g, '"open_ad_time":0');
+body = body.replace(/"offline_vip_num":\d+/g, '"offline_vip_num":999');
+body = body.replace(/"offline_normal_num":\d+/g, '"offline_normal_num":999');
 
-$done({ body: JSON.stringify(body) });
+$done({ body });

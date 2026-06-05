@@ -1,11 +1,10 @@
 #!name=简讯 VIP
-#!desc=阅读App 解锁VIP会员
+#!desc=阅读App 解锁VIP会员 + 去广告
 #!author=7452323
 #!icon=https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Jx.png
 
 [Script]
-http-response ^https:\/\/api\.tipsoon\.com\/api\/v1\/(user\/info|login\/account) script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Jx.js, requires-body=true, timeout=60, tag=简讯VIP
-http-response ^https:\/\/api\.tipsoon\.com\/api\/v1\/top\/system script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Jx.js, requires-body=true, timeout=60, tag=简讯去广告
+http-response ^https:\/\/api\.tipsoon\.com\/api\/v1\/(user\/info|login\/account|top\/system) script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Jx.js, requires-body=true, timeout=60, tag=简讯VIP
 
 [MITM]
 hostname = api.tipsoon.com
