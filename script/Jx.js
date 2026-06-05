@@ -1,8 +1,8 @@
 /*
-简讯 解锁VIP + 去广告 + 解锁付费内容 + 语音版
+简讯 解锁VIP + 去广告 + 解锁付费内容
 
 [rewrite_local]
-^https:\/\/api\.tipsoon\.com\/api\/v1\/(user\/info|login\/account|top\/system|info\/unlock|info\/item|info\/fm) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Jx.js
+^https:\/\/api\.tipsoon\.com\/api\/v1 url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Jx.js
 
 [mitm]
 hostname = api.tipsoon.com
@@ -18,9 +18,6 @@ body = body.replace(/"open_ad_time":\d+/g, '"open_ad_time":0');
 body = body.replace(/"offline_vip_num":\d+/g, '"offline_vip_num":999');
 body = body.replace(/"offline_normal_num":\d+/g, '"offline_normal_num":999');
 body = body.replace(/"is_unlock":\w+/g, '"is_unlock":true');
-body = body.replace(/"is_voice_only":\d+/g, '"is_voice_only":0');
-body = body.replace(/"voice":"[^"]*"/g, '"voice":"content"');
-body = body.replace(/"voice":\s*""/g, '"voice":"content"');
 body = body.replace(/"vip":\w+/g, '"vip":true');
 body = body.replace(/"user_stauts":\w+/g, '"user_stauts":true');
 
