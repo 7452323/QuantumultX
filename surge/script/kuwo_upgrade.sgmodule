@@ -3,7 +3,6 @@
 #!author=7452323
 #!category=签到
 #!arguments=cron=:30 8,10,12,14,16 * * *
-#!requirement=CORE_VERSION>=5.10
 
 [Script]
 kuwo_upgrade = type=cron,cronexp=%cron%,wake-system=1,timeout=120,script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/kuwo_upgrade.js
