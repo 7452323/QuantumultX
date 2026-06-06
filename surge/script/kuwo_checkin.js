@@ -1,20 +1,17 @@
 /*
-酷我音乐 升级签到 — Surge 自包含版（2025新版API）
+酷我音乐 升级签到 — Surge 自包含版
 由 surge/script/kuwo_upgrade.sgmodule 引用
 
-功能：每日签到 + 听歌10分钟 + 听小说10分钟 + 发真实评论(打卡) + 看创意视频x5
-      所有任务完成后调用 finishTask 领取奖励
+流程：doListen 完成任务 → finishTask 领取奖励（两步走）
 
-Cookie 采集（需要同时采集两个）：
-  1. integralapi.kuwo.cn → 自动（打开酷我 App 时触发）
-  2. www.kuwo.cn → 访问 kuwo.cn 时自动触发（用于发评论）
-
-Cookie 格式: integralapi 用 userid@websid，多账号用 &
+Cookie 采集：需同时采集 integralapi 和 www.kuwo.cn
+  integralapi: userid@websid（多账号 & 分隔）
+  www.kuwo.cn: 含 Hm_Iuvt token（用于发真实评论）
 */
 
 const KW_NAME = '酷我音乐(升级)';
-const KW_STORAGE_KEY = 'kuwo_upgrade';        // integralapi Cookie（uid@sid）
-const KW_WEB_COOKIE_KEY = 'kuwo_upgrade_web';  // www.kuwo.cn Cookie（用于发评论）
+const KW_COOKIE_KEY = 'kuwo_upgrade';
+const KW_WEB_KEY = 'kuwo_upgrade_web';
 const KW_SEP = '&';
 const KW_API = 'https://integralapi.kuwo.cn';
 const KW_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 KWMusic/12.1.6.0 DeviceModel/iPhone17,3 NetType/WIFI kuwopage';
@@ -26,7 +23,6 @@ const KW_H = {
 };
 const COMMENT_API = 'https://comment.kuwo.cn/com.s';
 
-// 随机打卡文案
 const CHECKIN_TEXTS = [
   '打卡', '签到打卡', '每日打卡', '我来打卡了', '打卡第N天',
   '滴~打卡', '日常打卡', '今天也打卡', '坚持打卡', '打卡一下',
@@ -42,183 +38,108 @@ const $ = new Env(KW_NAME);
     return;
   }
 
-  const raw = $.getdata(KW_STORAGE_KEY);
+  const raw = $.getdata(KW_COOKIE_KEY);
   if (!raw) {
     $.msg(KW_NAME, '⚠️ 未获取到 Cookie', '请先登录酷我音乐触发采集');
     $.done();
     return;
   }
 
-  let webCookie = $.getdata(KW_WEB_COOKIE_KEY);
+  let webCookie = $.getdata(KW_WEB_KEY);
   const accounts = raw.split(KW_SEP).map(a => a.trim()).filter(Boolean);
   $.log(`检测到 ${accounts.length} 个账户`);
-  if (webCookie) $.log('已获取 www.kuwo.cn Cookie');
 
   for (const acc of accounts) {
     const [uid, sid] = acc.split('@');
     if (!uid || !sid) continue;
 
-    // 验证 Cookie
     const ubRes = await httpGet(`${KW_API}/api/v1/online/sign/v1/music/userBase?loginUid=${uid}`);
-    let ubData;
-    try { ubData = JSON.parse(ubRes.body); } catch { ubData = null; }
-    const nickname = ubData?.data?.nickname || '';
+    const nickname = tryParse(ubRes.body)?.data?.nickname || '';
     if (!nickname) { $.log(`[${uid}] Cookie 已失效`); continue; }
     $.log(`\n[${nickname}]`);
 
-    // 获取任务列表
-    const tlRes = await httpGet(`${KW_API}/openapi/v1/usersystem/taskList?appUid=${uid}&loginUid=${uid}&loginSid=${sid}&version=12.1.6.0&src=kwplayer_ip_12.1.6.0_TJ.ipa`);
-    let tasks;
-    try { tasks = JSON.parse(tlRes.body)?.data; } catch { tasks = null; }
-    if (!tasks) { $.log('获取任务列表失败'); continue; }
+    // 1. 签到
+    await doDoListen(uid, sid, 'sign', 0, 110);
+    await finishTask(uid, sid, 'sign', 10);
+    await rwait(2000, 4000);
 
-    // ═══ 1. 签到 ═══
-    // taskList 里 sign 的 status=0 时才需要签到
-    // 签到用 finishTask?from=sign&goldNum=10&terminal=ip
-    const signTask = findTask(tasks, 'sign');
-    if (signTask && signTask.status !== 1) {
-      // 先检查今日签到状态
-      const stRes = await httpGet(`${KW_API}/api/v1/online/sign/new/todayStatus?source=kwplayer_ip_12.1.6.0_TJ.ipa&loginUid=${uid}&loginSid=${sid}`);
-      let stData;
-      try { stData = JSON.parse(stRes.body); } catch { stData = null; }
-      if (stData?.data?.isUserTodaySign === 1) {
-        $.log('签到: 今日已签到');
-      } else {
-        const r = await finishTask(uid, sid, 'sign', 10);
-        $.log(`签到: ${r ? '✅ 成功' : '❌ 失败'}`);
-      }
+    // 2. 听歌10分钟
+    await doDoListen(uid, sid, 'mobile', 18);
+    await finishTask(uid, sid, 'mobile', 18);
+    await rwait(2000, 4000);
+
+    // 3. 听小说10分钟
+    await doDoListen(uid, sid, 'novel', 18);
+    await finishTask(uid, sid, 'novel', 18);
+    await rwait(2000, 4000);
+
+    // 4. 发布评论（真实打卡 + finishTask）
+    if (webCookie && webCookie.includes('Hm_Iuvt')) {
+      await doRealComment(uid, sid, webCookie);
     } else {
-      $.log('签到: 今日已签到');
+      // 没有 web cookie 也硬调
+      await doDoListen(uid, sid, 'comment', 10);
+      await finishTask(uid, sid, 'comment', 10);
+      $.log('发布评论: 无 Hm_Iuvt，仅 doListen+finishTask');
     }
+    await rwait(2000, 4000);
 
-    // ═══ 2. 听歌10分钟 ═══
-    const musicTask = findTask(tasks, 'music');
-    if (musicTask && musicTask.status !== 1) {
-      const r = await finishTask(uid, sid, 'mobile', 18);
-      $.log(`听歌10分钟: ${r ? '✅ 成功' : '❌ 失败'}`);
-      await randomWait(2000, 4000);
-    } else {
-      $.log('听歌10分钟: 已完成');
+    // 5. 创意视频（调多次确保完成）
+    for (let i = 0; i < 3; i++) {
+      await doDoListen(uid, sid, 'videoadver', 58);
+      await rwait(2000, 5000);
     }
+    await finishTask(uid, sid, 'advert', 10);
 
-    // ═══ 3. 听小说10分钟 ═══
-    const novelTask = findTask(tasks, 'novel');
-    if (novelTask && novelTask.status !== 1) {
-      const r = await finishTask(uid, sid, 'novel', 18);
-      $.log(`听小说10分钟: ${r ? '✅ 成功' : '❌ 失败'}`);
-      await randomWait(2000, 4000);
-    } else {
-      $.log('听小说10分钟: 已完成');
-    }
-
-    // ═══ 4. 真实评论打卡 ═══
-    const commentTask = findTask(tasks, 'comment');
-    if (commentTask && commentTask.status !== 1) {
-      if (webCookie) {
-        await doRealComment(uid, sid, webCookie);
-      } else {
-        // 没有 www cookie 也尝试 finishTask
-        const r = await finishTask(uid, sid, 'comment', 10);
-        $.log(`发布评论: ${r ? '✅ 成功(可能无经验)' : '❌ 失败'}`);
-      }
-      await randomWait(2000, 4000);
-    } else {
-      $.log('发布评论: 已完成');
-    }
-
-    // ═══ 5. 看创意视频 ═══
-    const advTask = findTask(tasks, 'advert');
-    if (advTask && advTask.status !== 1) {
-      const total = advTask.total || 5;
-      const finished = advTask.finishCount || 0;
-      const remain = total - finished;
-      let ok = 0;
-      for (let i = 0; i < remain; i++) {
-        const r = await finishTask(uid, sid, 'videoadver', 58);
-        if (r) ok++;
-        if (i < remain - 1) {
-          const d = 3000 + Math.floor(Math.random() * 5000);
-          $.log(`  等待 ${(d/1000).toFixed(1)}s...`);
-          await $.wait(d);
-        }
-      }
-      $.log(`看创意视频: ${ok}/${remain}`);
-    } else {
-      $.log('看创意视频: 已完成');
-    }
-
-    // 等级
+    // 等级查询
     const rankRes = await httpGet(`${KW_API}/openapi/v1/usersystem/userRank?appUid=${uid}&loginUid=${uid}&loginSid=${sid}&type=1`);
-    try {
-      const rData = JSON.parse(rankRes.body);
-      if (rData.code === 200) $.log(`Lv.${rData.data.rank} 成长值:${rData.data.score}`);
-    } catch {}
+    const rankData = tryParse(rankRes.body);
+    if (rankData?.code === 200) $.log(`Lv.${rankData.data.rank} 成长值:${rankData.data.score}`);
   }
 
   $.done();
 })().catch(e => { $.logErr(e); $.done(); });
 
-// ─── 工具函数 ───
+// ─── 核心函数 ───
 
-function findTask(tasks, type) {
-  return tasks.find(x => x.taskType === type);
+// doListen：完成任务
+async function doDoListen(uid, sid, from, goldNum, extraGoldNum) {
+  const names = { sign: '签到', mobile: '听歌10分钟', novel: '听小说10分钟', comment: '发布评论', videoadver: '看创意视频' };
+  const taskName = names[from] || from;
+
+  let url = `${KW_API}/api/v1/online/sign/v1/earningSignIn/everydaymusic/doListen?loginUid=${uid}&loginSid=${sid}&from=${from}`;
+  if (goldNum > 0) url += `&goldNum=${goldNum}`;
+  if (extraGoldNum > 0) url += `&extraGoldNum=${extraGoldNum}`;
+
+  const res = await httpGet(url);
+  const data = tryParse(res.body);
+  if (data?.code === 200) {
+    const desc = data.data?.description || '成功';
+    $.log(`${taskName}: ✅ ${desc}`);
+  } else {
+    $.log(`${taskName}: ❌ ${data?.msg || '失败'}`);
+  }
 }
 
-// 根据 taskType 映射 from 参数
-function taskTypeToFrom(t) {
-  const map = { sign: 'sign', music: 'mobile', novel: 'novel', comment: 'comment', advert: 'videoadver' };
-  return map[t] || t;
-}
-
-// 领取奖励 — 新版 API
+// finishTask：领取奖励
 async function finishTask(uid, sid, from, goldNum) {
   const url = `${KW_API}/openapi/v1/usersystem/finishTask?loginUid=${uid}&loginSid=${sid}&appUid=${uid}&from=${from}&goldNum=${goldNum}&mobile=&terminal=ip`;
   const res = await httpGet(url);
-  try {
-    const d = JSON.parse(res.body);
-    return d.code === 200;
-  } catch { return false; }
-}
-
-// Cookie 采集
-function handleCookieCapture() {
-  const url = $request.url || '';
-  if (url.includes('integralapi.kuwo.cn') && url.includes('userBase')) {
-    const cookie = $request.headers['Cookie'] || $request.headers['cookie'] || '';
-    if (cookie) {
-      const uid = cookie.match(/userid=(\d+)/);
-      const sid = cookie.match(/websid=(\d+)/);
-      if (uid && sid) {
-        const val = uid[1] + '@' + sid[1];
-        let list = ($.getdata(KW_STORAGE_KEY) || '').split(KW_SEP).filter(Boolean);
-        if (!list.includes(val)) {
-          list.push(val);
-          $.setdata(list.join(KW_SEP), KW_STORAGE_KEY);
-        }
-        $.msg(KW_NAME, `✅ Cookie 已保存 (${list.length} 个账号)`, '');
-      }
-    }
-  }
-  if (url.includes('www.kuwo.cn')) {
-    const cookie = $request.headers['Cookie'] || $request.headers['cookie'] || '';
-    if (cookie && cookie.includes('Hm_Iuvt')) {
-      $.setdata(cookie, KW_WEB_COOKIE_KEY);
-      $.msg(KW_NAME, '✅ kuwo.cn Cookie 已保存', '可发真实评论');
-    }
-  }
-  $.done();
+  const data = tryParse(res.body);
+  return data?.code === 200;
 }
 
 // 真实评论打卡
 async function doRealComment(uid, sid, webCookie) {
   const hmMatch = webCookie.match(/Hm_Iuvt_cdb524f42f0ce19b169b8072123a4727=([^;]+)/);
   if (!hmMatch) {
-    $.log('发布评论: ⛔ 无 Hm_Iuvt，仅尝试 finishTask');
-    const r = await finishTask(uid, sid, 'comment', 10);
-    $.log(`发布评论: ${r ? '✅' : '❌'}`);
+    await doDoListen(uid, sid, 'comment', 10);
+    await finishTask(uid, sid, 'comment', 10);
+    $.log('发布评论: ⛔ 无 Hm_Iuvt');
     return;
   }
 
+  // 先发真实评论
   const hotSongRid = '3548250545';
   const text = CHECKIN_TEXTS[Math.floor(Math.random() * CHECKIN_TEXTS.length)];
   const secret = calcKuwoSecret(hmMatch[1], hmMatch[1]);
@@ -231,26 +152,52 @@ async function doRealComment(uid, sid, webCookie) {
       'Referer': 'https://kuwo.cn/',
       'Origin': 'https://kuwo.cn'
     });
-    let data;
-    try { data = JSON.parse(res.body); } catch { data = null; }
+    const data = tryParse(res.body);
     if (data && String(data.code) === '200') {
-      $.log(`发布评论: ✅ 打卡成功「${text}」，领取奖励...`);
-      // 评论成功后再领奖
-      await randomWait(1000, 2000);
-      const ftOk = await finishTask(uid, sid, 'comment', 10);
-      $.log(`发布评论: 领奖${ftOk ? '✅' : '❌'}`);
+      $.log(`发布评论: ✅ 打卡成功「${text}」`);
     } else {
       $.log(`发布评论: ❌ ${data?.msg || '评论失败'}`);
-      // 评论失败也试一下 finishTask
-      const ftOk = await finishTask(uid, sid, 'comment', 10);
-      if (ftOk) $.log('发布评论: 领奖✅（可能无经验）');
     }
   } catch (e) {
     $.log(`发布评论: ❌ ${e.message}`);
   }
+
+  // 再 doListen + finishTask 确保领到经验
+  await rwait(1000, 2000);
+  await doDoListen(uid, sid, 'comment', 10);
+  await finishTask(uid, sid, 'comment', 10);
 }
 
-// Kuwo Secret 算法
+// Cookie 采集
+function handleCookieCapture() {
+  const url = $request.url || '';
+  if (url.includes('integralapi.kuwo.cn') && url.includes('userBase')) {
+    const cookie = $request.headers['Cookie'] || $request.headers['cookie'] || '';
+    if (cookie) {
+      const uid = cookie.match(/userid=(\d+)/);
+      const sid = cookie.match(/websid=(\d+)/);
+      if (uid && sid) {
+        const val = uid[1] + '@' + sid[1];
+        let list = ($.getdata(KW_COOKIE_KEY) || '').split(KW_SEP).filter(Boolean);
+        if (!list.includes(val)) {
+          list.push(val);
+          $.setdata(list.join(KW_SEP), KW_COOKIE_KEY);
+        }
+        $.msg(KW_NAME, `✅ Cookie 已保存 (${list.length} 个账号)`, '');
+      }
+    }
+  }
+  if (url.includes('www.kuwo.cn')) {
+    const cookie = $request.headers['Cookie'] || $request.headers['cookie'] || '';
+    if (cookie && cookie.includes('Hm_Iuvt')) {
+      $.setdata(cookie, KW_WEB_KEY);
+      $.msg(KW_NAME, '✅ kuwo.cn Cookie 已保存', '可发真实评论');
+    }
+  }
+  $.done();
+}
+
+// Secret 算法
 function calcKuwoSecret(t, e) {
   if (!e) return '';
   let n = '';
@@ -275,21 +222,17 @@ function calcKuwoSecret(t, e) {
   return f + dHex;
 }
 
-function randomWait(min, max) {
-  return $.wait(min + Math.floor(Math.random() * (max - min)));
-}
+// 工具
+function tryParse(str) { try { return JSON.parse(str); } catch { return null; } }
+function rwait(min, max) { return $.wait(min + Math.floor(Math.random() * (max - min))); }
 
-// HTTP helpers
 function httpGet(url) {
   return new Promise((resolve, reject) => {
     const opts = { url, headers: KW_H };
     if (typeof $task !== 'undefined')
-      $task.fetch(opts).then(r => resolve({ status: r.statusCode, body: r.body, headers: r.headers })).catch(e => reject(e));
+      $task.fetch(opts).then(r => resolve({ status: r.statusCode, body: r.body })).catch(e => reject(e));
     else if (typeof $httpClient !== 'undefined')
-      $httpClient.get(opts, (err, resp, body) => {
-        if (err) reject(err);
-        else resolve({ status: resp.status || resp.statusCode, body, headers: resp.headers || {} });
-      });
+      $httpClient.get(opts, (err, resp, body) => { if (err) reject(err); else resolve({ status: resp.status || resp.statusCode, body }); });
     else reject(new Error('不支持的平台'));
   });
 }
@@ -298,26 +241,17 @@ function httpPost(url, headers) {
   return new Promise((resolve, reject) => {
     const opts = { url, headers };
     if (typeof $task !== 'undefined')
-      $task.fetch({ ...opts, method: 'POST' }).then(r => resolve({ status: r.statusCode, body: r.body, headers: r.headers })).catch(e => reject(e));
+      $task.fetch({ ...opts, method: 'POST' }).then(r => resolve({ status: r.statusCode, body: r.body })).catch(e => reject(e));
     else if (typeof $httpClient !== 'undefined')
-      $httpClient.post(opts, (err, resp, body) => {
-        if (err) reject(err);
-        else resolve({ status: resp.status || resp.statusCode, body, headers: resp.headers || {} });
-      });
+      $httpClient.post(opts, (err, resp, body) => { if (err) reject(err); else resolve({ status: resp.status || resp.statusCode, body }); });
     else reject(new Error('不支持的平台'));
   });
 }
 
-// ─── Env ───
+// Env
 function Env(name, opts) {
   return new (class {
-    constructor(name, opts) {
-      this.name = name;
-      this.data = null;
-      this.logs = [];
-      this.startTime = Date.now();
-      this.log(`🔔 ${this.name}, 开始!`);
-    }
+    constructor(n, o) { this.name = n; this.data = null; this.logs = []; this.startTime = Date.now(); this.log(`🔔 ${this.name}, 开始!`); }
     getEnv() {
       if (typeof $environment !== 'undefined' && $environment['surge-version']) return 'Surge';
       if (typeof $environment !== 'undefined' && $environment['stash-version']) return 'Stash';
@@ -330,20 +264,19 @@ function Env(name, opts) {
     isNode() { return this.getEnv() === 'Node.js'; }
     isQuanX() { return this.getEnv() === 'Quantumult X'; }
     isSurge() { return this.getEnv() === 'Surge'; }
-    isLoon() { return this.getEnv() === 'Loon'; }
-    getdata(key) {
+    getdata(k) {
       switch (this.getEnv()) {
-        case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket': return $persistentStore.read(key) || '';
-        case 'Quantumult X': return $prefs.valueForKey(key) || '';
-        case 'Node.js': return this.data && this.data[key] || process.env[key] || '';
+        case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket': return $persistentStore.read(k) || '';
+        case 'Quantumult X': return $prefs.valueForKey(k) || '';
+        case 'Node.js': return this.data && this.data[k] || process.env[k] || '';
         default: return '';
       }
     }
-    setdata(val, key) {
+    setdata(v, k) {
       switch (this.getEnv()) {
-        case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket': return $persistentStore.write(val, key);
-        case 'Quantumult X': return $prefs.setValueForKey(val, key);
-        case 'Node.js': this.data = this.data || {}; this.data[key] = val; return true;
+        case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket': return $persistentStore.write(v, k);
+        case 'Quantumult X': return $prefs.setValueForKey(v, k);
+        case 'Node.js': this.data = this.data || {}; this.data[k] = v; return true;
         default: return false;
       }
     }
