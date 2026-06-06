@@ -4,7 +4,7 @@
 变量格式: cookie1&cookie2 或 每行一个
 
 [rewrite_local]
-^http:\/\/www\.txtnovel\.vip\/plugin\.php\?id=dsu_paulsign url script-request-header https://raw.githubusercontent.com/7452323/QuantumultX/main/task/txtnovel_checkin.js
+^http:\/\/www\.txtnovel\.vip url script-request-header https://raw.githubusercontent.com/7452323/QuantumultX/main/task/txtnovel_checkin.js
 
 [task_local]
 0 9 * * * https://raw.githubusercontent.com/7452323/QuantumultX/main/task/txtnovel_checkin.js, tag=书香门第签到, enabled=true
