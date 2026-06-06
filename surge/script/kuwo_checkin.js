@@ -96,6 +96,10 @@ const $ = new Env(KW_NAME);
       let j;
       try { j = JSON.parse(r.body); } catch { j = null; }
       $.log(`${taskNames[tt]}: ${j?.code === 200 ? '✅ 成功' : j?.data?.description || j?.msg || '❌ 失败'}`);
+      if (tt !== taskTypes[taskTypes.length - 1]) {
+        const d = 2000 + Math.floor(Math.random() * 4000);
+        await $.wait(d);
+      }
     }
 
     // 看创意视频
@@ -108,7 +112,11 @@ const $ = new Env(KW_NAME);
         let j;
         try { j = JSON.parse(r.body); } catch { j = null; }
         if (j?.code === 200) ok++;
-        await $.wait(2000);
+        if (i < remain - 1) {
+          const delay = 3000 + Math.floor(Math.random() * 5000);
+          $.log(`  等待 ${(delay/1000).toFixed(1)}s 后看下一个...`);
+          await $.wait(delay);
+        }
       }
       $.log(`看创意视频: ${ok}/${remain}`);
     } else { $.log('看创意视频: 今日已完成'); }
