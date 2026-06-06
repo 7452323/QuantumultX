@@ -211,13 +211,11 @@ function handleCookieCapture() {
 
 // 真实评论打卡
 async function doRealComment(uid, sid, webCookie) {
-  // 先 finishTask 领经验
-  const ftOk = await finishTask(uid, sid, 'comment', 10);
-
-  // 再发真实评论
   const hmMatch = webCookie.match(/Hm_Iuvt_cdb524f42f0ce19b169b8072123a4727=([^;]+)/);
   if (!hmMatch) {
-    $.log(`发布评论: ${ftOk ? '✅ 领奖成功' : '❌ 领奖失败'} (无Hm_Iuvt跳过真实发帖)`);
+    $.log('发布评论: ⛔ 无 Hm_Iuvt，仅尝试 finishTask');
+    const r = await finishTask(uid, sid, 'comment', 10);
+    $.log(`发布评论: ${r ? '✅' : '❌'}`);
     return;
   }
 
@@ -236,9 +234,16 @@ async function doRealComment(uid, sid, webCookie) {
     let data;
     try { data = JSON.parse(res.body); } catch { data = null; }
     if (data && String(data.code) === '200') {
-      $.log(`发布评论: ✅ 打卡成功「${text}」`);
+      $.log(`发布评论: ✅ 打卡成功「${text}」，领取奖励...`);
+      // 评论成功后再领奖
+      await randomWait(1000, 2000);
+      const ftOk = await finishTask(uid, sid, 'comment', 10);
+      $.log(`发布评论: 领奖${ftOk ? '✅' : '❌'}`);
     } else {
-      $.log(`发布评论: ❌ ${data?.msg || '评论失败'} (领奖${ftOk ? '✅' : '❌'})`);
+      $.log(`发布评论: ❌ ${data?.msg || '评论失败'}`);
+      // 评论失败也试一下 finishTask
+      const ftOk = await finishTask(uid, sid, 'comment', 10);
+      if (ftOk) $.log('发布评论: 领奖✅（可能无经验）');
     }
   } catch (e) {
     $.log(`发布评论: ❌ ${e.message}`);
