@@ -1,20 +1,10 @@
 /*
-📌 探花TV论坛签到 — Surge 模块版
+📌 探花TV论坛签到 — Surge 自包含版
 👑 navix.site
-🔐 变量名：THTV（多账号用&分隔）
-✅ 抓取 https://navix.site/api/sign-in
-🔄 THTV="loginToken=xxx; SESSION=xxx"
+由 surge/script/thtv_checkin.sgmodule 引用
 
-[Script]
-cron "0 10 * * *" script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/surge/script/thtv_checkin.js, tag=探花TV签到
-
-[MITM]
-hostname = %APPEND% navix.site
-
-⚠️ Cookie 采集方法（Surge）：
-在 [Script] 中添加：
-http-request ^https://navix\.site/api/sign-in script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/surge/script/thtv_checkin.js
-然后打开 App 触发签到请求即可自动保存 Cookie
+Cookie 采集: 打开 App 触发签到请求即可自动保存
+多账号用 & 分隔
 */
 
 (function() {
@@ -31,7 +21,7 @@ http-request ^https://navix\.site/api/sign-in script-path=https://raw.githubuser
       return;
     }
 
-    // Node.js 模式（青龙等）
+    // Node.js 模式
     if ($.isNode()) {
       const envCookies = process.env.THTV || '';
       if (envCookies) {
@@ -40,7 +30,7 @@ http-request ^https://navix\.site/api/sign-in script-path=https://raw.githubuser
       }
     }
 
-    // 正常模式：从持久存储读取
+    // 正常模式
     const raw = $.getdata(STORAGE_KEY);
     if (!raw) {
       $.msg(NAME, '⛔️ 无 Cookie', '请先在 Surge 中触发签到页面抓取 Cookie');
@@ -55,7 +45,6 @@ http-request ^https://navix\.site/api/sign-in script-path=https://raw.githubuser
     if ($request.method === 'OPTIONS') return;
     const cookie = $request.headers['Cookie'] || $request.headers['cookie'] || '';
     if (!cookie) return;
-
     $.setdata(cookie, STORAGE_KEY);
     $.msg(NAME, '✅ Cookie 已保存', cookie.slice(0, 60) + '...');
   }
@@ -112,7 +101,6 @@ http-request ^https://navix\.site/api/sign-in script-path=https://raw.githubuser
         this.startTime = Date.now();
         this.log(`🔔 ${this.name}, 开始!`);
       }
-
       getEnv() {
         if (typeof $environment !== 'undefined' && $environment['surge-version']) return 'Surge';
         if (typeof $environment !== 'undefined' && $environment['stash-version']) return 'Stash';
@@ -122,38 +110,26 @@ http-request ^https://navix\.site/api/sign-in script-path=https://raw.githubuser
         if (typeof $rocket !== 'undefined') return 'Shadowrocket';
         return 'Unknown';
       }
-
       isNode() { return this.getEnv() === 'Node.js'; }
       isQuanX() { return this.getEnv() === 'Quantumult X'; }
       isSurge() { return this.getEnv() === 'Surge'; }
       isLoon() { return this.getEnv() === 'Loon'; }
-
       getdata(key) {
         switch (this.getEnv()) {
-          case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket':
-            return $persistentStore.read(key) || '';
-          case 'Quantumult X':
-            return $prefs.valueForKey(key) || '';
-          case 'Node.js':
-            return this.data && this.data[key] || process.env[key] || '';
+          case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket': return $persistentStore.read(key) || '';
+          case 'Quantumult X': return $prefs.valueForKey(key) || '';
+          case 'Node.js': return this.data && this.data[key] || process.env[key] || '';
           default: return '';
         }
       }
-
       setdata(val, key) {
         switch (this.getEnv()) {
-          case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket':
-            return $persistentStore.write(val, key);
-          case 'Quantumult X':
-            return $prefs.setValueForKey(val, key);
-          case 'Node.js':
-            this.data = this.data || {};
-            this.data[key] = val;
-            return true;
+          case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket': return $persistentStore.write(val, key);
+          case 'Quantumult X': return $prefs.setValueForKey(val, key);
+          case 'Node.js': this.data = this.data || {}; this.data[key] = val; return true;
           default: return false;
         }
       }
-
       async http(options) {
         const method = (options.method || 'GET').toUpperCase();
         return new Promise((resolve, reject) => {
@@ -194,7 +170,6 @@ http-request ^https://navix\.site/api/sign-in script-path=https://raw.githubuser
           }
         });
       }
-
       msg(title, subtitle, content) {
         switch (this.getEnv()) {
           case 'Quantumult X': $notify(title, subtitle || '', content || ''); break;
@@ -203,11 +178,9 @@ http-request ^https://navix\.site/api/sign-in script-path=https://raw.githubuser
           case 'Node.js': console.log(`${title}: ${subtitle} - ${content}`); break;
         }
       }
-
       log(msg) { console.log(msg); this.logs.push(msg); }
       logErr(e) { this.log(`错误: ${e.message || e}`); if (e.stack) this.log(e.stack); }
       wait(ms) { return new Promise(r => setTimeout(r, ms)); }
-
       done() {
         const elapsed = ((Date.now() - this.startTime) / 1000).toFixed(2);
         this.log(`结束! ${elapsed}s`);
