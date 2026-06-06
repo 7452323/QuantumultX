@@ -1,4 +1,5 @@
-/* 酷我音乐 升级签到
+/*
+酷我音乐 升级签到
 cron 30 8 * * * https://raw.githubusercontent.com/7452323/QuantumultX/main/task/kuwo_upgrade.js
 
 脚本兼容: Surge, Quantumult X, Loon, Shadowrocket, Node.js
