@@ -225,8 +225,7 @@ function Env(name, opts) {
     done() {
       const elapsed = ((Date.now() - this.startTime) / 1000).toFixed(2);
       this.log(`结束! ${elapsed}s`);
-      this.msg(this.name, `执行完毕 (${elapsed}s)`,
-        this.logs.filter(l => l.includes('❌')).length > 0 ? '部分任务失败' : '全部成功');
+      this.msg(this.name, this.logs.filter(l => l.includes('❌')).length > 0 ? '⚠️ 部分任务失败' : '✅ 全部成功', '');
       switch (this.getEnv()) {
         case 'Quantumult X': case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket': default: $done(); break;
         case 'Node.js': process.exit(0); break;
