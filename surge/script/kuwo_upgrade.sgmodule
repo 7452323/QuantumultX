@@ -2,7 +2,7 @@
 #!desc=酷我音乐每日签到 + 听歌 + 听小说 + 发评论 + 看创意视频
 #!author=7452323
 #!category=签到
-#!arguments=cron=30 8 * * *
+#!arguments=cron=:30 8,10,12,14,16 * * *
 #!requirement=CORE_VERSION>=5.10
 
 [Script]
