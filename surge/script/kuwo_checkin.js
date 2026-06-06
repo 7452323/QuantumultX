@@ -3,9 +3,10 @@
 由 surge/script/kuwo_upgrade.sgmodule 引用
 
 流程：
-1. 取 taskList 检测各任务状态（已完成的跳过不调）
+1. 取 taskList 检测各任务状态（已完成的跳过）
 2. 只对未完成的任务调 doListen 完成 + finishTask 领奖
-3. 创意视频调 doListen 3 次 + finishTask
+3. 创意视频最多 5 次，用 doListen 完成 + finishTask 领奖
+4. 通知卡片：每项一行 + 等级成长值
 
 Cookie 采集：需同时采集 integralapi 和 www.kuwo.cn
   integralapi: userid@websid（多账号 & 分隔）
@@ -57,6 +58,9 @@ const $ = new Env(KW_NAME);
     }
     $.log(`\n[${nickname}]`);
 
+    // 结果收集
+    const res = {};
+
     // 获取 taskList
     const tlRes = await httpGet(`${KW_API}/openapi/v1/usersystem/taskList?loginUid=${uid}&loginSid=${sid}&appUid=2782700304&version=12.1.6.0&src=kwplayer_ip_12.1.6.0_TJ.ipa`);
     const tlData = tryParse(tlRes.body);
@@ -65,64 +69,86 @@ const $ = new Env(KW_NAME);
     // 1. 签到
     const st = tasks.find(x => x.taskType === 'sign');
     if (st && st.status === 1) {
-      $.log(`每日签到: ✅ 已签到 (+${st.developValue} 成长值)`);
+      res.签到 = '✓';
+      $.log(`每日签到: ✅ 已签到`);
     } else {
       await doDoListen(uid, sid, 'sign', 0, 110);
-      await finishTask(uid, sid, 'sign', 10);
+      const signOk = await finishTask(uid, sid, 'sign', 10);
+      res.签到 = signOk ? '✓' : '✗';
     }
     await rwait(1000, 3000);
 
     // 2. 听歌10分钟
     const mt = tasks.find(x => x.taskType === 'music');
     if (mt && mt.status === 1) {
+      res.听歌 = '✓';
       $.log('听歌10分钟: ✅ 已完成');
     } else {
       await doDoListen(uid, sid, 'mobile', 18);
-      await finishTask(uid, sid, 'music', 18);
+      const mOk = await finishTask(uid, sid, 'music', 18);
+      res.听歌 = mOk ? '✓' : '✗';
     }
     await rwait(1000, 3000);
 
     // 3. 听小说10分钟
     const nt = tasks.find(x => x.taskType === 'novel');
     if (nt && nt.status === 1) {
+      res.小说 = '✓';
       $.log('听小说10分钟: ✅ 已完成');
     } else {
       await doDoListen(uid, sid, 'novel', 18);
-      await finishTask(uid, sid, 'novel', 18);
+      const nOk = await finishTask(uid, sid, 'novel', 18);
+      res.小说 = nOk ? '✓' : '✗';
     }
     await rwait(1000, 3000);
 
     // 4. 发布评论
     const ct = tasks.find(x => x.taskType === 'comment');
     if (ct && ct.status === 1) {
+      res.评论 = '✓';
       $.log('发布评论: ✅ 已完成');
     } else {
-      // 如果有 Hm_Iuvt 就走真实评论
       if (webCookie && webCookie.includes('Hm_Iuvt')) {
         await doRealComment(uid, sid, webCookie);
       } else {
         await doDoListen(uid, sid, 'comment', 10);
         await finishTask(uid, sid, 'comment', 10);
       }
+      res.评论 = '✓';
     }
     await rwait(1000, 3000);
 
-    // 5. 创意视频
+    // 5. 创意视频（最多5次）
     const at = tasks.find(x => x.taskType === 'advert');
+    const advDone = at?.finishCount || 0;
+    const advTotal = at?.total || 5;
     if (at && at.status === 1) {
-      $.log('看创意视频: ✅ 已完成');
+      res[`视频 ${advTotal}/${advTotal}`] = '✓';
+      $.log(`看创意视频: ✅ 已完成 ${advTotal}/${advTotal}`);
     } else {
-      for (let i = 0; i < 3; i++) {
+      let okCnt = 0;
+      for (let i = 0; i < advTotal; i++) {
         await doDoListen(uid, sid, 'videoadver', 58);
+        okCnt++;
         await rwait(2000, 5000);
       }
-      await finishTask(uid, sid, 'advert', 10);
+      const advOk = await finishTask(uid, sid, 'advert', 10);
+      res[`视频 ${okCnt}/${advTotal}`] = advOk ? '✓' : '✗';
     }
 
-    // 等级
+    // 等级成长值
+    let rankStr = '';
     const rankRes = await httpGet(`${KW_API}/openapi/v1/usersystem/userRank?appUid=${uid}&loginUid=${uid}&loginSid=${sid}&type=1`);
     const rankData = tryParse(rankRes.body);
-    if (rankData?.code === 200) $.log(`Lv.${rankData.data.rank} 成长值:${rankData.data.score}`);
+    if (rankData?.code === 200) {
+      rankStr = `Lv.${rankData.data.rank} 成长值:${rankData.data.score}`;
+      $.log(rankStr);
+    }
+
+    // 组装通知卡片
+    const lines = Object.entries(res).map(([k, v]) => `${k}  ${v}`).join('\n');
+    const notifyText = lines + (rankStr ? `\n${rankStr}` : '');
+    $.notifyBody = notifyText;
   }
 
   $.done();
@@ -166,18 +192,14 @@ async function doRealComment(uid, sid, webCookie) {
     $.log('发布评论: ⛔ 无 Hm_Iuvt');
     return;
   }
-
   const hotSongRid = '3548250545';
   const text = CHECKIN_TEXTS[Math.floor(Math.random() * CHECKIN_TEXTS.length)];
   const secret = calcKuwoSecret(hmMatch[1], hmMatch[1]);
-
   try {
     const res = await httpPost(`${COMMENT_API}?type=add_comment&f=web&sid=${hotSongRid}&digest=15&content=${encodeURIComponent(text)}`, {
-      'Cookie': webCookie,
-      'Secret': secret,
+      'Cookie': webCookie, 'Secret': secret,
       'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15',
-      'Referer': 'https://kuwo.cn/',
-      'Origin': 'https://kuwo.cn'
+      'Referer': 'https://kuwo.cn/', 'Origin': 'https://kuwo.cn'
     });
     const data = tryParse(res.body);
     if (data && String(data.code) === '200') {
@@ -188,13 +210,11 @@ async function doRealComment(uid, sid, webCookie) {
   } catch (e) {
     $.log(`发布评论: ❌ ${e.message}`);
   }
-
   await rwait(1000, 2000);
   await doDoListen(uid, sid, 'comment', 10);
   await finishTask(uid, sid, 'comment', 10);
 }
 
-// Cookie 采集
 function handleCookieCapture() {
   const url = $request.url || '';
   if (url.includes('integralapi.kuwo.cn') && url.includes('userBase')) {
@@ -223,7 +243,6 @@ function handleCookieCapture() {
   $.done();
 }
 
-// Secret 算法 (from General74110)
 function calcKuwoSecret(t, e) {
   if (!e) return '';
   let n = '';
@@ -256,7 +275,6 @@ const CHECKIN_TEXTS = [
 ];
 const COMMENT_API = 'https://comment.kuwo.cn/com.s';
 
-// 工具
 function tryParse(str) { try { return JSON.parse(str); } catch { return null; } }
 function rwait(min, max) { return $.wait(min + Math.floor(Math.random() * (max - min))); }
 
@@ -282,10 +300,9 @@ function httpPost(url, headers) {
   });
 }
 
-// Env
 function Env(name, opts) {
   class _env {
-    constructor(n, o) { this.name = n; this.data = null; this.logs = []; this.startTime = Date.now(); this.log(`🔔 ${this.name}, 开始!`); }
+    constructor(n, o) { this.name = n; this.data = null; this.notifyBody = ''; this.logs = []; this.startTime = Date.now(); this.log(`🔔 ${this.name}, 开始!`); }
     getEnv() {
       if (typeof $environment !== 'undefined' && $environment['surge-version']) return 'Surge';
       if (typeof $environment !== 'undefined' && $environment['stash-version']) return 'Stash';
@@ -327,7 +344,8 @@ function Env(name, opts) {
     done() {
       const elapsed = ((Date.now() - this.startTime) / 1000).toFixed(2);
       this.log(`结束! ${elapsed}s`);
-      this.msg(this.name, this.logs.filter(l => l.includes('❌')).length > 0 ? '⚠️ 部分任务失败' : '✅ 全部成功', '');
+      const body = this.notifyBody || (this.logs.filter(l => l.includes('❌')).length > 0 ? '⚠️ 部分任务失败' : '✅ 全部成功');
+      this.msg(this.name, `${elapsed}s`, body);
       switch (this.getEnv()) {
         case 'Quantumult X': case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket': default: $done(); break;
         case 'Node.js': process.exit(0); break;

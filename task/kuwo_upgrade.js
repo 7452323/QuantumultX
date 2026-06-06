@@ -1,6 +1,6 @@
 /*
 酷我音乐 升级签到 — for Quantumult X
-Quantumult X 专用版（不依赖 checkin 框架）
+Quantumult X 专用版
 
 [rewrite_local]
 ^https?:\/\/integralapi\.kuwo\.cn\/api\/v1\/online\/sign\/v1\/music\/userBase url script-request-header kuwo_upgrade.js
@@ -14,7 +14,8 @@ hostname = integralapi.kuwo.cn
 流程：
 1. 取 taskList 检测各任务状态（已完成的跳过）
 2. 只对未完成的任务调 doListen 完成 + finishTask 领奖
-3. 创意视频调 doListen 3 次 + finishTask
+3. 创意视频最多 5 次，用 doListen 完成 + finishTask 领奖
+4. 通知卡片：每项一行 + 等级成长值
 
 Cookie 采集：需采集 integralapi（userid@websid）
 多账号用 & 分隔
@@ -59,6 +60,8 @@ const H = {
     if (!nickname) { $.log(`[${uid}] Cookie 已失效，跳过`); continue; }
     $.log(`\n[${nickname}]`);
 
+    const res = {};
+
     // 获取 taskList
     const tlRes = await httpGet(`${API}/openapi/v1/usersystem/taskList?loginUid=${uid}&loginSid=${sid}&appUid=2782700304&version=12.1.6.0&src=kwplayer_ip_12.1.6.0_TJ.ipa`);
     const tlData = tryParse(tlRes.body);
@@ -67,59 +70,80 @@ const H = {
     // 1. 签到
     const st = tasks.find(x => x.taskType === 'sign');
     if (st && st.status === 1) {
-      $.log(`每日签到: ✅ 已签到 (+${st.developValue} 成长值)`);
+      res.签到 = '✓';
+      $.log('每日签到: ✅ 已签到');
     } else {
       await doListen(uid, sid, 'sign', 0, 110);
-      await finishTask(uid, sid, 'sign', 10);
+      const ok = await finishTask(uid, sid, 'sign', 10);
+      res.签到 = ok ? '✓' : '✗';
     }
     await rwait(1000, 3000);
 
     // 2. 听歌10分钟
     const mt = tasks.find(x => x.taskType === 'music');
     if (mt && mt.status === 1) {
+      res.听歌 = '✓';
       $.log('听歌10分钟: ✅ 已完成');
     } else {
       await doListen(uid, sid, 'mobile', 18);
-      await finishTask(uid, sid, 'music', 18);
+      const ok = await finishTask(uid, sid, 'music', 18);
+      res.听歌 = ok ? '✓' : '✗';
     }
     await rwait(1000, 3000);
 
     // 3. 听小说10分钟
     const nt = tasks.find(x => x.taskType === 'novel');
     if (nt && nt.status === 1) {
+      res.小说 = '✓';
       $.log('听小说10分钟: ✅ 已完成');
     } else {
       await doListen(uid, sid, 'novel', 18);
-      await finishTask(uid, sid, 'novel', 18);
+      const ok = await finishTask(uid, sid, 'novel', 18);
+      res.小说 = ok ? '✓' : '✗';
     }
     await rwait(1000, 3000);
 
     // 4. 发布评论
     const ct = tasks.find(x => x.taskType === 'comment');
     if (ct && ct.status === 1) {
+      res.评论 = '✓';
       $.log('发布评论: ✅ 已完成');
     } else {
       await doListen(uid, sid, 'comment', 10);
       await finishTask(uid, sid, 'comment', 10);
+      res.评论 = '✓';
     }
     await rwait(1000, 3000);
 
-    // 5. 创意视频
+    // 5. 创意视频（最多5次）
     const at = tasks.find(x => x.taskType === 'advert');
+    const advTotal = at?.total || 5;
     if (at && at.status === 1) {
-      $.log('看创意视频: ✅ 已完成');
+      res[`视频 ${advTotal}/${advTotal}`] = '✓';
+      $.log(`看创意视频: ✅ 已完成 ${advTotal}/${advTotal}`);
     } else {
-      for (let i = 0; i < 3; i++) {
+      let okCnt = 0;
+      for (let i = 0; i < advTotal; i++) {
         await doListen(uid, sid, 'videoadver', 58);
+        okCnt++;
         await rwait(2000, 5000);
       }
-      await finishTask(uid, sid, 'advert', 10);
+      const advOk = await finishTask(uid, sid, 'advert', 10);
+      res[`视频 ${okCnt}/${advTotal}`] = advOk ? '✓' : '✗';
     }
 
-    // 等级
+    // 等级成长值
+    let rankStr = '';
     const rankRes = await httpGet(`${API}/openapi/v1/usersystem/userRank?appUid=${uid}&loginUid=${uid}&loginSid=${sid}&type=1`);
     const rankData = tryParse(rankRes.body);
-    if (rankData?.code === 200) $.log(`Lv.${rankData.data.rank} 成长值:${rankData.data.score}`);
+    if (rankData?.code === 200) {
+      rankStr = `Lv.${rankData.data.rank} 成长值:${rankData.data.score}`;
+      $.log(rankStr);
+    }
+
+    // 组装通知
+    const lines = Object.entries(res).map(([k, v]) => `${k}  ${v}`).join('\n');
+    $.notifyBody = lines + (rankStr ? `\n${rankStr}` : '');
   }
 
   $.done();
@@ -186,7 +210,7 @@ function httpGet(url) {
 
 function Env(name, opts) {
   class _env {
-    constructor(n, o) { this.name = n; this.data = null; this.logs = []; this.startTime = Date.now(); this.log(`🔔 ${this.name}, 开始!`); }
+    constructor(n, o) { this.name = n; this.data = null; this.notifyBody = ''; this.logs = []; this.startTime = Date.now(); this.log(`🔔 ${this.name}, 开始!`); }
     getEnv() {
       if (typeof $task !== 'undefined') return 'Quantumult X';
       if (typeof $environment !== 'undefined' && $environment['surge-version']) return 'Surge';
@@ -225,7 +249,8 @@ function Env(name, opts) {
     done() {
       const elapsed = ((Date.now() - this.startTime) / 1000).toFixed(2);
       this.log(`结束! ${elapsed}s`);
-      this.msg(this.name, this.logs.filter(l => l.includes('❌')).length > 0 ? '⚠️ 部分任务失败' : '✅ 全部成功', '');
+      const body = this.notifyBody || (this.logs.filter(l => l.includes('❌')).length > 0 ? '⚠️ 部分任务失败' : '✅ 全部成功');
+      this.msg(this.name, `${elapsed}s`, body);
       switch (this.getEnv()) {
         case 'Quantumult X': case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket': default: $done(); break;
         case 'Node.js': process.exit(0); break;
