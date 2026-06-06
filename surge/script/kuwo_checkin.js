@@ -2,7 +2,10 @@
 酷我音乐 升级签到 — Surge 自包含版
 由 surge/script/kuwo_upgrade.sgmodule 引用
 
-流程：doListen 完成任务 → finishTask 领取奖励（两步走）
+流程：
+1. 取 taskList 检测各任务状态（已完成的跳过不调）
+2. 只对未完成的任务调 doListen 完成 + finishTask 领奖
+3. 创意视频调 doListen 3 次 + finishTask
 
 Cookie 采集：需同时采集 integralapi 和 www.kuwo.cn
   integralapi: userid@websid（多账号 & 分隔）
@@ -21,14 +24,6 @@ const KW_H = {
   'User-Agent': KW_UA,
   'Referer': 'https://h5app.kuwo.cn/apps/user-system/index.html?MBOX_WEBCLOSE=1&hideBottomMargin=1&FULLHASARROW=1'
 };
-const COMMENT_API = 'https://comment.kuwo.cn/com.s';
-
-const CHECKIN_TEXTS = [
-  '打卡', '签到打卡', '每日打卡', '我来打卡了', '打卡第N天',
-  '滴~打卡', '日常打卡', '今天也打卡', '坚持打卡', '打卡一下',
-  '打个卡', '到这打卡', '听歌打卡', '顺便打卡', '走一个',
-  '来了', '今日打卡', '滴滴打卡', '照常打卡', '习惯性打卡'
-];
 
 const $ = new Env(KW_NAME);
 
@@ -54,44 +49,77 @@ const $ = new Env(KW_NAME);
     if (!uid || !sid) continue;
 
     const ubRes = await httpGet(`${KW_API}/api/v1/online/sign/v1/music/userBase?loginUid=${uid}`);
-    const nickname = tryParse(ubRes.body)?.data?.nickname || '';
-    if (!nickname) { $.log(`[${uid}] Cookie 已失效`); continue; }
+    const ubData = tryParse(ubRes.body);
+    const nickname = ubData?.data?.nickname || '';
+    if (!nickname) {
+      $.log(`[${uid}] Cookie 已失效，跳过`);
+      continue;
+    }
     $.log(`\n[${nickname}]`);
 
+    // 获取 taskList
+    const tlRes = await httpGet(`${KW_API}/openapi/v1/usersystem/taskList?loginUid=${uid}&loginSid=${sid}&appUid=2782700304&version=12.1.6.0&src=kwplayer_ip_12.1.6.0_TJ.ipa`);
+    const tlData = tryParse(tlRes.body);
+    const tasks = tlData?.data || [];
+
     // 1. 签到
-    await doDoListen(uid, sid, 'sign', 0, 110);
-    await finishTask(uid, sid, 'sign', 10);
-    await rwait(2000, 4000);
+    const st = tasks.find(x => x.taskType === 'sign');
+    if (st && st.status === 1) {
+      $.log(`每日签到: ✅ 已签到 (+${st.developValue} 成长值)`);
+    } else {
+      await doDoListen(uid, sid, 'sign', 0, 110);
+      await finishTask(uid, sid, 'sign', 10);
+    }
+    await rwait(1000, 3000);
 
     // 2. 听歌10分钟
-    await doDoListen(uid, sid, 'mobile', 18);
-    await finishTask(uid, sid, 'mobile', 18);
-    await rwait(2000, 4000);
+    const mt = tasks.find(x => x.taskType === 'music');
+    if (mt && mt.status === 1) {
+      $.log('听歌10分钟: ✅ 已完成');
+    } else {
+      await doDoListen(uid, sid, 'mobile', 18);
+      await finishTask(uid, sid, 'music', 18);
+    }
+    await rwait(1000, 3000);
 
     // 3. 听小说10分钟
-    await doDoListen(uid, sid, 'novel', 18);
-    await finishTask(uid, sid, 'novel', 18);
-    await rwait(2000, 4000);
-
-    // 4. 发布评论（真实打卡 + finishTask）
-    if (webCookie && webCookie.includes('Hm_Iuvt')) {
-      await doRealComment(uid, sid, webCookie);
+    const nt = tasks.find(x => x.taskType === 'novel');
+    if (nt && nt.status === 1) {
+      $.log('听小说10分钟: ✅ 已完成');
     } else {
-      // 没有 web cookie 也硬调
-      await doDoListen(uid, sid, 'comment', 10);
-      await finishTask(uid, sid, 'comment', 10);
-      $.log('发布评论: 无 Hm_Iuvt，仅 doListen+finishTask');
+      await doDoListen(uid, sid, 'novel', 18);
+      await finishTask(uid, sid, 'novel', 18);
     }
-    await rwait(2000, 4000);
+    await rwait(1000, 3000);
 
-    // 5. 创意视频（调多次确保完成）
-    for (let i = 0; i < 3; i++) {
-      await doDoListen(uid, sid, 'videoadver', 58);
-      await rwait(2000, 5000);
+    // 4. 发布评论
+    const ct = tasks.find(x => x.taskType === 'comment');
+    if (ct && ct.status === 1) {
+      $.log('发布评论: ✅ 已完成');
+    } else {
+      // 如果有 Hm_Iuvt 就走真实评论
+      if (webCookie && webCookie.includes('Hm_Iuvt')) {
+        await doRealComment(uid, sid, webCookie);
+      } else {
+        await doDoListen(uid, sid, 'comment', 10);
+        await finishTask(uid, sid, 'comment', 10);
+      }
     }
-    await finishTask(uid, sid, 'advert', 10);
+    await rwait(1000, 3000);
 
-    // 等级查询
+    // 5. 创意视频
+    const at = tasks.find(x => x.taskType === 'advert');
+    if (at && at.status === 1) {
+      $.log('看创意视频: ✅ 已完成');
+    } else {
+      for (let i = 0; i < 3; i++) {
+        await doDoListen(uid, sid, 'videoadver', 58);
+        await rwait(2000, 5000);
+      }
+      await finishTask(uid, sid, 'advert', 10);
+    }
+
+    // 等级
     const rankRes = await httpGet(`${KW_API}/openapi/v1/usersystem/userRank?appUid=${uid}&loginUid=${uid}&loginSid=${sid}&type=1`);
     const rankData = tryParse(rankRes.body);
     if (rankData?.code === 200) $.log(`Lv.${rankData.data.rank} 成长值:${rankData.data.score}`);
@@ -102,34 +130,34 @@ const $ = new Env(KW_NAME);
 
 // ─── 核心函数 ───
 
-// doListen：完成任务
 async function doDoListen(uid, sid, from, goldNum, extraGoldNum) {
   const names = { sign: '签到', mobile: '听歌10分钟', novel: '听小说10分钟', comment: '发布评论', videoadver: '看创意视频' };
   const taskName = names[from] || from;
-
   let url = `${KW_API}/api/v1/online/sign/v1/earningSignIn/everydaymusic/doListen?loginUid=${uid}&loginSid=${sid}&from=${from}`;
   if (goldNum > 0) url += `&goldNum=${goldNum}`;
   if (extraGoldNum > 0) url += `&extraGoldNum=${extraGoldNum}`;
-
   const res = await httpGet(url);
   const data = tryParse(res.body);
   if (data?.code === 200) {
-    const desc = data.data?.description || '成功';
-    $.log(`${taskName}: ✅ ${desc}`);
+    $.log(`${taskName}: ✅ ${data.data?.description || '成功'}`);
   } else {
     $.log(`${taskName}: ❌ ${data?.msg || '失败'}`);
   }
 }
 
-// finishTask：领取奖励
 async function finishTask(uid, sid, from, goldNum) {
   const url = `${KW_API}/openapi/v1/usersystem/finishTask?loginUid=${uid}&loginSid=${sid}&appUid=${uid}&from=${from}&goldNum=${goldNum}&mobile=&terminal=ip`;
   const res = await httpGet(url);
   const data = tryParse(res.body);
-  return data?.code === 200;
+  if (data?.code === 200) {
+    $.log(`领奖(${from}): ✅ ${data.data?.description || '成功'}`);
+    return true;
+  } else {
+    $.log(`领奖(${from}): ❌ ${data?.msg || data?.data?.description || '失败'}`);
+    return false;
+  }
 }
 
-// 真实评论打卡
 async function doRealComment(uid, sid, webCookie) {
   const hmMatch = webCookie.match(/Hm_Iuvt_cdb524f42f0ce19b169b8072123a4727=([^;]+)/);
   if (!hmMatch) {
@@ -139,7 +167,6 @@ async function doRealComment(uid, sid, webCookie) {
     return;
   }
 
-  // 先发真实评论
   const hotSongRid = '3548250545';
   const text = CHECKIN_TEXTS[Math.floor(Math.random() * CHECKIN_TEXTS.length)];
   const secret = calcKuwoSecret(hmMatch[1], hmMatch[1]);
@@ -162,7 +189,6 @@ async function doRealComment(uid, sid, webCookie) {
     $.log(`发布评论: ❌ ${e.message}`);
   }
 
-  // 再 doListen + finishTask 确保领到经验
   await rwait(1000, 2000);
   await doDoListen(uid, sid, 'comment', 10);
   await finishTask(uid, sid, 'comment', 10);
@@ -197,7 +223,7 @@ function handleCookieCapture() {
   $.done();
 }
 
-// Secret 算法
+// Secret 算法 (from General74110)
 function calcKuwoSecret(t, e) {
   if (!e) return '';
   let n = '';
@@ -221,6 +247,14 @@ function calcKuwoSecret(t, e) {
   while (dHex.length < 8) dHex = '0' + dHex;
   return f + dHex;
 }
+
+const CHECKIN_TEXTS = [
+  '打卡', '签到打卡', '每日打卡', '我来打卡了', '打卡第N天',
+  '滴~打卡', '日常打卡', '今天也打卡', '坚持打卡', '打卡一下',
+  '打个卡', '到这打卡', '听歌打卡', '顺便打卡', '走一个',
+  '来了', '今日打卡', '滴滴打卡', '照常打卡', '习惯性打卡'
+];
+const COMMENT_API = 'https://comment.kuwo.cn/com.s';
 
 // 工具
 function tryParse(str) { try { return JSON.parse(str); } catch { return null; } }
@@ -250,7 +284,7 @@ function httpPost(url, headers) {
 
 // Env
 function Env(name, opts) {
-  return new (class {
+  class _env {
     constructor(n, o) { this.name = n; this.data = null; this.logs = []; this.startTime = Date.now(); this.log(`🔔 ${this.name}, 开始!`); }
     getEnv() {
       if (typeof $environment !== 'undefined' && $environment['surge-version']) return 'Surge';
@@ -293,10 +327,13 @@ function Env(name, opts) {
     done() {
       const elapsed = ((Date.now() - this.startTime) / 1000).toFixed(2);
       this.log(`结束! ${elapsed}s`);
+      this.msg(this.name, `执行完毕 (${elapsed}s)`,
+        this.logs.filter(l => l.includes('❌')).length > 0 ? '部分任务失败，查看日志' : '全部成功');
       switch (this.getEnv()) {
         case 'Quantumult X': case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket': default: $done(); break;
         case 'Node.js': process.exit(0); break;
       }
     }
-  })(name, opts);
+  }
+  return new _env(name, opts);
 }
