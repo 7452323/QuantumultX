@@ -84,10 +84,21 @@ const $ = new Env(KW_NAME);
     // ═══ 签到 ═══
     const signTask = tasks.find(x => x.taskType === 'sign');
     if (signTask && signTask.status !== 1) {
-      const sRes = await httpGet(`${KW_API}/api/v1/online/sign/normal/sign?loginUid=${uid}&loginSid=${sid}&source=kwplayer_ip_12.1.6.0_TJ.ipa&tmeapp=1&notrace=0&allpay=0&corp=kuwo&plat=ip&vipMode=0&newver=3`);
+      // 从任务列表取签到 URI（若有），否则用默认接口
+      let signUrl;
+      if (signTask.uri) {
+        signUrl = signTask.uri.startsWith('http') ? signTask.uri : `${KW_API}${signTask.uri}`;
+      } else if (signTask.jumpUrl) {
+        signUrl = signTask.jumpUrl.startsWith('http') ? signTask.jumpUrl : `${KW_API}${signTask.jumpUrl}`;
+      } else {
+        signUrl = `${KW_API}/api/v1/online/sign/normal/sign?loginUid=${uid}&loginSid=${sid}&source=kwplayer_ip_12.1.6.0_TJ.ipa&tmeapp=1&notrace=0&allpay=0&corp=kuwo&plat=ip&vipMode=0&newver=3`;
+      }
+      const sRes = await httpGet(signUrl);
       let sData;
       try { sData = JSON.parse(sRes.body); } catch { sData = null; }
       $.log(`签到: ${sData?.code === 200 ? '✅ 成功' : sData?.msg || '❌ 失败'}`);
+      // 打印原始响应以便调试
+      if (sData && sData.code !== 200) { $.log(`  响应: ${sRes.body.substring(0,200)}`); }
     } else { $.log('签到: 今日已签到'); }
 
     // ═══ 听歌、小说 ═══
