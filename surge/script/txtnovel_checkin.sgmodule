@@ -2,7 +2,7 @@
 #!desc=书香门第(txtnovel.vip)自动签到
 #!author=7452323
 #!category=签到
-#!arguments=cron= 0 9 * * *
+#!arguments=cron:30 0 * * *
 #!requirement=CORE_VERSION>=5.10
 
 [Script]
