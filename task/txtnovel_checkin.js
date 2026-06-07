@@ -1,6 +1,6 @@
 /*
 书香门第论坛签到 — www.txtnovel.vip
-Discuz 论坛，采集 Cookie + formhash POST 签到
+Discuz dsu_paulsign 插件，采集 Cookie + POST 签到
 Surge/QX 通用版
 
 支持环境变量（通过 $argument 传入）：
@@ -41,7 +41,6 @@ function ts() {
   // rewrite 模式：采集 Cookie
   if (typeof $request !== 'undefined') {
     if (!ENABLE_COOKIE) {
-      $.log('Cookie采集已关闭');
       $.done();
       return;
     }
@@ -59,53 +58,63 @@ function ts() {
   // task 模式：签到
   const cookie = $.getdata(COOKIE_KEY);
   if (!cookie) {
-    $.msg($.name, '⚠️ 未获取到 Cookie', '请先访问 txtnovel.vip 触发采集');
+    $.msg($.name, `${((Date.now() - $.startTime) / 1000).toFixed(2)}s`,
+      `────────────────\n⚠️ 未获取到 Cookie\n────────────────\n请先访问 txtnovel.vip 触发采集\n────────────────\n🎯 失败`);
     $.done();
     return;
   }
 
-  const userAgent = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15';
+  const ua = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15';
   const commonHeaders = {
-    'User-Agent': userAgent,
+    'User-Agent': ua,
     'Cookie': cookie,
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
     'Accept-Language': 'zh-CN,zh;q=0.9'
   };
 
-  // 1. 访问首页获取 formhash
-  $.log('步骤1: 获取 formhash');
-  const homeRes = await httpGet(`${BASE_URL}/`, commonHeaders);
-  const homeBody = homeRes.body || '';
-  const formhashMatch = homeBody.match(/name="formhash" value="([^"]+)"/);
+  // 1. 访问签到页获取 formhash
+  $.log('步骤1: 访问签到页获取 formhash');
+  const pageRes = await httpGet(`${BASE_URL}/plugin.php?id=dsu_paulsign:sign`, commonHeaders);
+  const pageBody = pageRes.body || '';
+  const formhashMatch = pageBody.match(/name="formhash" value="([^"]+)"/);
   const formhash = formhashMatch ? formhashMatch[1] : '';
   if (!formhash) {
-    $.log('❌ 未获取到 formhash，可能 Cookie 已过期');
-    $.msg($.name, '❌ Cookie 已过期', '请重新访问 txtnovel.vip 采集');
+    $.log('❌ 未获取到 formhash');
+    $.msg($.name, `${((Date.now() - $.startTime) / 1000).toFixed(2)}s`,
+      `────────────────\n👤 txtnovel.vip\n${ts()}  ❌ Cookie 已过期\n────────────────\n无法获取 formhash，请重新访问采集\n────────────────\n🎯 失败`);
     $.done();
     return;
   }
   $.log(`formhash: ${formhash}`);
 
-  // 2. 签到
+  // 2. POST 签到（qdxq=kx 表示心情=开心）
   $.log('步骤2: 执行签到');
-  const signRes = await httpGet(`${BASE_URL}/plugin.php?id=dc_signin:sign&formhash=${formhash}&inajax=1`, {
-    ...commonHeaders,
-    'Referer': `${BASE_URL}/`,
-    'X-Requested-With': 'XMLHttpRequest'
-  });
+  const signRes = await httpPost(
+    `${BASE_URL}/plugin.php?id=dsu_paulsign:sign&operation=qiandao&infloat=0&inajax=0&mobile=yes`,
+    {
+      ...commonHeaders,
+      'Origin': BASE_URL,
+      'Referer': `${BASE_URL}/plugin.php?id=dsu_paulsign:sign`,
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    `formhash=${formhash}&qdxq=kx`
+  );
   const signBody = signRes.body || '';
-  $.log(`签到响应: ${signBody.substring(0, 500)}`);
+  $.log(`签到响应(前500): ${signBody.substring(0, 500)}`);
 
   // 3. 解析结果
   let notifyBody;
   const t = ts();
 
-  if (signBody.includes('已签到') || signBody.includes('签到成功') || signBody.includes('今日已经签到')) {
-    const msg = signBody.match(/<root><!\[CDATA\[(.*?)\]\]>/)?.[1] || '签到成功';
-    $.log(`✅ ${msg}`);
-    notifyBody = `────────────────\n👤 txtnovel.vip\n${t}  ✅ ${msg}\n────────────────\n🎯 已完成`;
+  if (signBody.includes('签到成功') || signBody.includes('已经签到') || signBody.includes('今日已经签到')) {
+    // 尝试提取具体信息
+    let detail = '';
+    const msgMatch = signBody.match(/<div class="c">([^<]+)/);
+    if (msgMatch) detail = msgMatch[1].trim();
+    $.log(`✅ 签到成功${detail ? ': ' + detail : ''}`);
+    notifyBody = `────────────────\n👤 txtnovel.vip\n${t}  ✅ 签到成功${detail ? '\n💬 ' + detail : ''}\n────────────────\n🎯 已完成`;
   } else {
-    const err = signBody.substring(0, 200);
+    const err = signBody.substring(0, 200).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
     $.log(`❌ 签到失败: ${err}`);
     notifyBody = `────────────────\n👤 txtnovel.vip\n${t}  ❌ 签到失败\n────────────────\n💬 ${err}\n────────────────\n🎯 失败`;
   }
@@ -122,6 +131,18 @@ function httpGet(url, headers) {
       $task.fetch(opts).then(r => { if (DEBUG) $.log(`[HTTP←] ${r.statusCode} ${r.body.substring(0,300)}`); resolve({ status: r.statusCode, body: r.body }); }).catch(e => reject(e));
     else if (typeof $httpClient !== 'undefined')
       $httpClient.get(opts, (err, resp, body) => { if (err) reject(err); else { if (DEBUG) $.log(`[HTTP←] ${resp.status||resp.statusCode} ${body.substring(0,300)}`); resolve({ status: resp.status || resp.statusCode, body }); } });
+    else reject(new Error('不支持的平台'));
+  });
+}
+
+function httpPost(url, headers, body) {
+  if (DEBUG) $.log(`[HTTP→] POST ${url}`);
+  return new Promise((resolve, reject) => {
+    const opts = { url, headers, body, method: 'POST' };
+    if (typeof $task !== 'undefined')
+      $task.fetch(opts).then(r => { if (DEBUG) $.log(`[HTTP←] ${r.statusCode} ${r.body.substring(0,300)}`); resolve({ status: r.statusCode, body: r.body }); }).catch(e => reject(e));
+    else if (typeof $httpClient !== 'undefined')
+      $httpClient.post(opts, (err, resp, data) => { if (err) reject(err); else { if (DEBUG) $.log(`[HTTP←] ${resp.status||resp.statusCode} ${data.substring(0,300)}`); resolve({ status: resp.status || resp.statusCode, body: data }); } });
     else reject(new Error('不支持的平台'));
   });
 }
