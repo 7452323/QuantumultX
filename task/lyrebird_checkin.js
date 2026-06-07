@@ -2,10 +2,10 @@
 Lyrebird Emby 签到 — Surge/QX 通用版
 
 [rewrite_local]
-^https:\/\/console\.lyrebirdemby\.com\/api\/account\/me url script-request-header lyrebird_checkin.js
+^https:\/\/console\.lyrebirdemby\.com\/api\/account\/me url script-request-header https://raw.githubusercontent.com/7452323/QuantumultX/main/task/lyrebird_checkin.js
 
 [task_local]
-0 10 * * * lyrebird_checkin.js, tag=Lyrebird签到, enabled=true
+0 10 * * * https://raw.githubusercontent.com/7452323/QuantumultX/main/task/lyrebird_checkin.js, tag=Lyrebird签到, enabled=true
 
 [MITM]
 hostname = console.lyrebirdemby.com
