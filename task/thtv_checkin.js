@@ -35,11 +35,16 @@ const COOKIE_KEY = 'THTV_COOKIE';
 const SEP = '\n';
 const SIGN_URL = 'https://navix.site/api/sign-in';
 
+function ts() {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
 !(async () => {
   // rewrite 模式：采集 Cookie
   if (typeof $request !== 'undefined') {
     if (!ENABLE_COOKIE) {
-      $.log('Cookie采集已关闭(enable_cookie=0)');
+      $.log('Cookie采集已关闭');
       $.done();
       return;
     }
@@ -50,9 +55,9 @@ const SIGN_URL = 'https://navix.site/api/sign-in';
         list.push(cookie);
         $.setdata(list.join(SEP), COOKIE_KEY);
       }
-      $.msg($.name, `✅ Cookie 已保存 (${list.length} 个账号)`, '');
+      $.msg($.name, '✅ Cookie 已保存', `${list.length} 个账号`);
     } else {
-      $.msg($.name, '❌ Cookie 采集失败', '未获取到 Cookie');
+      $.msg($.name, '❌ 采集失败', '未获取到 Cookie');
     }
     $.done();
     return;
@@ -67,7 +72,7 @@ const SIGN_URL = 'https://navix.site/api/sign-in';
   }
 
   const cookies = raw.split(SEP).filter(Boolean);
-  const results = [];
+  const allLines = [];
 
   for (let i = 0; i < cookies.length; i++) {
     const ck = cookies[i];
@@ -82,23 +87,25 @@ const SIGN_URL = 'https://navix.site/api/sign-in';
       }, '{}');
 
       const data = tryParse(res.body);
+      const t = ts();
 
       if (data && data.success) {
-        const msg = `✅ 签到成功｜+${data.expGained}经验｜连续${data.consecutiveDays}天｜等级：${data.level?.title || ''}`;
-        $.log(msg);
-        results.push(`账号${i + 1}: 签到成功`);
+        const msg = `+${data.expGained}经验 连续${data.consecutiveDays}天`;
+        $.log(`✅ ${msg}`);
+        allLines.push(`👤 探花TV账号${i + 1}\n${t}  ✅ 签到成功  ${msg}`);
       } else {
-        const msg = `❌ 签到失败｜${data?.message || res.body}`;
-        $.log(msg);
-        results.push(`账号${i + 1}: 签到失败`);
+        const msg = data?.message || res.body;
+        $.log(`❌ ${msg}`);
+        allLines.push(`👤 探花TV账号${i + 1}\n${t}  ❌ ${msg}`);
       }
     } catch (err) {
       $.logErr(err);
-      results.push(`账号${i + 1}: 请求异常`);
+      allLines.push(`👤 探花TV账号${i + 1}\n${ts()}  ❌ 请求异常`);
     }
   }
 
-  $.msg($.name, `${cookies.length} 个账号`, results.join('\n'));
+  const notifyBody = `────────────────\n${allLines.join('\n\n')}\n\n────────────────\n🎯 全部完成  ${allLines.length}/${cookies.length}`;
+  $.msg($.name, `${((Date.now() - $.startTime) / 1000).toFixed(2)}s`, notifyBody);
   $.done();
 })().catch(e => { $.logErr(e); $.done(); });
 
@@ -155,9 +162,6 @@ function Env(name, opts) {
       }
     }
     done() {
-      const elapsed = ((Date.now() - this.startTime) / 1000).toFixed(2);
-      this.log(`结束! ${elapsed}s`);
-      this.msg(this.name, `${elapsed}s`, '');
       switch (this.getEnv()) {
         case 'Quantumult X': case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket': default: $done(); break;
         case 'Node.js': process.exit(0); break;

@@ -32,11 +32,16 @@ const DEBUG = ARG.debug === '1';
 const COOKIE_KEY = 'txtnovel_cookie';
 const BASE_URL = 'http://www.txtnovel.vip';
 
+function ts() {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
 !(async () => {
   // rewrite 模式：采集 Cookie
   if (typeof $request !== 'undefined') {
     if (!ENABLE_COOKIE) {
-      $.log('Cookie采集已关闭(enable_cookie=0)');
+      $.log('Cookie采集已关闭');
       $.done();
       return;
     }
@@ -45,7 +50,7 @@ const BASE_URL = 'http://www.txtnovel.vip';
       $.setdata(cookie, COOKIE_KEY);
       $.msg($.name, '✅ Cookie 已保存', '');
     } else {
-      $.msg($.name, '❌ Cookie 采集失败', '未获取到 Cookie');
+      $.msg($.name, '❌ 采集失败', '未获取到 Cookie');
     }
     $.done();
     return;
@@ -92,15 +97,20 @@ const BASE_URL = 'http://www.txtnovel.vip';
   $.log(`签到响应: ${signBody.substring(0, 500)}`);
 
   // 3. 解析结果
+  let notifyBody;
+  const t = ts();
+
   if (signBody.includes('已签到') || signBody.includes('签到成功') || signBody.includes('今日已经签到')) {
     const msg = signBody.match(/<root><!\[CDATA\[(.*?)\]\]>/)?.[1] || '签到成功';
     $.log(`✅ ${msg}`);
-    $.msg($.name, '✅ 签到成功', msg);
+    notifyBody = `────────────────\n👤 txtnovel.vip\n${t}  ✅ ${msg}\n────────────────\n🎯 已完成`;
   } else {
-    $.log(`❌ 签到失败: ${signBody.substring(0, 200)}`);
-    $.msg($.name, '❌ 签到失败', signBody.substring(0, 200));
+    const err = signBody.substring(0, 200);
+    $.log(`❌ 签到失败: ${err}`);
+    notifyBody = `────────────────\n👤 txtnovel.vip\n${t}  ❌ 签到失败\n────────────────\n💬 ${err}\n────────────────\n🎯 失败`;
   }
 
+  $.msg($.name, `${((Date.now() - $.startTime) / 1000).toFixed(2)}s`, notifyBody);
   $.done();
 })().catch(e => { $.logErr(e); $.done(); });
 
@@ -155,9 +165,6 @@ function Env(name, opts) {
       }
     }
     done() {
-      const elapsed = ((Date.now() - this.startTime) / 1000).toFixed(2);
-      this.log(`结束! ${elapsed}s`);
-      this.msg(this.name, `${elapsed}s`, '');
       switch (this.getEnv()) {
         case 'Quantumult X': case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket': default: $done(); break;
         case 'Node.js': process.exit(0); break;

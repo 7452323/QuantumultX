@@ -33,6 +33,11 @@ const BASE = 'https://console.lyrebirdemby.com';
 
 const MONTHS = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+function ts() {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
 !(async () => {
   // rewrite 模式：采集 Cookie + Token
   if (typeof $request !== 'undefined') {
@@ -80,69 +85,42 @@ const MONTHS = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep
   // 判断今天是否已签到
   const alreadyChecked = lastTx?.metadata?.checkInDate === todayStr;
 
+  let notifyBody = '';
+  let amount = 0;
+  let newBalance = balance;
+
   if (alreadyChecked) {
-    // 已签到 — 友好通知
-    const lines = [
-      '╭──────────────╮',
-      '│  ✅ 今日已签到 │',
-      '╰──────────────╯',
-      '',
-      `📅 日期    ${formatDate(today)}`,
-      `💰 余额    ${balance} 积分`,
-      `📊 连续签到  ${countStreak(txList)} 天`,
-      '',
-      `🕐 ${formatTime(new Date())}`
-    ];
-    $.msg($.name, '✅ 今日已签到', lines.join('\n'));
-    $.done();
-    return;
-  }
-
-  // 未签到 — 执行签到
-  $.log('🔄 执行签到...');
-  const res = await httpPost(`${BASE}/api/account/points/check-in`, headers, '{}');
-  const data = tryParse(res.body);
-
-  if (data && data.balance !== undefined) {
-    const gained = data.amount;
-    const newBalance = data.balance;
-    const streak = countStreak(txList) + 1;
-    $.log(`签到成功! +${gained} 积分，余额: ${newBalance}`);
-
-    const lines = [
-      '┌─────────────────┐',
-      `│  🎉 签到成功 +${gained} 🎉  │`,
-      '└─────────────────┘',
-      '',
-      `💰 余额    ${newBalance} 积分`,
-      `📊 连续签到  ${streak} 天`,
-      '',
-      `🕐 ${formatTime(new Date())}`
-    ];
-    $.msg($.name, `🎉 +${gained} 积分`, lines.join('\n'));
+    // 已签到
+    const streak = countStreak(txList);
+    notifyBody = `────────────────\n👤 Lyrebird\n${ts()}  ✅ 今日已签到\n────────────────\n🏆 连续 ${streak} 天  |  💰 ${balance} 积分\n\n────────────────\n🎯 已完成`;
+    $.log('今日已签到');
   } else {
-    const errMsg = data?.message || res.body || '未知错误';
-    $.logErr(`签到失败: ${errMsg}`);
-    const lines = [
-      '┌──────────────┐',
-      '│  ❌ 签到失败   │',
-      '└──────────────┘',
-      '',
-      `📝 ${errMsg}`,
-      `💰 余额    ${balance} 积分`,
-      '',
-      `🕐 ${formatTime(new Date())}`
-    ];
-    $.msg($.name, '❌ 签到失败', lines.join('\n'));
+    // 未签到 — 执行签到
+    $.log('🔄 执行签到...');
+    const res = await httpPost(`${BASE}/api/account/points/check-in`, headers, '{}');
+    const data = tryParse(res.body);
+
+    if (data && data.balance !== undefined) {
+      amount = data.amount;
+      newBalance = data.balance;
+      const streak = countStreak(txList) + 1;
+      $.log(`签到成功! +${amount} 积分，余额: ${newBalance}`);
+
+      notifyBody = `────────────────\n👤 Lyrebird\n${ts()}  ✅ 签到成功  +${amount}\n────────────────\n🏆 连续 ${streak} 天  |  💰 ${newBalance} 积分\n\n────────────────\n🎯 已完成`;
+    } else {
+      const errMsg = data?.message || res.body || '未知错误';
+      $.logErr(`签到失败: ${errMsg}`);
+      notifyBody = `────────────────\n👤 Lyrebird\n${ts()}  ❌ 签到失败\n────────────────\n💬 ${errMsg}\n💰 余额 ${balance}\n\n────────────────\n🎯 失败`;
+    }
   }
 
+  $.msg($.name, `${((Date.now() - $.startTime) / 1000).toFixed(2)}s`, notifyBody);
   $.done();
 })().catch(e => { $.logErr(e); $.done(); });
 
 function countStreak(txList) {
   const ins = txList.filter(t => t.type === 'DAILY_CHECK_IN');
   if (!ins.length) return 0;
-  // 按日期倒序，算连续
   let cnt = 1;
   const dates = ins.map(t => t.metadata?.checkInDate).filter(Boolean).sort().reverse();
   for (let i = 1; i < dates.length; i++) {
@@ -153,14 +131,6 @@ function countStreak(txList) {
     else break;
   }
   return cnt;
-}
-
-function formatDate(d) {
-  return `${MONTHS[d.getMonth()+1]} ${d.getDate()}, ${d.getFullYear()}`;
-}
-
-function formatTime(d) {
-  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;
 }
 
 function tryParse(str) { try { return JSON.parse(str); } catch { return null; } }
@@ -228,8 +198,6 @@ function Env(name, opts) {
       }
     }
     done() {
-      const elapsed = ((Date.now() - this.startTime) / 1000).toFixed(2);
-      this.log(`结束! ${elapsed}s`);
       switch (this.getEnv()) {
         case 'Quantumult X': case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket': default: $done(); break;
         case 'Node.js': process.exit(0); break;
