@@ -15,7 +15,7 @@ hostname = integralapi.kuwo.cn
 1. 取 taskList 检测各任务状态（已完成的跳过）
 2. 只对未完成的任务调 doListen 完成 + finishTask 领奖
 3. 创意视频最多 5 次，用 doListen 完成 + finishTask 领奖
-4. 通知卡片：每项一行 + 等级成长值
+4. 通知卡片：C5-3 风格
 
 Cookie 采集：需采集 integralapi（userid@websid）
 多账号用 & 分隔
@@ -51,12 +51,16 @@ const H = {
   'Referer': 'https://h5app.kuwo.cn/apps/user-system/index.html?MBOX_WEBCLOSE=1&hideBottomMargin=1&FULLHASARROW=1'
 };
 
+function ts() {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
 !(async () => {
   if (typeof $request !== 'undefined') {
     if (ENABLE_COOKIE) {
       handleCookie();
     } else {
-      $.log('Cookie采集已关闭(enable_cookie=0)');
       $.done();
     }
     return;
@@ -64,7 +68,8 @@ const H = {
 
   const raw = $.getdata(KEY);
   if (!raw) {
-    $.msg($.name, '⚠️ 未获取到 Cookie', '请先登录酷我音乐触发采集');
+    $.msg($.name, `${((Date.now() - $.startTime) / 1000).toFixed(2)}s`,
+      `────────────────\n⚠️ 未获取到 Cookie\n────────────────\n请先登录酷我音乐触发采集\n────────────────\n🎯 失败`);
     $.done();
     return;
   }
@@ -72,9 +77,9 @@ const H = {
   const accounts = raw.split(SEP).map(a => a.trim()).filter(Boolean);
   $.log(`检测到 ${accounts.length} 个账户`);
 
-  let allBody = '';
-  let successCount = 0;
-  let failCount = 0;
+  const allBodies = [];
+  let validAccounts = 0;
+  let expiredAccounts = 0;
 
   for (const acc of accounts) {
     const [uid, sid] = acc.split('@');
@@ -83,15 +88,19 @@ const H = {
     const ubRes = await httpGet(`${API}/api/v1/online/sign/v1/music/userBase?loginUid=${uid}`);
     const ubData = tryParse(ubRes.body);
     const nickname = ubData?.data?.nickname || '';
-    if (!nickname) { $.log(`[${uid}] Cookie 已失效，跳过`); continue; }
+
+    // Cookie 过期
+    if (!nickname) {
+      $.log(`[${uid}] Cookie 已失效，跳过`);
+      expiredAccounts++;
+      allBodies.push(`👤 ${uid}\n${ts()}  ❌ Cookie 已过期`);
+      continue;
+    }
+
+    validAccounts++;
     $.log(`\n[${nickname}]`);
 
     const res = {};
-
-    function ts() {
-      const d = new Date();
-      return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-    }
     const logTime = [];
 
     // 获取 taskList
@@ -192,29 +201,26 @@ const H = {
       $.log(rankStr);
     }
 
-    // 组装通知
+    // 组装每个账号通知块
     const hasFail = Object.values(res).some(v => v === '✗');
-    if (hasFail) failCount++; else successCount++;
-
-    const taskLines = [];
-    let idx = 0;
-    for (const [k, v] of Object.entries(res)) {
-      const label = k;
-      const time = logTime[idx] || ts();
-      taskLines.push(`${time}  ${v === '✓' ? '✅' : '❌'} ${label}`);
-      idx++;
-    }
-
-    let accBody = `👤 ${nickname}\n${taskLines.join('\n')}\n────────────────\n🏆 ${rankStr}`;
-    if (allBody) allBody += '\n\n';
-    allBody += accBody;
+    const taskLines = Object.entries(res).map(([k, v], i) => {
+      const t = logTime[i] || ts();
+      return `${t}  ${v === '✓' ? '✅' : '❌'} ${k}`;
+    });
+    allBodies.push(`👤 ${nickname}\n${taskLines.join('\n')}\n────────────────\n🏆 ${rankStr}`);
   }
 
-  if (allBody) {
-    allBody = `────────────────\n${allBody}\n\n────────────────\n🎯 全部完成  ${successCount}/${accounts.length}`;
-    $.notifyBody = allBody;
+  // 最终通知拼装
+  let notifyBody;
+  if (allBodies.length === 0) {
+    notifyBody = `────────────────\n⚠️ 没有可用账号\n────────────────\n🎯 失败`;
+  } else if (validAccounts === 0 && expiredAccounts > 0) {
+    notifyBody = `────────────────\n${allBodies.join('\n\n')}\n\n────────────────\n🎯 Cookie 全部过期  ${expiredAccounts}/${accounts.length}`;
+  } else {
+    notifyBody = `────────────────\n${allBodies.join('\n\n')}\n\n────────────────\n🎯 全部完成  ${validAccounts}/${accounts.length}`;
   }
 
+  $.msg($.name, `${((Date.now() - $.startTime) / 1000).toFixed(2)}s`, notifyBody);
   $.done();
 })().catch(e => { $.logErr(e); $.done(); });
 
@@ -280,7 +286,7 @@ function httpGet(url) {
 
 function Env(name, opts) {
   class _env {
-    constructor(n, o) { this.name = n; this.data = null; this.notifyBody = ''; this.logs = []; this.startTime = Date.now(); this.log(`🔔 ${this.name}, 开始!`); }
+    constructor(n, o) { this.name = n; this.data = null; this.logs = []; this.startTime = Date.now(); this.log(`🔔 ${this.name}, 开始!`); }
     getEnv() {
       if (typeof $task !== 'undefined') return 'Quantumult X';
       if (typeof $environment !== 'undefined' && $environment['surge-version']) return 'Surge';
@@ -319,8 +325,6 @@ function Env(name, opts) {
     done() {
       const elapsed = ((Date.now() - this.startTime) / 1000).toFixed(2);
       this.log(`结束! ${elapsed}s`);
-      const body = this.notifyBody || (this.logs.filter(l => l.includes('❌')).length > 0 ? '⚠️ 部分任务失败' : '✅ 全部成功');
-      this.msg(this.name, `${elapsed}s`, body);
       switch (this.getEnv()) {
         case 'Quantumult X': case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket': default: $done(); break;
         case 'Node.js': process.exit(0); break;

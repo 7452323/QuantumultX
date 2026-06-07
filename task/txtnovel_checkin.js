@@ -165,6 +165,8 @@ function Env(name, opts) {
       }
     }
     done() {
+      const elapsed = ((Date.now() - this.startTime) / 1000).toFixed(2);
+      this.log(`结束! ${elapsed}s`);
       switch (this.getEnv()) {
         case 'Quantumult X': case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket': default: $done(); break;
         case 'Node.js': process.exit(0); break;
