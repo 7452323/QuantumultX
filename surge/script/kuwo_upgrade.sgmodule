@@ -2,7 +2,7 @@
 #!desc=酷我音乐每日签到 + 听歌 + 听小说 + 发评论 + 看创意视频
 #!author=7452323
 #!category=签到
-#!arguments=cron:30 8,10,12,14,16 * * *,enable_cookie:1,tasks:all,debug:0,hostname:integralapi.kuwo.cn|www.kuwo.cn
+#!arguments=cron:30 8-16/2 * * *,enable_cookie:1,tasks:all,debug:0,hostname:integralapi.kuwo.cn|www.kuwo.cn
 #!arguments-desc=签到模块参数设置\n├ cron: 定时运行时间\n├ enable_cookie: Cookie采集开关(0关闭/1开启)\n├ tasks: 执行任务(all=全部,或指定如sign,music,video)\n├ debug: 调试模式(0关闭/1开启，开启后打印详细日志)\n└ hostname: MITM域名
 
 [Script]
