@@ -110,8 +110,19 @@ function ts() {
     let detail = '';
     const msgMatch = signBody.match(/<div class="c">([^<]+)/);
     if (msgMatch) detail = msgMatch[1].trim();
+
+    // 提取总金币和本次奖励
+    let totalCoin = '', gainedCoin = '';
+    const totalMatch = signBody.match(/您目前获得的总奖励为:金币\s*(\d+)\s*枚/);
+    const gainedMatch = signBody.match(/获得随机奖励\s*金币\s*(\d+)\s*枚/);
+    if (totalMatch) totalCoin = totalMatch[1];
+    if (gainedMatch) gainedCoin = gainedMatch[1];
+
     $.log(`✅ 签到成功${detail ? ': ' + detail : ''}`);
-    notifyBody = `👤 txtnovel.vip\n${t}  ✅ 签到成功${detail ? '\n💬 ' + detail : ''}\n\n🎯 已完成`;
+    let line2 = '';
+    if (gainedCoin && totalCoin) line2 = `\n💰 +${gainedCoin} 金币  |  总计 ${totalCoin} 金币`;
+    else if (detail) line2 = `\n💬 ${detail}`;
+    notifyBody = `👤 txtnovel.vip\n${t}  ✅ 签到成功${line2}\n\n🎯 已完成`;
   } else {
     const err = signBody.substring(0, 200).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
     $.log(`❌ 签到失败: ${err}`);
