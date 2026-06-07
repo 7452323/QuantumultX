@@ -58,8 +58,8 @@ function ts() {
   // task 模式：签到
   const cookie = $.getdata(COOKIE_KEY);
   if (!cookie) {
-    $.msg($.name, `${((Date.now() - $.startTime) / 1000).toFixed(2)}s`,
-      `────────────────\n⚠️ 未获取到 Cookie\n────────────────\n请先访问 txtnovel.vip 触发采集\n────────────────\n🎯 失败`);
+    $.msg($.name, '',
+      `⚠️ 未获取到 Cookie\n\n请先访问 txtnovel.vip 触发采集\n\n🎯 失败`);
     $.done();
     return;
   }
@@ -80,8 +80,8 @@ function ts() {
   const formhash = formhashMatch ? formhashMatch[1] : '';
   if (!formhash) {
     $.log('❌ 未获取到 formhash');
-    $.msg($.name, `${((Date.now() - $.startTime) / 1000).toFixed(2)}s`,
-      `────────────────\n👤 txtnovel.vip\n${ts()}  ❌ Cookie 已过期\n────────────────\n无法获取 formhash，请重新访问采集\n────────────────\n🎯 失败`);
+    $.msg($.name, '',
+      `👤 txtnovel.vip\n${ts()}  ❌ Cookie 已过期\n无法获取 formhash，请重新访问采集\n\n🎯 失败`);
     $.done();
     return;
   }
@@ -107,19 +107,18 @@ function ts() {
   const t = ts();
 
   if (signBody.includes('签到成功') || signBody.includes('已经签到') || signBody.includes('今日已经签到')) {
-    // 尝试提取具体信息
     let detail = '';
     const msgMatch = signBody.match(/<div class="c">([^<]+)/);
     if (msgMatch) detail = msgMatch[1].trim();
     $.log(`✅ 签到成功${detail ? ': ' + detail : ''}`);
-    notifyBody = `────────────────\n👤 txtnovel.vip\n${t}  ✅ 签到成功${detail ? '\n💬 ' + detail : ''}\n────────────────\n🎯 已完成`;
+    notifyBody = `👤 txtnovel.vip\n${t}  ✅ 签到成功${detail ? '\n💬 ' + detail : ''}\n\n🎯 已完成`;
   } else {
     const err = signBody.substring(0, 200).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
     $.log(`❌ 签到失败: ${err}`);
-    notifyBody = `────────────────\n👤 txtnovel.vip\n${t}  ❌ 签到失败\n────────────────\n💬 ${err}\n────────────────\n🎯 失败`;
+    notifyBody = `👤 txtnovel.vip\n${t}  ❌ 签到失败\n💬 ${err}\n\n🎯 失败`;
   }
 
-  $.msg($.name, `${((Date.now() - $.startTime) / 1000).toFixed(2)}s`, notifyBody);
+  $.msg($.name, '', notifyBody);
   $.done();
 })().catch(e => { $.logErr(e); $.done(); });
 

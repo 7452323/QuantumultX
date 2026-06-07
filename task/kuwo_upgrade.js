@@ -68,8 +68,12 @@ function ts() {
 
   const raw = $.getdata(KEY);
   if (!raw) {
-    $.msg($.name, `${((Date.now() - $.startTime) / 1000).toFixed(2)}s`,
-      `────────────────\n⚠️ 未获取到 Cookie\n────────────────\n请先登录酷我音乐触发采集\n────────────────\n🎯 失败`);
+    $.msg($.name, '',
+      `⚠️ 未获取到 Cookie
+
+请先登录酷我音乐触发采集
+
+🎯 失败`);
     $.done();
     return;
   }
@@ -207,20 +211,26 @@ function ts() {
       const t = logTime[i] || ts();
       return `${t}  ${v === '✓' ? '✅' : '❌'} ${k}`;
     });
-    allBodies.push(`👤 ${nickname}\n${taskLines.join('\n')}\n────────────────\n🏆 ${rankStr}`);
+    allBodies.push(`👤 ${nickname}\n${taskLines.join('\n')}\n🏆 ${rankStr}`);
   }
 
   // 最终通知拼装
   let notifyBody;
   if (allBodies.length === 0) {
-    notifyBody = `────────────────\n⚠️ 没有可用账号\n────────────────\n🎯 失败`;
+    notifyBody = `⚠️ 没有可用账号
+
+🎯 失败`;
   } else if (validAccounts === 0 && expiredAccounts > 0) {
-    notifyBody = `────────────────\n${allBodies.join('\n\n')}\n\n────────────────\n🎯 Cookie 全部过期  ${expiredAccounts}/${accounts.length}`;
+    notifyBody = `${allBodies.join('\n\n')}
+
+🎯 Cookie 全部过期  ${expiredAccounts}/${accounts.length}`;
   } else {
-    notifyBody = `────────────────\n${allBodies.join('\n\n')}\n\n────────────────\n🎯 全部完成  ${validAccounts}/${accounts.length}`;
+    notifyBody = `${allBodies.join('\n\n')}
+
+🎯 全部完成  ${validAccounts}/${accounts.length}`;
   }
 
-  $.msg($.name, `${((Date.now() - $.startTime) / 1000).toFixed(2)}s`, notifyBody);
+  $.msg($.name, '', notifyBody);
   $.done();
 })().catch(e => { $.logErr(e); $.done(); });
 

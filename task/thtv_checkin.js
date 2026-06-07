@@ -104,8 +104,10 @@ function ts() {
     }
   }
 
-  const notifyBody = `────────────────\n${allLines.join('\n\n')}\n\n────────────────\n🎯 全部完成  ${allLines.length}/${cookies.length}`;
-  $.msg($.name, `${((Date.now() - $.startTime) / 1000).toFixed(2)}s`, notifyBody);
+  const notifyBody = `${allLines.join('\n\n')}
+
+🎯 全部完成  ${allLines.length}/${cookies.length}`;
+  $.msg($.name, '', notifyBody);
   $.done();
 })().catch(e => { $.logErr(e); $.done(); });
 

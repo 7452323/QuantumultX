@@ -92,7 +92,9 @@ function ts() {
   if (alreadyChecked) {
     // 已签到
     const streak = countStreak(txList);
-    notifyBody = `────────────────\n👤 Lyrebird\n${ts()}  ✅ 今日已签到\n────────────────\n🏆 连续 ${streak} 天  |  💰 ${balance} 积分\n\n────────────────\n🎯 已完成`;
+    notifyBody = `👤 Lyrebird\n${ts()}  ✅ 今日已签到\n🏆 连续 ${streak} 天  |  💰 ${balance} 积分
+
+🎯 已完成`;
     $.log('今日已签到');
   } else {
     // 未签到 — 执行签到
@@ -106,15 +108,19 @@ function ts() {
       const streak = countStreak(txList) + 1;
       $.log(`签到成功! +${amount} 积分，余额: ${newBalance}`);
 
-      notifyBody = `────────────────\n👤 Lyrebird\n${ts()}  ✅ 签到成功  +${amount}\n────────────────\n🏆 连续 ${streak} 天  |  💰 ${newBalance} 积分\n\n────────────────\n🎯 已完成`;
+      notifyBody = `👤 Lyrebird\n${ts()}  ✅ 签到成功  +${amount}\n🏆 连续 ${streak} 天  |  💰 ${newBalance} 积分
+
+🎯 已完成`;
     } else {
       const errMsg = data?.message || res.body || '未知错误';
       $.logErr(`签到失败: ${errMsg}`);
-      notifyBody = `────────────────\n👤 Lyrebird\n${ts()}  ❌ 签到失败\n────────────────\n💬 ${errMsg}\n💰 余额 ${balance}\n\n────────────────\n🎯 失败`;
+      notifyBody = `👤 Lyrebird\n${ts()}  ❌ 签到失败\n💬 ${errMsg}\n💰 余额 ${balance}
+
+🎯 失败`;
     }
   }
 
-  $.msg($.name, `${((Date.now() - $.startTime) / 1000).toFixed(2)}s`, notifyBody);
+  $.msg($.name, '', notifyBody);
   $.done();
 })().catch(e => { $.logErr(e); $.done(); });
 
