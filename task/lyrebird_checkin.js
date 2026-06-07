@@ -28,13 +28,15 @@ const ENABLE_COOKIE = ARG.enable_cookie !== '0';
 
 const TOKEN_KEY = 'lyrebird_token';
 const COOKIE_KEY = 'lyrebird_cookie';
-const CHECKIN_URL = 'https://console.lyrebirdemby.com/api/account/points/check-in';
+const BASE = 'https://console.lyrebirdemby.com';
+
+const MONTHS = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 !(async () => {
   // rewrite 模式：采集 Cookie + Token
   if (typeof $request !== 'undefined') {
     if (!ENABLE_COOKIE) {
-      $.log('Cookie采集已关闭(enable_cookie=0)');
+      $.log('Cookie采集已关闭');
       $.done();
       return;
     }
@@ -49,38 +51,129 @@ const CHECKIN_URL = 'https://console.lyrebirdemby.com/api/account/points/check-i
 
   // task 模式：签到
   const token = $.getdata(TOKEN_KEY);
-  const cookie = $.getdata(COOKIE_KEY);
   if (!token) {
     $.msg($.name, '⚠️ 未获取到 Token', '请先打开 lyrebirdemby.com 控制台');
     $.done();
     return;
   }
 
-  const res = await httpPost(CHECKIN_URL, {
+  const headers = {
     'Authorization': token,
-    'Cookie': cookie || '',
+    'Cookie': $.getdata(COOKIE_KEY) || '',
     'Content-Type': 'application/json',
     'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15',
-    'Origin': 'https://console.lyrebirdemby.com',
-    'Referer': 'https://console.lyrebirdemby.com/'
-  }, '{}');
+    'Origin': BASE,
+    'Referer': BASE + '/'
+  };
 
+  // 先查当前积分和签到记录
+  $.log('📊 查询积分状态...');
+  const ptRes = await httpGet(`${BASE}/api/account/points`, headers);
+  const ptData = tryParse(ptRes.body);
+  const balance = ptData?.balance ?? '?';
+  const txList = ptData?.transactions || [];
+  const lastTx = txList.find(t => t.type === 'DAILY_CHECK_IN');
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+
+  // 判断今天是否已签到
+  const alreadyChecked = lastTx?.metadata?.checkInDate === todayStr;
+
+  if (alreadyChecked) {
+    // 已签到 — 友好通知
+    const lines = [
+      '╭──────────────╮',
+      '│  ✅ 今日已签到 │',
+      '╰──────────────╯',
+      '',
+      `📅 日期    ${formatDate(today)}`,
+      `💰 余额    ${balance} 积分`,
+      `📊 连续签到  ${countStreak(txList)} 天`,
+      '',
+      `🕐 ${formatTime(new Date())}`
+    ];
+    $.msg($.name, '✅ 今日已签到', lines.join('\n'));
+    $.done();
+    return;
+  }
+
+  // 未签到 — 执行签到
+  $.log('🔄 执行签到...');
+  const res = await httpPost(`${BASE}/api/account/points/check-in`, headers, '{}');
   const data = tryParse(res.body);
+
   if (data && data.balance !== undefined) {
-    $.log(`签到成功! +${data.amount} 积分，余额: ${data.balance}`);
-    $.msg($.name, `✅ +${data.amount} 分`, `余额 ${data.balance}`);
-  } else if (res.body && res.body.includes('already')) {
-    $.log('今日已签到');
-    $.msg($.name, '✅ 今日已签到', '');
+    const gained = data.amount;
+    const newBalance = data.balance;
+    const streak = countStreak(txList) + 1;
+    $.log(`签到成功! +${gained} 积分，余额: ${newBalance}`);
+
+    const lines = [
+      '┌─────────────────┐',
+      `│  🎉 签到成功 +${gained} 🎉  │`,
+      '└─────────────────┘',
+      '',
+      `💰 余额    ${newBalance} 积分`,
+      `📊 连续签到  ${streak} 天`,
+      '',
+      `🕐 ${formatTime(new Date())}`
+    ];
+    $.msg($.name, `🎉 +${gained} 积分`, lines.join('\n'));
   } else {
-    $.log(`签到失败: ${res.body}`);
-    $.msg($.name, '❌ 签到失败', res.body);
+    const errMsg = data?.message || res.body || '未知错误';
+    $.logErr(`签到失败: ${errMsg}`);
+    const lines = [
+      '┌──────────────┐',
+      '│  ❌ 签到失败   │',
+      '└──────────────┘',
+      '',
+      `📝 ${errMsg}`,
+      `💰 余额    ${balance} 积分`,
+      '',
+      `🕐 ${formatTime(new Date())}`
+    ];
+    $.msg($.name, '❌ 签到失败', lines.join('\n'));
   }
 
   $.done();
 })().catch(e => { $.logErr(e); $.done(); });
 
+function countStreak(txList) {
+  const ins = txList.filter(t => t.type === 'DAILY_CHECK_IN');
+  if (!ins.length) return 0;
+  // 按日期倒序，算连续
+  let cnt = 1;
+  const dates = ins.map(t => t.metadata?.checkInDate).filter(Boolean).sort().reverse();
+  for (let i = 1; i < dates.length; i++) {
+    const prev = new Date(dates[i-1]);
+    const cur = new Date(dates[i]);
+    const diff = (prev - cur) / 86400000;
+    if (Math.round(diff) === 1) cnt++;
+    else break;
+  }
+  return cnt;
+}
+
+function formatDate(d) {
+  return `${MONTHS[d.getMonth()+1]} ${d.getDate()}, ${d.getFullYear()}`;
+}
+
+function formatTime(d) {
+  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;
+}
+
 function tryParse(str) { try { return JSON.parse(str); } catch { return null; } }
+
+function httpGet(url, headers) {
+  return new Promise((resolve, reject) => {
+    const opts = { url, headers };
+    if (typeof $task !== 'undefined')
+      $task.fetch(opts).then(r => resolve({ status: r.statusCode, body: r.body })).catch(e => reject(e));
+    else if (typeof $httpClient !== 'undefined')
+      $httpClient.get(opts, (err, resp, body) => { if (err) reject(err); else resolve({ status: resp.status || resp.statusCode, body }); });
+    else reject(new Error('不支持的平台'));
+  });
+}
 
 function httpPost(url, headers, body) {
   return new Promise((resolve, reject) => {
@@ -134,7 +227,6 @@ function Env(name, opts) {
     done() {
       const elapsed = ((Date.now() - this.startTime) / 1000).toFixed(2);
       this.log(`结束! ${elapsed}s`);
-      this.msg(this.name, `${elapsed}s`, this.logs.filter(l => l.includes('❌')).length > 0 ? '失败' : '成功');
       switch (this.getEnv()) {
         case 'Quantumult X': case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket': default: $done(); break;
         case 'Node.js': process.exit(0); break;
