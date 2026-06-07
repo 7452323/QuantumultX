@@ -2,12 +2,13 @@
 #!desc=酷我音乐每日签到 + 听歌 + 听小说 + 发评论 + 看创意视频
 #!author=7452323
 #!category=签到
-#!arguments=cron:30 8,10,12,14,16 * * *
+#!arguments=cron:30 8,10,12,14,16 * * *,enable_cookie:1,tasks:all,hostname:integralapi.kuwo.cn|www.kuwo.cn
+#!arguments-desc=签到模块参数设置\n├ cron: 定时运行时间\n├ enable_cookie: Cookie采集开关(0关闭/1开启)\n├ tasks: 执行任务(all=全部,或指定如sign,music,video)\n└ hostname: MITM域名
 
 [Script]
-kuwo_upgrade = type=cron,cronexp=%cron%,wake-system=1,timeout=120,script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/kuwo_upgrade.js
+kuwo_upgrade = type=cron,cronexp="{{{cron}}}",wake-system=1,timeout=120,script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/kuwo_upgrade.js,argument="enable_cookie={{{enable_cookie}}}&tasks={{{tasks}}}"
 kuwo_upgrade_cookie = type=http-request,pattern=^https?:\/\/integralapi\.kuwo\.cn\/api\/v1\/online\/sign\/v1\/music\/userBase,script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/kuwo_upgrade.js,requires-body=1
 kuwo_upgrade_webcookie = type=http-request,pattern=^https?:\/\/www\.kuwo\.cn\/,script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/kuwo_upgrade.js,requires-body=1
 
 [MITM]
-hostname = %APPEND% integralapi.kuwo.cn, www.kuwo.cn
+hostname = %APPEND% {{{hostname}}}

@@ -1,207 +1,166 @@
 /*
-书香门第(txtnovel.vip)自动签到
-环境变量: TXTNOVEL_COOKIE（多账号用换行或&分隔）
-变量格式: cookie1&cookie2 或 每行一个
+书香门第论坛签到 — www.txtnovel.vip
+Discuz 论坛，采集 Cookie + formhash POST 签到
+Surge/QX 通用版
+
+支持环境变量（通过 $argument 传入）：
+  enable_cookie: 1=启用Cookie采集(默认) 0=关闭
 
 [rewrite_local]
-^http:\/\/www\.txtnovel\.vip url script-request-header https://raw.githubusercontent.com/7452323/QuantumultX/main/task/txtnovel_checkin.js
+^http:\/\/www\.txtnovel\.vip\/ url script-request-header https://raw.githubusercontent.com/7452323/QuantumultX/main/task/txtnovel_checkin.js
 
 [task_local]
-0 9 * * * https://raw.githubusercontent.com/7452323/QuantumultX/main/task/txtnovel_checkin.js, tag=书香门第签到, enabled=true
+30 0 * * * https://raw.githubusercontent.com/7452323/QuantumultX/main/task/txtnovel_checkin.js, tag=书香门第签到, enabled=true
 
 [MITM]
 hostname = www.txtnovel.vip
 */
 
-const $ = new Env("书香门第签到");
-const COOKIE_KEY = 'txtnovel_checkin_cookie';
+const $ = new Env('书香门第签到');
+
+// 解析 $argument
+const ARG = {};
+if (typeof $argument === 'string') {
+  $argument.split('&').forEach(p => {
+    const idx = p.indexOf('=');
+    if (idx > 0) ARG[p.slice(0, idx)] = p.slice(idx + 1);
+  });
+}
+const ENABLE_COOKIE = ARG.enable_cookie !== '0';
+
+const COOKIE_KEY = 'txtnovel_cookie';
+const BASE_URL = 'http://www.txtnovel.vip';
 
 !(async () => {
-    // rewrite 模式：抓 Cookie
-    if (typeof $request != "undefined") {
-        await captureCookie();
-        return;
+  // rewrite 模式：采集 Cookie
+  if (typeof $request !== 'undefined') {
+    if (!ENABLE_COOKIE) {
+      $.log('Cookie采集已关闭(enable_cookie=0)');
+      $.done();
+      return;
     }
-
-    // task 模式：执行签到
-    const cookies = getCookies();
-    if (!cookies || cookies.length === 0) {
-        $.msg($.name, '⛔️ 未设置Cookie', '请先打开 txtnovel.vip 签到页面触发采集');
-        return;
+    const cookie = $request.headers['Cookie'] || $request.headers['cookie'] || '';
+    if (cookie) {
+      $.setdata(cookie, COOKIE_KEY);
+      $.msg($.name, '✅ Cookie 已保存', '');
+    } else {
+      $.msg($.name, '❌ Cookie 采集失败', '未获取到 Cookie');
     }
+    $.done();
+    return;
+  }
 
-    let succ = 0, fail = 0;
-    const msgs = [];
-    for (let i = 0; i < cookies.length; i++) {
-        $.log(`📱 账号${i + 1} 开始签到...`);
-        try {
-            const result = await doSign(cookies[i]);
-            msgs.push(`账号${i + 1}: ${result}`);
-            if (result.includes('✅')) succ++;
-            else fail++;
-        } catch (e) {
-            $.logErr(e);
-            msgs.push(`账号${i + 1}: ❌ ${e.message}`);
-            fail++;
-        }
-        if (i < cookies.length - 1) await $.wait(2000);
-    }
+  // task 模式：签到
+  const cookie = $.getdata(COOKIE_KEY);
+  if (!cookie) {
+    $.msg($.name, '⚠️ 未获取到 Cookie', '请先访问 txtnovel.vip 触发采集');
+    $.done();
+    return;
+  }
 
-    $.msg($.name, `成功 ${succ} / 失败 ${fail}`, msgs.join('\n'));
-})().catch(e => $.logErr(e)).finally(() => $.done());
+  const userAgent = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15';
+  const commonHeaders = {
+    'User-Agent': userAgent,
+    'Cookie': cookie,
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'zh-CN,zh;q=0.9'
+  };
 
-// ── 抓 Cookie ──
-async function captureCookie() {
-    if ($request.method === 'OPTIONS') return;
-    const raw = $request.headers || {};
-    const cookie = raw['Cookie'] || raw['cookie'] || '';
-    if (!cookie) {
-        $.log('⛔️ 未抓到 Cookie');
-        return;
-    }
-    $.setdata(cookie, COOKIE_KEY);
-    $.msg($.name, '✅ Cookie 已保存', '');
+  // 1. 访问首页获取 formhash
+  $.log('步骤1: 获取 formhash');
+  const homeRes = await httpGet(`${BASE_URL}/`, commonHeaders);
+  const homeBody = homeRes.body || '';
+  const formhashMatch = homeBody.match(/name="formhash" value="([^"]+)"/);
+  const formhash = formhashMatch ? formhashMatch[1] : '';
+  if (!formhash) {
+    $.log('❌ 未获取到 formhash，可能 Cookie 已过期');
+    $.msg($.name, '❌ Cookie 已过期', '请重新访问 txtnovel.vip 采集');
+    $.done();
+    return;
+  }
+  $.log(`formhash: ${formhash}`);
+
+  // 2. 签到
+  $.log('步骤2: 执行签到');
+  const signRes = await httpGet(`${BASE_URL}/plugin.php?id=dc_signin:sign&formhash=${formhash}&inajax=1`, {
+    ...commonHeaders,
+    'Referer': `${BASE_URL}/`,
+    'X-Requested-With': 'XMLHttpRequest'
+  });
+  const signBody = signRes.body || '';
+  $.log(`签到响应: ${signBody.substring(0, 500)}`);
+
+  // 3. 解析结果
+  if (signBody.includes('已签到') || signBody.includes('签到成功') || signBody.includes('今日已经签到')) {
+    const msg = signBody.match(/<root><!\[CDATA\[(.*?)\]\]>/)?.[1] || '签到成功';
+    $.log(`✅ ${msg}`);
+    $.msg($.name, '✅ 签到成功', msg);
+  } else {
+    $.log(`❌ 签到失败: ${signBody.substring(0, 200)}`);
+    $.msg($.name, '❌ 签到失败', signBody.substring(0, 200));
+  }
+
+  $.done();
+})().catch(e => { $.logErr(e); $.done(); });
+
+function httpGet(url, headers) {
+  return new Promise((resolve, reject) => {
+    const opts = { url, headers };
+    if (typeof $task !== 'undefined')
+      $task.fetch(opts).then(r => resolve({ status: r.statusCode, body: r.body })).catch(e => reject(e));
+    else if (typeof $httpClient !== 'undefined')
+      $httpClient.get(opts, (err, resp, body) => { if (err) reject(err); else resolve({ status: resp.status || resp.statusCode, body }); });
+    else reject(new Error('不支持的平台'));
+  });
 }
 
-// ── 获取 Cookie 列表 ──
-function getCookies() {
-    const stored = $.getdata(COOKIE_KEY);
-    return stored ? [stored] : [];
-}
-
-// ── 执行签到 ──
-async function doSign(cookie) {
-    const signPageUrl = 'http://www.txtnovel.vip/plugin.php?id=dsu_paulsign:sign&mobile=yes';
-    const signPostUrl = 'http://www.txtnovel.vip/plugin.php?id=dsu_paulsign:sign&operation=qiandao&infloat=0&inajax=0&mobile=yes';
-
-    const ua = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_2_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.2.1 Mobile/15E148 Safari/604.1';
-
-    // Step 1: 获取 formhash
-    const pageHtml = await http(signPageUrl, 'GET', {
-        'Host': 'www.txtnovel.vip',
-        'Cookie': cookie,
-        'User-Agent': ua,
-        'Accept': 'text/html,*/*',
-        'Referer': 'http://www.txtnovel.vip/',
-    });
-
-    const match = pageHtml.match(/name="formhash"\s+value="([^"]+)"/);
-    if (!match) {
-        if (/请先登录|需要登录/.test(pageHtml)) return '❌ Cookie失效';
-        return '❌ 未获取到formhash';
+function Env(name, opts) {
+  class _env {
+    constructor(n, o) { this.name = n; this.data = null; this.logs = []; this.startTime = Date.now(); this.log(`🔔 ${this.name}, 开始!`); }
+    getEnv() {
+      if (typeof $task !== 'undefined') return 'Quantumult X';
+      if (typeof $environment !== 'undefined' && $environment['surge-version']) return 'Surge';
+      if (typeof $environment !== 'undefined' && $environment['stash-version']) return 'Stash';
+      if (typeof $loon !== 'undefined') return 'Loon';
+      if (typeof $rocket !== 'undefined') return 'Shadowrocket';
+      if (typeof module !== 'undefined' && module.exports) return 'Node.js';
+      return 'Unknown';
     }
-    const formhash = match[1];
-    $.log(`✅ formhash: ${formhash}`);
-
-    // Step 2: 签到
-    const postData = `formhash=${formhash}&qdxq=kx&qdmode=1&todaysay=`;
-    const resp = await http(signPostUrl, 'POST', {
-        'Host': 'www.txtnovel.vip',
-        'Cookie': cookie,
-        'User-Agent': ua,
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Origin': 'http://www.txtnovel.vip',
-        'Referer': signPageUrl,
-        'Accept': 'text/html,*/*',
-    }, postData);
-
-    // Step 3: 解析结果
-    if (/签到成功|恭喜你签到成功/.test(resp)) return '✅ 签到成功';
-    if (/已经签到|今日已签/.test(resp)) return '✅ 今日已签到';
-    if (/请先登录|需要登录/.test(resp)) return '❌ Cookie失效';
-    if (/验证码/.test(resp)) return '❌ 需要验证码';
-    return '⚠️ 未知返回';
-}
-
-// ── HTTP 兼容层 ──
-function http(url, method, headers, body) {
-    return new Promise((resolve, reject) => {
-        const opts = { url, headers, method };
-        if (body) opts.body = body;
-
-        if (typeof $task !== 'undefined') {
-            $task.fetch(opts).then(r => resolve(r.body), e => reject(e));
-        } else if (typeof $httpClient !== 'undefined') {
-            const cb = (err, resp, data) => err ? reject(err) : resolve(data);
-            method === 'GET' ? $httpClient.get(opts, cb) : $httpClient.post(opts, cb);
-        } else {
-            reject(new Error('不支持的平台'));
-        }
-    });
-}
-
-// ── Env 通用框架 ──
-function Env(t, e) {
-    return new class {
-        constructor(t, e) {
-            this.name = t;
-            this.data = null;
-            this.logs = [];
-            this.startTime = Date.now();
-            this.log(`🔔 ${this.name}, 开始!`);
-        }
-
-        getEnv() {
-            if (typeof $environment !== 'undefined' && $environment['surge-version']) return 'Surge';
-            if (typeof $environment !== 'undefined' && $environment['stash-version']) return 'Stash';
-            if (typeof module !== 'undefined' && module.exports) return 'Node.js';
-            if (typeof $task !== 'undefined') return 'Quantumult X';
-            if (typeof $loon !== 'undefined') return 'Loon';
-            if (typeof $rocket !== 'undefined') return 'Shadowrocket';
-        }
-
-        isNode() { return this.getEnv() === 'Node.js'; }
-        isQuanX() { return this.getEnv() === 'Quantumult X'; }
-        isSurge() { return this.getEnv() === 'Surge'; }
-        isLoon() { return this.getEnv() === 'Loon'; }
-
-        getdata(key) {
-            switch (this.getEnv()) {
-                case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket':
-                    return $persistentStore.read(key) || '';
-                case 'Quantumult X':
-                    return $prefs.valueForKey(key) || '';
-                case 'Node.js':
-                    return this.data && this.data[key] || '';
-                default: return '';
-            }
-        }
-
-        setdata(val, key) {
-            switch (this.getEnv()) {
-                case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket':
-                    return $persistentStore.write(val, key);
-                case 'Quantumult X':
-                    return $prefs.setValueForKey(val, key);
-                case 'Node.js':
-                    this.data = this.data || {};
-                    this.data[key] = val;
-                    return true;
-                default: return false;
-            }
-        }
-
-        log(msg) { console.log(msg); this.logs.push(msg); }
-        logErr(e) { this.log(`❌ ${e.message || e}`); if (e.stack) this.log(e.stack); }
-        wait(ms) { return new Promise(r => setTimeout(r, ms)); }
-
-        msg(title, subtitle, content) {
-            switch (this.getEnv()) {
-                case 'Quantumult X': $notify(title, subtitle || '', content || ''); break;
-                case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket':
-                    $notification.post(title, subtitle || '', content || ''); break;
-                case 'Node.js': console.log(`${title}: ${subtitle} - ${content}`); break;
-            }
-        }
-
-        done() {
-            const elapsed = ((Date.now() - this.startTime) / 1000).toFixed(2);
-            this.log(`结束! ${elapsed}s`);
-            switch (this.getEnv()) {
-                case 'Quantumult X': case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket':
-                    $done({}); break;
-                case 'Node.js': process.exit(0); break;
-            }
-        }
-    }(t, e);
+    getdata(k) {
+      switch (this.getEnv()) {
+        case 'Quantumult X': return $prefs.valueForKey(k) || '';
+        case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket': return $persistentStore.read(k) || '';
+        case 'Node.js': return this.data && this.data[k] || process.env[k] || '';
+        default: return '';
+      }
+    }
+    setdata(v, k) {
+      switch (this.getEnv()) {
+        case 'Quantumult X': return $prefs.setValueForKey(v, k);
+        case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket': return $persistentStore.write(v, k);
+        case 'Node.js': this.data = this.data || {}; this.data[k] = v; return true;
+        default: return false;
+      }
+    }
+    log(...t) { t.length > 0 && (this.logs = [...this.logs, ...t]); console.log(t.join('\n')); }
+    logErr(t) { this.log('', `❗️${this.name}, 错误!`, t?.message || t); }
+    wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+    msg(t, s, c) {
+      switch (this.getEnv()) {
+        case 'Quantumult X': $notify(t, s||'', c||''); break;
+        case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket': default: $notification.post(t, s||'', c||''); break;
+        case 'Node.js': console.log(`${t}: ${s} - ${c}`); break;
+      }
+    }
+    done() {
+      const elapsed = ((Date.now() - this.startTime) / 1000).toFixed(2);
+      this.log(`结束! ${elapsed}s`);
+      this.msg(this.name, `${elapsed}s`, '');
+      switch (this.getEnv()) {
+        case 'Quantumult X': case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket': default: $done(); break;
+        case 'Node.js': process.exit(0); break;
+      }
+    }
+  }
+  return new _env(name, opts);
 }

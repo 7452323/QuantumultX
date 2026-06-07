@@ -1,6 +1,6 @@
 /*
-酷我音乐 升级签到 — for Quantumult X
-Quantumult X 专用版
+酷我音乐 升级签到 — for Quantumult X / Surge
+Quantumult X & Surge 通用版
 
 [rewrite_local]
 ^https?:\/\/integralapi\.kuwo\.cn\/api\/v1\/online\/sign\/v1\/music\/userBase url script-request-header kuwo_upgrade.js
@@ -19,9 +19,25 @@ hostname = integralapi.kuwo.cn
 
 Cookie 采集：需采集 integralapi（userid@websid）
 多账号用 & 分隔
+
+支持环境变量（通过 $argument 传入）：
+  enable_cookie: 1=启用Cookie采集(默认) 0=关闭
+  tasks: all=全部任务(默认) 或 sign,music,novel,comment,video 指定
 */
 
 const $ = new Env('酷我音乐(升级)');
+
+// 解析 $argument
+const ARG = {};
+if (typeof $argument === 'string') {
+  $argument.split('&').forEach(p => {
+    const idx = p.indexOf('=');
+    if (idx > 0) ARG[p.slice(0, idx)] = p.slice(idx + 1);
+  });
+}
+const ENABLE_COOKIE = ARG.enable_cookie !== '0';
+const TASKS = ARG.tasks || 'all';
+const TASK_LIST = TASKS === 'all' ? [] : TASKS.split(',').map(t => t.trim());
 
 const KEY = 'kuwo_upgrade';
 const SEP = '&';
@@ -36,7 +52,12 @@ const H = {
 
 !(async () => {
   if (typeof $request !== 'undefined') {
-    handleCookie();
+    if (ENABLE_COOKIE) {
+      handleCookie();
+    } else {
+      $.log('Cookie采集已关闭(enable_cookie=0)');
+      $.done();
+    }
     return;
   }
 
@@ -67,69 +88,83 @@ const H = {
     const tlData = tryParse(tlRes.body);
     const tasks = tlData?.data || [];
 
+    function shouldRun(name) {
+      return TASK_LIST.length === 0 || TASK_LIST.includes(name);
+    }
+
     // 1. 签到
-    const st = tasks.find(x => x.taskType === 'sign');
-    if (st && st.status === 1) {
-      res.签到 = '✓';
-      $.log('每日签到: ✅ 已签到');
-    } else {
-      await doListen(uid, sid, 'sign', 0, 110);
-      const ok = await finishTask(uid, sid, 'sign', 10);
-      res.签到 = ok ? '✓' : '✗';
+    if (shouldRun('sign')) {
+      const st = tasks.find(x => x.taskType === 'sign');
+      if (st && st.status === 1) {
+        res.签到 = '✓';
+        $.log('每日签到: ✅ 已签到');
+      } else {
+        await doListen(uid, sid, 'sign', 0, 110);
+        const ok = await finishTask(uid, sid, 'sign', 10);
+        res.签到 = ok ? '✓' : '✗';
+      }
     }
     await rwait(1000, 3000);
 
     // 2. 听歌10分钟
-    const mt = tasks.find(x => x.taskType === 'music');
-    if (mt && mt.status === 1) {
-      res.听歌 = '✓';
-      $.log('听歌10分钟: ✅ 已完成');
-    } else {
-      await doListen(uid, sid, 'mobile', 18);
-      const ok = await finishTask(uid, sid, 'music', 18);
-      res.听歌 = ok ? '✓' : '✗';
+    if (shouldRun('music')) {
+      const mt = tasks.find(x => x.taskType === 'music');
+      if (mt && mt.status === 1) {
+        res.听歌 = '✓';
+        $.log('听歌10分钟: ✅ 已完成');
+      } else {
+        await doListen(uid, sid, 'mobile', 18);
+        const ok = await finishTask(uid, sid, 'music', 18);
+        res.听歌 = ok ? '✓' : '✗';
+      }
     }
     await rwait(1000, 3000);
 
     // 3. 听小说10分钟
-    const nt = tasks.find(x => x.taskType === 'novel');
-    if (nt && nt.status === 1) {
-      res.小说 = '✓';
-      $.log('听小说10分钟: ✅ 已完成');
-    } else {
-      await doListen(uid, sid, 'novel', 18);
-      const ok = await finishTask(uid, sid, 'novel', 18);
-      res.小说 = ok ? '✓' : '✗';
+    if (shouldRun('novel')) {
+      const nt = tasks.find(x => x.taskType === 'novel');
+      if (nt && nt.status === 1) {
+        res.小说 = '✓';
+        $.log('听小说10分钟: ✅ 已完成');
+      } else {
+        await doListen(uid, sid, 'novel', 18);
+        const ok = await finishTask(uid, sid, 'novel', 18);
+        res.小说 = ok ? '✓' : '✗';
+      }
     }
     await rwait(1000, 3000);
 
     // 4. 发布评论
-    const ct = tasks.find(x => x.taskType === 'comment');
-    if (ct && ct.status === 1) {
-      res.评论 = '✓';
-      $.log('发布评论: ✅ 已完成');
-    } else {
-      await doListen(uid, sid, 'comment', 10);
-      await finishTask(uid, sid, 'comment', 10);
-      res.评论 = '✓';
+    if (shouldRun('comment')) {
+      const ct = tasks.find(x => x.taskType === 'comment');
+      if (ct && ct.status === 1) {
+        res.评论 = '✓';
+        $.log('发布评论: ✅ 已完成');
+      } else {
+        await doListen(uid, sid, 'comment', 10);
+        await finishTask(uid, sid, 'comment', 10);
+        res.评论 = '✓';
+      }
     }
     await rwait(1000, 3000);
 
     // 5. 创意视频（最多5次）
-    const at = tasks.find(x => x.taskType === 'advert');
-    const advTotal = at?.total || 5;
-    if (at && at.status === 1) {
-      res[`视频 ${advTotal}/${advTotal}`] = '✓';
-      $.log(`看创意视频: ✅ 已完成 ${advTotal}/${advTotal}`);
-    } else {
-      let okCnt = 0;
-      for (let i = 0; i < advTotal; i++) {
-        await doListen(uid, sid, 'videoadver', 58);
-        okCnt++;
-        await rwait(2000, 5000);
+    if (shouldRun('video') || shouldRun('advert')) {
+      const at = tasks.find(x => x.taskType === 'advert');
+      const advTotal = at?.total || 5;
+      if (at && at.status === 1) {
+        res[`视频 ${advTotal}/${advTotal}`] = '✓';
+        $.log(`看创意视频: ✅ 已完成 ${advTotal}/${advTotal}`);
+      } else {
+        let okCnt = 0;
+        for (let i = 0; i < advTotal; i++) {
+          await doListen(uid, sid, 'videoadver', 58);
+          okCnt++;
+          await rwait(2000, 5000);
+        }
+        const advOk = await finishTask(uid, sid, 'advert', 10);
+        res[`视频 ${okCnt}/${advTotal}`] = advOk ? '✓' : '✗';
       }
-      const advOk = await finishTask(uid, sid, 'advert', 10);
-      res[`视频 ${okCnt}/${advTotal}`] = advOk ? '✓' : '✗';
     }
 
     // 等级成长值

@@ -9,9 +9,22 @@ Lyrebird Emby 签到 — Surge/QX 通用版
 
 [MITM]
 hostname = console.lyrebirdemby.com
+
+支持环境变量（通过 $argument 传入）：
+  enable_cookie: 1=启用Cookie采集(默认) 0=关闭
 */
 
 const $ = new Env('Lyrebird签到');
+
+// 解析 $argument
+const ARG = {};
+if (typeof $argument === 'string') {
+  $argument.split('&').forEach(p => {
+    const idx = p.indexOf('=');
+    if (idx > 0) ARG[p.slice(0, idx)] = p.slice(idx + 1);
+  });
+}
+const ENABLE_COOKIE = ARG.enable_cookie !== '0';
 
 const TOKEN_KEY = 'lyrebird_token';
 const COOKIE_KEY = 'lyrebird_cookie';
@@ -20,6 +33,11 @@ const CHECKIN_URL = 'https://console.lyrebirdemby.com/api/account/points/check-i
 !(async () => {
   // rewrite 模式：采集 Cookie + Token
   if (typeof $request !== 'undefined') {
+    if (!ENABLE_COOKIE) {
+      $.log('Cookie采集已关闭(enable_cookie=0)');
+      $.done();
+      return;
+    }
     const auth = $request.headers['Authorization'] || $request.headers['authorization'] || '';
     const cookie = $request.headers['Cookie'] || $request.headers['cookie'] || '';
     if (auth) $.setdata(auth, TOKEN_KEY);
