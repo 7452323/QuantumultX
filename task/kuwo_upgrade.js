@@ -72,6 +72,10 @@ const H = {
   const accounts = raw.split(SEP).map(a => a.trim()).filter(Boolean);
   $.log(`检测到 ${accounts.length} 个账户`);
 
+  let allBody = '';
+  let successCount = 0;
+  let failCount = 0;
+
   for (const acc of accounts) {
     const [uid, sid] = acc.split('@');
     if (!uid || !sid) continue;
@@ -83,6 +87,12 @@ const H = {
     $.log(`\n[${nickname}]`);
 
     const res = {};
+
+    function ts() {
+      const d = new Date();
+      return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    }
+    const logTime = [];
 
     // 获取 taskList
     const tlRes = await httpGet(`${API}/openapi/v1/usersystem/taskList?loginUid=${uid}&loginSid=${sid}&appUid=2782700304&version=12.1.6.0&src=kwplayer_ip_12.1.6.0_TJ.ipa`);
@@ -104,6 +114,7 @@ const H = {
         const ok = await finishTask(uid, sid, 'sign', 10);
         res.签到 = ok ? '✓' : '✗';
       }
+      logTime.push(ts());
     }
     await rwait(1000, 3000);
 
@@ -118,6 +129,7 @@ const H = {
         const ok = await finishTask(uid, sid, 'music', 18);
         res.听歌 = ok ? '✓' : '✗';
       }
+      logTime.push(ts());
     }
     await rwait(1000, 3000);
 
@@ -132,6 +144,7 @@ const H = {
         const ok = await finishTask(uid, sid, 'novel', 18);
         res.小说 = ok ? '✓' : '✗';
       }
+      logTime.push(ts());
     }
     await rwait(1000, 3000);
 
@@ -146,6 +159,7 @@ const H = {
         await finishTask(uid, sid, 'comment', 10);
         res.评论 = '✓';
       }
+      logTime.push(ts());
     }
     await rwait(1000, 3000);
 
@@ -166,6 +180,7 @@ const H = {
         const advOk = await finishTask(uid, sid, 'advert', 10);
         res[`视频 ${okCnt}/${advTotal}`] = advOk ? '✓' : '✗';
       }
+      logTime.push(ts());
     }
 
     // 等级成长值
@@ -178,8 +193,26 @@ const H = {
     }
 
     // 组装通知
-    const lines = Object.entries(res).map(([k, v]) => `${k}  ${v}`).join('\n');
-    $.notifyBody = lines + (rankStr ? `\n${rankStr}` : '');
+    const hasFail = Object.values(res).some(v => v === '✗');
+    if (hasFail) failCount++; else successCount++;
+
+    const taskLines = [];
+    let idx = 0;
+    for (const [k, v] of Object.entries(res)) {
+      const label = k;
+      const time = logTime[idx] || ts();
+      taskLines.push(`${time}  ${v === '✓' ? '✅' : '❌'} ${label}`);
+      idx++;
+    }
+
+    let accBody = `👤 ${nickname}\n${taskLines.join('\n')}\n────────────────\n🏆 ${rankStr}`;
+    if (allBody) allBody += '\n\n';
+    allBody += accBody;
+  }
+
+  if (allBody) {
+    allBody = `────────────────\n${allBody}\n\n────────────────\n🎯 全部完成  ${successCount}/${accounts.length}`;
+    $.notifyBody = allBody;
   }
 
   $.done();
