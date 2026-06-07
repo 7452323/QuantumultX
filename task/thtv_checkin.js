@@ -29,6 +29,7 @@ if (typeof $argument === 'string') {
   });
 }
 const ENABLE_COOKIE = ARG.enable_cookie !== '0';
+const DEBUG = ARG.debug === '1';
 
 const COOKIE_KEY = 'THTV_COOKIE';
 const SEP = '\n';
@@ -104,12 +105,13 @@ const SIGN_URL = 'https://navix.site/api/sign-in';
 function tryParse(str) { try { return JSON.parse(str); } catch { return null; } }
 
 function httpPost(url, headers, body) {
+  if (DEBUG) $.log(`[HTTP→] POST ${url}`);
   return new Promise((resolve, reject) => {
     const opts = { url, headers, body, method: 'POST' };
     if (typeof $task !== 'undefined')
-      $task.fetch(opts).then(r => resolve({ status: r.statusCode, body: r.body })).catch(e => reject(e));
+      $task.fetch(opts).then(r => { if (DEBUG) $.log(`[HTTP←] ${r.statusCode} ${r.body.substring(0,300)}`); resolve({ status: r.statusCode, body: r.body }); }).catch(e => reject(e));
     else if (typeof $httpClient !== 'undefined')
-      $httpClient.post(opts, (err, resp, data) => { if (err) reject(err); else resolve({ status: resp.status || resp.statusCode, body: data }); });
+      $httpClient.post(opts, (err, resp, data) => { if (err) reject(err); else { if (DEBUG) $.log(`[HTTP←] ${resp.status||resp.statusCode} ${data.substring(0,300)}`); resolve({ status: resp.status || resp.statusCode, body: data }); } });
     else reject(new Error('不支持的平台'));
   });
 }

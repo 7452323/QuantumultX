@@ -37,8 +37,9 @@ if (typeof $argument === 'string') {
 }
 const ENABLE_COOKIE = ARG.enable_cookie !== '0';
 const TASKS = ARG.tasks || 'all';
-const TASK_LIST = TASKS === 'all' ? [] : TASKS.split(',').map(t => t.trim());
+const DEBUG = ARG.debug === '1';
 
+const TASK_LIST = TASKS === 'all' ? [] : TASKS.split(',').map(t => t.trim());
 const KEY = 'kuwo_upgrade';
 const SEP = '&';
 const API = 'https://integralapi.kuwo.cn';
@@ -233,12 +234,13 @@ function tryParse(str) { try { return JSON.parse(str); } catch { return null; } 
 function rwait(min, max) { return $.wait(min + Math.floor(Math.random() * (max - min))); }
 
 function httpGet(url) {
+  if (DEBUG) $.log(`[HTTP→] GET ${url}`);
   return new Promise((resolve, reject) => {
     const opts = { url, headers: H };
     if (typeof $task !== 'undefined')
-      $task.fetch(opts).then(r => resolve({ status: r.statusCode, body: r.body })).catch(e => reject(e));
+      $task.fetch(opts).then(r => { if (DEBUG) $.log(`[HTTP←] ${r.statusCode} ${r.body.substring(0,300)}`); resolve({ status: r.statusCode, body: r.body }); }).catch(e => reject(e));
     else if (typeof $httpClient !== 'undefined')
-      $httpClient.get(opts, (err, resp, body) => { if (err) reject(err); else resolve({ status: resp.status || resp.statusCode, body }); });
+      $httpClient.get(opts, (err, resp, body) => { if (err) reject(err); else { if (DEBUG) $.log(`[HTTP←] ${resp.status||resp.statusCode} ${body.substring(0,300)}`); resolve({ status: resp.status || resp.statusCode, body }); } });
     else reject(new Error('不支持的平台'));
   });
 }
