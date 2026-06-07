@@ -2,7 +2,7 @@
 #!desc=探花TV论坛(navix.site)自动签到
 #!author=7452323
 #!category=签到
-#!arguments=cron="0 10 * * *"
+#!arguments=cron=0 10 * * *
 #!requirement=CORE_VERSION>=5.10
 
 [Script]
