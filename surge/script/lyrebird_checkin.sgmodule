@@ -2,11 +2,10 @@
 #!desc=Lyrebird Emby 每日签到领积分
 #!author=7452323
 #!category=签到
-#!arguments=cron=0%2010%20*%20*%20*
 #!requirement=CORE_VERSION>=5.10
 
 [Script]
-lyrebird_checkin = type=cron,cronexp=%cron%,wake-system=1,timeout=30,script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/lyrebird_checkin.js
+lyrebird_checkin = type=cron,cronexp="0 10 * * *",wake-system=1,timeout=30,script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/lyrebird_checkin.js
 lyrebird_checkin_cookie = type=http-request,pattern=^https:\/\/console\.lyrebirdemby\.com\/api\/account\/me,script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/lyrebird_checkin.js,requires-body=1
 
 [MITM]
