@@ -39,8 +39,8 @@ $.info(formatLog(arg, "参数信息"));
 
   const pushBody = `${(subtitle ?? '').trim()}\n${(body ?? '').trim()}`.trim();
 
-  // 使用 Bark 兼容 API 格式（POST /:key/:title/:body）
-  const BARK_URL = `https://push.scripting.fun/${arg.Scripting_key}/${encodeURIComponent(title)}/${encodeURIComponent(pushBody)}?group=${arg.group || 'Surge'}&automaticallyCopy=${arg.automaticallyCopy || 1}&icon=${decodeURIComponent(arg.icon) || 'https://raw.githubusercontent.com/xream/scripts/main/scriptable/surge/surge-dark.png'}&sound=${arg.sound || 'default'}&level=${arg.level || 'active'}&volume=${arg.volume || 5}`;
+  // 使用 Scripting Push API（兼容 Bark 格式）
+  const BARK_URL = `https://push.scripting.fun/${arg.SCRIPTING_KEY}/${encodeURIComponent(title)}/${encodeURIComponent(pushBody)}?group=${arg.group || 'Surge'}&autoCopy=${arg.AUTO_COPY || 1}&icon=${arg.icon || 'https://raw.githubusercontent.com/xream/scripts/main/scriptable/surge/surge-dark.png'}&sound=${arg.sound || 'default'}&level=${arg.level || 'active'}&volume=${arg.volume || 5}`;
 
   await http({
     method: 'get',
