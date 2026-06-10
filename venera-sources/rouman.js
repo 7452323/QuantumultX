@@ -1,5 +1,3 @@
-/** @type {import('./_venera_.js')} */
-
 class Rouman extends ComicSource {
   name = "肉漫屋"
   key = "rouman"
