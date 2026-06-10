@@ -19,7 +19,7 @@ class MH18 extends ComicSource {
     domains: {
       title: "域名",
       type: "input",
-      default: "18mh.org"
+      default: "18mh.net"
     }
   }
 

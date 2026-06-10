@@ -21,10 +21,10 @@ class JM extends ComicSource {
     dailyCheckInInProgress = false
 
     static fallbackServers = [
-        "www.cdntwice.org",
-        "www.cdnsha.org",
-        "www.cdnaspa.cc",
-        "www.cdnntr.cc",
+        "www.cdnhjk.net",
+        "www.cdngwc.cc",
+        "www.cdngwc.net",
+        "www.cdngwc.club",
     ];
 
     static imageUrl = "https://cdn-msp.jmapinodeudzn.net"
