@@ -48,5 +48,11 @@
     "fileName": "jcomic.js",
     "key": "jcomic",
     "version": "1.0.0"
+  },
+  {
+    "name": "肉漫屋",
+    "fileName": "rouman.js",
+    "key": "rouman",
+    "version": "1.0.0"
   }
 ]
