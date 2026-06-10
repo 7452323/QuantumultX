@@ -3,7 +3,7 @@ class Rouman extends ComicSource {
   key = "rouman"
   version = "1.0.0"
   minAppVersion = "1.4.0"
-  url = "https://cdn.jsdelivr.net/gh/7452323/QuantumultX@main/venera-sources/rouman.js"
+  url = "https://raw.githubusercontent.com/7452323/QuantumultX/main/venera-sources/rouman.js"
 
   baseUrl = "https://rouman5.com"
 
