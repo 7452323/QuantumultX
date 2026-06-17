@@ -1,4 +1,5 @@
 /* 
+修改自🌸佬的bark模块
 Scripting App 远程通知推送
 监听 Surge 通知事件，通过 Scripting App Remote Push API 推送到 iOS 设备
 兼容 Bark API 格式
