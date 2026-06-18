@@ -1,0 +1,13 @@
+#!name=读不舍手
+#!desc=读不舍手 - RC解锁
+#!author=7452323
+#!homepage=https://github.com/7452323/QuantumultX
+
+[Script]
+# 清 ETag 防 304
+http-request ^https:\/\/api\.rc-backup\.com\/v1\/subscribers\/.+/ requires-body=false, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/读不舍手.js, tag=读不舍手-清ETag
+# 改订阅日期
+http-response ^https:\/\/api\.rc-backup\.com\/v1\/subscribers\/.+/ requires-body=true, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/读不舍手.js, tag=读不舍手-解锁
+
+[MITM]
+hostname = %APPEND% api.rc-backup.com
