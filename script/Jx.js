@@ -1,5 +1,5 @@
 /*
-简讯 解锁VIP + 去广告 + 解锁付费内容
+简讯 解锁VIP
 
 [rewrite_local]
 ^https:\/\/api\.tipsoon\.com\/api\/v1 url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Jx.js
