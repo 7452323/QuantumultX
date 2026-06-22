@@ -1,5 +1,4 @@
 /*
-
 简讯 解锁VIP
 
 [rewrite_local]
@@ -9,20 +8,17 @@
 hostname = api.tipsoon.com
 */
 
-re('"is_vip":\\w+@"vip_expire_time":"[^"]+"@"show_home_tips":\\d+@"ad_scale":\\d+@"open_ad_time":\\d+@"offline_vip_num":\\d+@"offline_normal_num":\\d+@"is_unlock":\\w+@"vip":\\w+@"user_stauts":\\w+', '"is_vip":true@"vip_expire_time":"2099-12-31 23:59:59"@"show_home_tips":0@"ad_scale":0@"open_ad_time":0@"offline_vip_num":999@"offline_normal_num":999@"is_unlock":true@"vip":true@"user_stauts":true')
+let body = $response.body;
 
-function re() {
-  var e = $response.body;
-  if (arguments[0].includes("@")) {
-    var n = arguments[0].split("@"),
-        r = arguments[1].split("@");
-    for (i = 0; i < n.length; i++) {
-      var l = new RegExp(n[i], "g");
-      e = e.replace(l, r[i]);
-    }
-  } else {
-    l = new RegExp(arguments[0], "g");
-    e = e.replace(l, arguments[1]);
-  }
-  $done({ body: e });
-}
+body = body.replace(/"is_vip":\w+/g, '"is_vip":true');
+body = body.replace(/"vip_expire_time":"[^"]+"/g, '"vip_expire_time":"2099-12-31 23:59:59"');
+body = body.replace(/"show_home_tips":\d+/g, '"show_home_tips":0');
+body = body.replace(/"ad_scale":\d+/g, '"ad_scale":0');
+body = body.replace(/"open_ad_time":\d+/g, '"open_ad_time":0');
+body = body.replace(/"offline_vip_num":\d+/g, '"offline_vip_num":999');
+body = body.replace(/"offline_normal_num":\d+/g, '"offline_normal_num":999');
+body = body.replace(/"is_unlock":\w+/g, '"is_unlock":true');
+body = body.replace(/"vip":\w+/g, '"vip":true');
+body = body.replace(/"user_stauts":\w+/g, '"user_stauts":true');
+
+$done({ body });
