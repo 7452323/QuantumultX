@@ -8,12 +8,13 @@
 只测试过QuantumultX，其它环境请自行尝试
 
 2025.02.01 修复图豆显示错误，增加延迟避免风控。
-2026.06.22 修复cookie获取：接口升级到 v4
+@Description:
+脚本兼容：Surge、QuantumultX、Loon、Shadowrocket，不支持青龙
 
 重写：打开app，点击我的
 
 [rewrite_local]
-^https:\/\/ns\.huatu\.com\/u\/v4\/member\/user\/icon url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/htzx.js
+^https:\/\/ns\.huatu\.com\/u\/v4\/member\/user\/icon url script-response-body https://gist.githubusercontent.com/Sliverkiss/242211e19ce56b711436a8e4393452ed/raw/htzx.js
 
 [MITM]
 hostname = ns.huatu.com
@@ -28,6 +29,7 @@ hostname = ns.huatu.com
 6、如果任何单位或个人认为此脚本可能涉嫌侵犯其权利，应及时通知并提供身份证明，所有权证明，我们将在收到认证文件确认后删除此脚本。
 7、所有直接或间接使用、查看此脚本的人均应该仔细阅读此声明。本人保留随时更改或补充此声明的权利。一旦您使用或复制了此脚本，即视为您已接受此免责声明。
 */
+const $ = new Env("华图在线");
 window = {};
 //notify
 const notify = $.isNode() ? require('./sendNotify') : '';
