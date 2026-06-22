@@ -1,4 +1,7 @@
 /*
+
+https://apps.apple.com/app/id6744239296
+
 [rewrite_local]
 ^https?:\/\/api\.rawpixlive\.com\/api\/sign\/profile url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Rawpix.js
 
