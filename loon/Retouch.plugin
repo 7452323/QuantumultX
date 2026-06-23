@@ -1,0 +1,12 @@
+#!name=Retouch
+#!desc=TouchRetouch - RC解锁
+#!author=7452323
+#!icon=https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Loon.png
+#!homepage=https://github.com/7452323/QuantumultX
+
+[Script]
+http-response ^https:\/\/([a-z0-9-]+\.)*(revenuecat|rc-backup)\.com\/(v[12]\/)?(receipts$|subscribers\/[^?#]+) script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Retouch.js, requires-body=true, tag=Retouch-解锁
+http-request ^https:\/\/([a-z0-9-]+\.)*(revenuecat|rc-backup)\.com\/(v[12]\/)?(receipts$|subscribers\/[^?#]+) script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Retouch.js, requires-body=false, tag=Retouch-清ETag
+
+[MITM]
+hostname = *.revenuecat.com, *.rc-backup.com
