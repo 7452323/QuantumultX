@@ -8,7 +8,7 @@
 ^https:\/\/api\.revenuecat\.com\/v1\/subscribers\/[^\/]+(\/offerings)?\/?$ url script-request-header https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Retouch.js
 
 [mitm]
-hostname = api.revenuecat.com, api.superwall.me, collector.superwall.me, subscriptions-api.superwall.com, enrichment-api.superwall.com
+hostname = api.revenuecat.com
 */
 if (typeof $response == "undefined") {
   delete $request.headers["if-none-match"];
