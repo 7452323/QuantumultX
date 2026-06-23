@@ -4,11 +4,11 @@
  * @author 7452323
  *
 [rewrite_local]
-^https?:\/\/([a-z0-9-]+\.)*(revenuecat|rc-backup)\.com\/(v[12]\/)?(receipts$|subscribers\/[^?#]+) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Retouch.js
-^https?:\/\/([a-z0-9-]+\.)*(revenuecat|rc-backup)\.com\/(v[12]\/)?(receipts$|subscribers\/[^?#]+) url script-request-header https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Retouch.js
+^https:\/\/api\.revenuecat\.com\/v1\/subscribers\/.+ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Retouch.js
+^https:\/\/api\.revenuecat\.com\/v1\/subscribers\/.+ url script-request-header https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Retouch.js
 
 [mitm]
-hostname = *.revenuecat.com, *.rc-backup.com
+hostname = api.revenuecat.com
 */
 var body = JSON.parse($response.body);
 if ($response && body && body.subscriber) {
