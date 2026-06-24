@@ -56,13 +56,24 @@
       return;
     }
 
-    // 输出格式：软件名字      限免中
-    const maxLen = Math.max(...freeDeals.map(d => (d.app?.title || '').length));
-    const pad = Math.min(maxLen + 2, 30);
+    // 视觉宽度计算：中文=2，英文/数字=1
+    function vw(s) {
+      let w = 0;
+      for (const ch of s) {
+        if (/[\u4e00-\u9fff\u3000-\u30ff\uff00-\uffef]/.test(ch)) w += 2;
+        else w += 1;
+      }
+      return w;
+    }
+
+    // 用全角空格填充到统一视觉宽度，确保"限免中"右对齐
+    const maxVw = Math.max(...freeDeals.map(d => vw(d.app?.title || '')));
+    const targetVw = Math.min(maxVw + 2, 40);
     let lines = [];
     for (const deal of freeDeals) {
       const title = deal.app?.title || '未知';
-      lines.push(`${title.padEnd(pad)}限免中`);
+      const need = Math.max(0, targetVw - vw(title));
+      lines.push(`${title}${'　'.repeat(Math.ceil(need / 2))}限免中`);
     }
 
     $done({
