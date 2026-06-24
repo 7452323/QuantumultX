@@ -1,6 +1,5 @@
 // AppStore 限免面板 - Surge Module
-// 数据源: AppRaven GraphQL API (逆向自 AppRaven)
-// 参数: appCount (条数), region (地区: cn/us/jp 等)
+// 数据源: AppRaven GraphQL API
 
 (async () => {
   const args = {};
@@ -15,25 +14,17 @@
   if (appCount > 30) appCount = 30;
   const region = (args.region || 'cn').toLowerCase();
 
-  const GRAPHQL_URL = 'https://appraven.net/appraven/graphql';
-
-  const regionEmoji = {
-    cn: '🇨🇳', us: '🇺🇸', jp: '🇯🇵', gb: '🇬🇧',
-    hk: '🇭🇰', tw: '🇹🇼', kr: '🇰🇷', de: '🇩🇪',
-    fr: '🇫🇷', ca: '🇨🇦', au: '🇦🇺'
-  };
-
   try {
     const dealsData = await new Promise((resolve, reject) => {
       $httpClient.post({
-        url: GRAPHQL_URL,
+        url: 'https://appraven.net/appraven/graphql',
         headers: { 'Content-Type': 'application/json', 'User-Agent': 'Surge/5.0' },
         body: JSON.stringify({
           query: `query GetDailyDeals($page: Int!) {
             dailyDeals(page: $page) {
               content {
-                id oldPriceTier newPriceTier sponsored released
-                app { id title subtitle ITunesId genres { title } }
+                id oldPriceTier newPriceTier
+                app { id title ITunesId }
               }
               hasNext
             }
@@ -60,27 +51,22 @@
     if (!freeDeals.length) freeDeals = deals.filter(d => d.newPriceTier === 0);
     freeDeals = freeDeals.slice(0, appCount);
 
-    const emoji = regionEmoji[region] || '🌍';
-    let lines = [`${emoji} AppStore 限免中\n`];
-
-    for (const deal of freeDeals) {
-      const app = deal.app || {};
-      const title = app.title || '未知';
-      const subtitle = app.subtitle || '';
-      const genres = (app.genres || []).map(g => g.title).join(' / ') || '';
-      const url = `https://apps.apple.com/${region}/app/id${app.ITunesId}`;
-      const tag = deal.sponsored ? '💼' : '🔥';
-
-      lines.push(
-        `${tag} **[${title}](${url})** ${subtitle ? `— ${subtitle}` : ''}` +
-        `\n    📉 限免中${genres ? ` · ${genres}` : ''}`
-      );
+    if (!freeDeals.length) {
+      $done({ title: '限免(0)', content: '今日暂无限免' });
+      return;
     }
 
-    lines.push(`\n— AppRaven · ${new Date().toLocaleString('zh-CN')}`);
+    // 输出格式：软件名字      限免中
+    const maxLen = Math.max(...freeDeals.map(d => (d.app?.title || '').length));
+    const pad = Math.min(maxLen + 2, 30);
+    let lines = [];
+    for (const deal of freeDeals) {
+      const title = deal.app?.title || '未知';
+      lines.push(`${title.padEnd(pad)}限免中`);
+    }
 
     $done({
-      title: `限免 (${freeDeals.length})`,
+      title: `限免(${freeDeals.length})`,
       content: lines.join('\n')
     });
 
