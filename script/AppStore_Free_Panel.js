@@ -1,14 +1,43 @@
 // AppStore 限免面板 - Surge Panel Script
 // 数据来源: https://api.zxki.cn/api/appfree
-// 参数: appCount=8 (默认显示8条，最多30条)
+// 参数: appCount=8 (显示条数), action=show|switch(换区), region=(目标地区), group=Proxy(策略组名)
+// 用法: 编辑参数 action=switch&region=日本 → 敲面板执行换区 → 改回 action=show 恢复
 
 (async () => {
-  let count = 8;
+  let args = {};
   if (typeof $argument === 'string' && $argument) {
-    let m = $argument.match(/appCount=(\d+)/);
-    if (m) count = parseInt(m[1]);
+    $argument.split('&').forEach(p => {
+      let [k, v] = p.split('=');
+      if (k && v) args[k.trim()] = v.trim();
+    });
   }
+
+  // 换区模式
+  if (args.action === 'switch' && args.region) {
+    let group = args.group || 'Proxy';
+    try {
+      $surge.setSelectGroupPolicy(group, args.region);
+      $done({
+        title: '✅ 换区成功',
+        content: `策略组: ${group}\n已切换至: ${args.region}\n\n再次点击刷新面板`,
+        icon: 'checkmark.circle',
+        'icon-color': '#34C759'
+      });
+    } catch (e) {
+      $done({
+        title: '❌ 换区失败',
+        content: `策略组 [${group}] 或地区 [${args.region}] 不存在\n\n请检查参数`,
+        icon: 'xmark.circle',
+        'icon-color': '#FF3B30'
+      });
+    }
+    return;
+  }
+
+  // 显示模式（默认）
+  let count = parseInt(args.appCount) || 8;
   count = Math.min(Math.max(count, 1), 30);
+  let group = args.group || 'Proxy';
 
   try {
     let data = await new Promise((resolve, reject) => {
@@ -29,7 +58,6 @@
     let updated = data.last_updated || '';
 
     let lines = [];
-    
     lines.push('━━━ 本体限免 ━━━');
     if (bodyApps.length === 0) {
       lines.push('  暂无');
@@ -51,10 +79,14 @@
       });
     }
 
-    if (updated) {
-      lines.push('');
-      lines.push(`更新时间: ${updated}`);
-    }
+    if (updated) lines.push('');
+    if (updated) lines.push(`🕐 ${updated}`);
+
+    lines.push('');
+    lines.push('━━━ 换区 ━━━');
+    lines.push('编辑参数换区:');
+    lines.push('  action=switch&region=日本');
+    lines.push(`  当前策略组: ${group}`);
 
     $done({
       title: 'AppStore 限免',
