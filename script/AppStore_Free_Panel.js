@@ -3,7 +3,6 @@
 // 参数: appCount (条数), region (地区: cn/us/jp 等)
 
 (async () => {
-  // Surge 传递的参数是 query string 格式, 不是 JSON!
   const args = {};
   if (typeof $argument === 'string') {
     $argument.split('&').forEach(pair => {
@@ -49,11 +48,10 @@
 
     let deals = dealsData?.data?.dailyDeals?.content || [];
     if (!deals.length) {
-      $done({ title: 'AppStore 限免', content: '暂无数据' });
+      $done({ title: '限免(0)', content: '暂无数据' });
       return;
     }
 
-    // 限免 = newPriceTier===0 且有原价
     let freeDeals = deals.filter(d =>
       d.newPriceTier === 0 &&
       d.oldPriceTier !== null &&
@@ -63,7 +61,7 @@
     freeDeals = freeDeals.slice(0, appCount);
 
     const emoji = regionEmoji[region] || '🌍';
-    let lines = [`📱 ${emoji} AppStore 限免\n`];
+    let lines = [`${emoji} AppStore 限免中\n`];
 
     for (const deal of freeDeals) {
       const app = deal.app || {};
@@ -74,13 +72,12 @@
       const tag = deal.sponsored ? '💼' : '🔥';
 
       lines.push(
-        `${tag} **[${title}](${url})**` +
-        (subtitle ? `\n    ${subtitle}` : '') +
+        `${tag} **[${title}](${url})** ${subtitle ? `— ${subtitle}` : ''}` +
         `\n    📉 限免中${genres ? ` · ${genres}` : ''}`
       );
     }
 
-    lines.push(`\n---\nAppRaven · ${new Date().toLocaleString('zh-CN')}`);
+    lines.push(`\n— AppRaven · ${new Date().toLocaleString('zh-CN')}`);
 
     $done({
       title: `限免 (${freeDeals.length})`,

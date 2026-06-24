@@ -2,9 +2,9 @@
 #!desc=AppRaven 限免
 #!author=7452323
 #!homepage=https://github.com/7452323/QuantumultX
-#!arguments=appCount:8
-#!arguments=region:cn
-#!arguments-desc=appCount: 显示条数\nregion: App Store 地区 (cn/us/jp/kr/gb/hk/tw 等)
+#!arguments=appCount=8
+#!arguments=region=cn
+#!arguments-desc=appCount: 显示条数\nregion: App Store 地区
 
 [Panel]
 限免 = script-name=AppStore_Free_Panel, update-interval=600
