@@ -2,6 +2,8 @@
 #!desc=显示 App Store 限免应用列表（本体限免 & 内购限免），数据来源酷酷API。在 appCount= 后修改显示条数，不填默认 8 条。
 #!author=7452323
 #!homepage=https://github.com/7452323/QuantumultX
+#!arguments=appCount:8
+#!arguments-desc=appCount: 显示条数，默认 8，最大 30
 
 [Panel]
 AppStore限免 = script-name=AppStore_Free_Panel, update-interval=600
