@@ -9,4 +9,4 @@
 AppStore限免 = script-name=AppStore_Free_Panel, update-interval=600
 
 [Script]
-AppStore_Free_Panel = type=panel, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/AppStore_Free_Panel.js, argument=appCount=8
+AppStore_Free_Panel = type=panel, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/AppStore_Free_Panel.js, argument=appCount={{{appCount}}}
