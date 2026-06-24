@@ -1,7 +1,7 @@
 // AppStore 限免面板 - Surge Module
 // 数据源: AppRaven GraphQL API (逆向自 AppRaven iOS 应用)
-// 价格: Apple Lookup API
 // 支持参数: appCount(显示条数), region(地区, 如 cn/us/jp)
+// 换区通过 region 参数切换 App Store 国家/地区
 
 (async () => {
   const args = typeof $argument === 'string' ? JSON.parse($argument) : {};
@@ -9,11 +9,6 @@
   const region = (args.region || 'cn').toLowerCase();
 
   const GRAPHQL_URL = 'https://appraven.net/appraven/graphql';
-
-  function getArtworkUrl(url) {
-    if (!url) return '';
-    return url.replace('{w}x{h}{c}.{f}', '120x120bb.png');
-  }
 
   const regionName = {
     cn: '🇨🇳 中国', us: '🇺🇸 美国', jp: '🇯🇵 日本',
@@ -23,7 +18,7 @@
   }[region] || region.toUpperCase();
 
   try {
-    // 第1步: 获取 AppRaven 限免数据
+    // 获取 AppRaven 限免数据
     const dealsData = await new Promise((resolve, reject) => {
       $httpClient.post({
         url: GRAPHQL_URL,
@@ -33,9 +28,8 @@
             dailyDeals(page: $page) {
               content {
                 id oldPriceTier newPriceTier sponsored released
-                startDate endDate
-                app { id title subtitle artworkUrl ITunesId game
-                  genres { ITunesId title } }
+                app { id title subtitle ITunesId
+                  genres { title } }
               }
               hasNext
             }
@@ -54,34 +48,18 @@
       return;
     }
 
-    // 筛选限免 (newPriceTier === 0)
-    let freeDeals = deals.filter(d => d.newPriceTier === 0);
-    // 如果全免费(可能新上架app无原价), 尽量排除刚发布无原价的
-    let goodFreeDeals = freeDeals.filter(d => d.oldPriceTier > 0);
-    if (goodFreeDeals.length > 0) freeDeals = goodFreeDeals;
+    // 筛选限免 (newPriceTier === 0, 有原价)
+    let freeDeals = deals.filter(d =>
+      d.newPriceTier === 0 &&
+      d.oldPriceTier !== null &&
+      d.oldPriceTier > 0
+    );
+    // 如果没有有原价的, 退而求其次
+    if (!freeDeals.length) freeDeals = deals.filter(d => d.newPriceTier === 0);
     // 取前 appCount 个
-    freeDeals = freeDeals.slice(0, appCount);
+    freeDeals = freeDeals.slice(0, Math.min(appCount, 30));
 
-    // 第2步: iTunes Lookup 获取地区价格
-    const ids = freeDeals.map(d => d.app?.ITunesId).filter(Boolean).join(',');
-    let priceMap = {};
-    if (ids) {
-      try {
-        const lookupData = await new Promise((resolve, reject) => {
-          $httpClient.get(`https://itunes.apple.com/lookup?id=${ids}&country=${region}`, (err, resp, data) => {
-            if (err) resolve(null);
-            else resolve(JSON.parse(data));
-          });
-        });
-        if (lookupData?.results) {
-          for (const app of lookupData.results) {
-            priceMap[app.trackId] = app.formattedPrice || '';
-          }
-        }
-      } catch (e) {}
-    }
-
-    // 第3步: 构建输出
+    // 构建输出
     let lines = [`📱 AppStore 限免 · ${regionName}\n`];
 
     for (const deal of freeDeals) {
@@ -89,20 +67,18 @@
       const itunesId = app.ITunesId;
       const title = app.title || '未知';
       const subtitle = app.subtitle || '';
-      const artworkUrl = getArtworkUrl(app.artworkUrl);
       const genres = (app.genres || []).map(g => g.title).join(' / ') || '';
-      const curPrice = priceMap[itunesId] || 'Free';
       const appStoreUrl = `https://apps.apple.com/${region}/app/id${itunesId}`;
       const tag = deal.sponsored ? '💼' : '🔥';
 
       lines.push(
         `${tag} **[${title}](${appStoreUrl})**` +
-        (subtitle ? ` ${subtitle}` : '') +
-        `\n    ~~${curPrice}~~ → **免费**${genres ? ` · ${genres}` : ''}`
+        (subtitle ? `\n    ${subtitle}` : '') +
+        `\n    📉 限免中${genres ? ` · ${genres}` : ''}`
       );
     }
 
-    lines.push(`\n---\n数据: AppRaven · 更新: ${new Date().toLocaleString('zh-CN')}`);
+    lines.push(`\n---\n数据: AppRaven · ${new Date().toLocaleString('zh-CN')}`);
 
     $done({
       title: `AppStore 限免 (${freeDeals.length})`,
