@@ -1,17 +1,20 @@
 // AppStore 限免面板 - Surge Panel Script
-// 数据来源: AppRaven (appraven.net)
-// 参数: appCount=8 (默认显示8条，最多30条)
+// 数据来源: AppRaven (appraven.net/appraven/graphql)
+// 参数: appCount=8 (默认显示8条, 最多30条), region=cn (地区)
 
 (async () => {
   let count = 8;
+  let region = 'cn';
   if (typeof $argument === 'string' && $argument) {
     let m = $argument.match(/appCount=(\d+)/);
     if (m) count = parseInt(m[1]);
+    m = $argument.match(/region=([a-z]{2})/);
+    if (m) region = m[1];
   }
   count = Math.min(Math.max(count, 1), 30);
 
   const GRAPHQL_URL = 'https://appraven.net/appraven/graphql';
-  const MAX_PAGES = 5;
+  const MAX_PAGES = 20;
   let bodyApps = [];
   let iapApps = [];
 
@@ -37,20 +40,17 @@
       for (const deal of deals) {
         if (deal.newPriceTier === 0) {
           if (deal.oldPriceTier !== null) {
-            bodyApps.push(deal);
+            if (bodyApps.length < count) bodyApps.push(deal);
           } else if (deal.subject) {
-            iapApps.push(deal);
+            if (iapApps.length < count) iapApps.push(deal);
           } else {
-            bodyApps.push(deal);
+            if (bodyApps.length < count) bodyApps.push(deal);
           }
         }
       }
 
       if (bodyApps.length >= count && iapApps.length >= count) break;
     }
-
-    bodyApps = bodyApps.slice(0, count);
-    iapApps = iapApps.slice(0, count);
 
     let lines = [];
 
@@ -74,7 +74,7 @@
     }
 
     $done({
-      title: 'AppStore 限免',
+      title: `AppStore 限免 (${region.toUpperCase()})`,
       content: lines.join('\n'),
       icon: 'gift.circle',
       'icon-color': '#FF2D55'
