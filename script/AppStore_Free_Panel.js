@@ -1,4 +1,4 @@
-// AppStore 限免面板 - Surge Module
+// AppStore 限免面板 - Surge Panel
 // 数据源: AppRaven GraphQL API
 
 (async () => {
@@ -15,7 +15,6 @@
   if (appCount < 1) appCount = 1;
   const region = (args.region || 'cn').toLowerCase();
 
-  // 国家/地区国旗映射
   const flags = {
     cn: '🇨🇳', us: '🇺🇸', jp: '🇯🇵', kr: '🇰🇷', hk: '🇭🇰',
     tw: '🇹🇼', gb: '🇬🇧', de: '🇩🇪', fr: '🇫🇷', ru: '🇷🇺',
@@ -68,37 +67,26 @@
       return;
     }
 
-    // 视觉宽度计算：中文=2，英文/数字=1，emoji=2
-    function vw(s) {
-      let w = 0;
-      for (const ch of s) {
-        if (/[\u4e00-\u9fff\u3000-\u30ff\uff00-\uffef]/.test(ch)) w += 2;
-        else if (/[\u{1F000}-\u{1FFFF}]/u.test(ch)) w += 2; // emoji
-        else w += 1;
-      }
-      return w;
-    }
-
-    // 用中点「·」填充，精度为1vw（比全角空格2vw更精细）
-    const maxVw = Math.max(...freeDeals.map(d => vw((d.app?.title || ''))));
-    const targetVw = Math.min(maxVw + 4, 42);
+    // 第一版风格: 简洁编号列表
     let lines = [];
-    for (const deal of freeDeals) {
-      const title = deal.app?.title || '未知';
-      const need = Math.max(0, targetVw - vw(title));
-      // 限免中标记取最短 "中"一字 = 2vw，但整体视觉保留
-      lines.push(`${flag} ${title}${'·'.repeat(need + 1)}限免中`);
-    }
+    freeDeals.forEach((deal, i) => {
+      let name = deal.app?.title || '未知';
+      lines.push(`  ${i+1}. ${name}`);
+    });
 
     $done({
       title: `${flag} 限免(${freeDeals.length}) | ${region.toUpperCase()}`,
-      content: lines.join('\n')
+      content: lines.join('\n'),
+      icon: 'gift.circle',
+      'icon-color': '#FF2D55'
     });
 
   } catch (e) {
     $done({
       title: `${flag} 限免`,
-      content: `❌ ${e.message || e}`
+      content: `❌ ${e.message || e}`,
+      icon: 'exclamationmark.circle',
+      'icon-color': '#FF3B30'
     });
   }
 })();
