@@ -1,16 +1,43 @@
 // AppStore 限免面板 - Surge Panel Script
 // 数据来源: AppRaven (appraven.net/appraven/graphql)
-// 参数: appCount=8 (默认显示8条, 最多30条), region=cn (地区)
+// 参数: appCount=8 (默认显示8条, 最多30条), region=cn (地区), action=switch (换区模式), group=Proxy (策略组名)
+// 换区: 参数改为 action=switch&region=日本 后点面板执行 → 改回默认参数恢复显示
 
 (async () => {
-  let count = 8;
-  let region = 'cn';
+  let args = {};
   if (typeof $argument === 'string' && $argument) {
-    let m = $argument.match(/appCount=(\d+)/);
-    if (m) count = parseInt(m[1]);
-    m = $argument.match(/region=([a-z]{2})/);
-    if (m) region = m[1];
+    $argument.split('&').forEach(p => {
+      let [k, v] = p.split('=');
+      if (k && v) args[k.trim()] = v.trim();
+    });
   }
+
+  let region = args.region || 'cn';
+  let group = args.group || 'Proxy';
+
+  // 换区模式
+  if (args.action === 'switch' && args.region) {
+    try {
+      $surge.setSelectGroupPolicy(group, args.region);
+      $done({
+        title: '✅ 换区成功',
+        content: `策略组: ${group}\n已切换至: ${args.region}\n\n再次点击刷新面板`,
+        icon: 'checkmark.circle',
+        'icon-color': '#34C759'
+      });
+    } catch (e) {
+      $done({
+        title: '❌ 换区失败',
+        content: `策略组 [${group}] 或地区 [${args.region}] 不存在\n\n请检查参数`,
+        icon: 'xmark.circle',
+        'icon-color': '#FF3B30'
+      });
+    }
+    return;
+  }
+
+  // 显示模式（默认）
+  let count = parseInt(args.appCount) || 8;
   count = Math.min(Math.max(count, 1), 30);
 
   const GRAPHQL_URL = 'https://appraven.net/appraven/graphql';
@@ -72,6 +99,12 @@
         lines.push(`  ${i+1}. ${deal.app.title} (${deal.subject})`);
       });
     }
+
+    lines.push('');
+    lines.push('━━━ 换区 ━━━');
+    lines.push('编辑参数换区:');
+    lines.push('  action=switch&region=日本');
+    lines.push(`  当前策略组: ${group}`);
 
     $done({
       title: `AppStore 限免 (${region.toUpperCase()})`,
