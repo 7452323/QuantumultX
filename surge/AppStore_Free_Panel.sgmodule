@@ -1,5 +1,5 @@
 #!name=AppStore 限免面板
-#!desc=AppRaven 实时数据 | 本体/内购限免 | 参数编辑框实时生效 | 支持换区
+#!desc=酷酷API数据 | 本体/内购限免 | 参数编辑框实时生效 | 支持换区
 #!author=7452323
 #!homepage=https://github.com/7452323/QuantumultX
 #!arguments = appCount:8, region:cn, group:Proxy
@@ -9,4 +9,4 @@
 限免 = script-name=AppStore_Free_Panel, update-interval=600
 
 [Script]
-AppStore_Free_Panel = type=panel, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/AppStore_Free_Panel.js?t=5, argument=appCount={{{appCount}}}&region={{{region}}}&group={{{group}}}
+AppStore_Free_Panel = type=panel, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/AppStore_Free_Panel.js?t=6, argument=appCount={{{appCount}}}&region={{{region}}}&group={{{group}}}
