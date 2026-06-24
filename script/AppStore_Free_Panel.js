@@ -12,7 +12,19 @@
 
   let appCount = parseInt(args.appCount) || 8;
   if (appCount > 30) appCount = 30;
+  if (appCount < 1) appCount = 1;
   const region = (args.region || 'cn').toLowerCase();
+
+  // 国家/地区国旗映射
+  const flags = {
+    cn: '🇨🇳', us: '🇺🇸', jp: '🇯🇵', kr: '🇰🇷', hk: '🇭🇰',
+    tw: '🇹🇼', gb: '🇬🇧', de: '🇩🇪', fr: '🇫🇷', ru: '🇷🇺',
+    au: '🇦🇺', ca: '🇨🇦', sg: '🇸🇬', my: '🇲🇾', th: '🇹🇭',
+    vn: '🇻🇳', it: '🇮🇹', es: '🇪🇸', br: '🇧🇷', mx: '🇲🇽',
+    nl: '🇳🇱', se: '🇸🇪', no: '🇳🇴', dk: '🇩🇰', fi: '🇫🇮',
+    pl: '🇵🇱', tr: '🇹🇷', sa: '🇸🇦', ae: '🇦🇪', in: '🇮🇳'
+  };
+  const flag = flags[region] || '🌍';
 
   try {
     const dealsData = await new Promise((resolve, reject) => {
@@ -39,7 +51,7 @@
 
     let deals = dealsData?.data?.dailyDeals?.content || [];
     if (!deals.length) {
-      $done({ title: '限免(0)', content: '暂无数据' });
+      $done({ title: `${flag} 限免(0)`, content: '暂无数据' });
       return;
     }
 
@@ -52,38 +64,40 @@
     freeDeals = freeDeals.slice(0, appCount);
 
     if (!freeDeals.length) {
-      $done({ title: '限免(0)', content: '今日暂无限免' });
+      $done({ title: `${flag} 限免(0)`, content: '今日暂无限免' });
       return;
     }
 
-    // 视觉宽度计算：中文=2，英文/数字=1
+    // 视觉宽度计算：中文=2，英文/数字=1，emoji=2
     function vw(s) {
       let w = 0;
       for (const ch of s) {
         if (/[\u4e00-\u9fff\u3000-\u30ff\uff00-\uffef]/.test(ch)) w += 2;
+        else if (/[\u{1F000}-\u{1FFFF}]/u.test(ch)) w += 2; // emoji
         else w += 1;
       }
       return w;
     }
 
-    // 用全角空格填充到统一视觉宽度，确保"限免中"右对齐
-    const maxVw = Math.max(...freeDeals.map(d => vw(d.app?.title || '')));
-    const targetVw = Math.min(maxVw + 2, 40);
+    // 用中点「·」填充，精度为1vw（比全角空格2vw更精细）
+    const maxVw = Math.max(...freeDeals.map(d => vw((d.app?.title || ''))));
+    const targetVw = Math.min(maxVw + 4, 42);
     let lines = [];
     for (const deal of freeDeals) {
       const title = deal.app?.title || '未知';
       const need = Math.max(0, targetVw - vw(title));
-      lines.push(`${title}${'　'.repeat(Math.ceil(need / 2))}限免中`);
+      // 限免中标记取最短 "中"一字 = 2vw，但整体视觉保留
+      lines.push(`${flag} ${title}${'·'.repeat(need + 1)}限免中`);
     }
 
     $done({
-      title: `限免(${freeDeals.length})`,
+      title: `${flag} 限免(${freeDeals.length}) | ${region.toUpperCase()}`,
       content: lines.join('\n')
     });
 
   } catch (e) {
     $done({
-      title: '限免',
+      title: `${flag} 限免`,
       content: `❌ ${e.message || e}`
     });
   }
