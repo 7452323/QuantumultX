@@ -1,104 +1,73 @@
-// AppStore 限免面板 - Surge Module
-// 数据源: AppRaven GraphQL API
+// AppStore 限免面板 - Surge Panel Script
+// 数据来源: https://api.zxki.cn/api/appfree
+// 参数: appCount=8 (默认显示8条，最多30条)
 
 (async () => {
-  const args = {};
-  if (typeof $argument === 'string') {
-    $argument.split('&').forEach(pair => {
-      const [k, v] = pair.split('=');
-      if (k) args[k.trim()] = (v || '').trim();
-    });
+  let count = 8;
+  if (typeof $argument === 'string' && $argument) {
+    let m = $argument.match(/appCount=(\d+)/);
+    if (m) count = parseInt(m[1]);
   }
-
-  let appCount = parseInt(args.appCount) || 8;
-  if (appCount > 30) appCount = 30;
-  if (appCount < 1) appCount = 1;
-  const region = (args.region || 'cn').toLowerCase();
-
-  // 国家/地区国旗映射
-  const flags = {
-    cn: '🇨🇳', us: '🇺🇸', jp: '🇯🇵', kr: '🇰🇷', hk: '🇭🇰',
-    tw: '🇹🇼', gb: '🇬🇧', de: '🇩🇪', fr: '🇫🇷', ru: '🇷🇺',
-    au: '🇦🇺', ca: '🇨🇦', sg: '🇸🇬', my: '🇲🇾', th: '🇹🇭',
-    vn: '🇻🇳', it: '🇮🇹', es: '🇪🇸', br: '🇧🇷', mx: '🇲🇽',
-    nl: '🇳🇱', se: '🇸🇪', no: '🇳🇴', dk: '🇩🇰', fi: '🇫🇮',
-    pl: '🇵🇱', tr: '🇹🇷', sa: '🇸🇦', ae: '🇦🇪', in: '🇮🇳'
-  };
-  const flag = flags[region] || '🌍';
+  count = Math.min(Math.max(count, 1), 30);
 
   try {
-    const dealsData = await new Promise((resolve, reject) => {
-      $httpClient.post({
-        url: 'https://appraven.net/appraven/graphql',
-        headers: { 'Content-Type': 'application/json', 'User-Agent': 'Surge/5.0' },
-        body: JSON.stringify({
-          query: `query GetDailyDeals($page: Int!) {
-            dailyDeals(page: $page) {
-              content {
-                id oldPriceTier newPriceTier
-                app { id title ITunesId }
-              }
-              hasNext
-            }
-          }`,
-          variables: { page: 0 }
-        })
-      }, (err, resp, data) => {
-        if (err) reject(err);
-        else resolve(JSON.parse(data));
+    let data = await new Promise((resolve, reject) => {
+      $httpClient.get({
+        url: 'https://api.zxki.cn/api/appfree',
+        headers: { 'User-Agent': 'Surge/5.0' }
+      }, (err, resp, body) => {
+        if (err) reject(new Error(err));
+        else {
+          try { resolve(JSON.parse(body)); }
+          catch(e) { reject(new Error('JSON parse failed')); }
+        }
       });
     });
 
-    let deals = dealsData?.data?.dailyDeals?.content || [];
-    if (!deals.length) {
-      $done({ title: `${flag} 限免(0)`, content: '暂无数据' });
-      return;
-    }
+    let bodyApps = data.apps?.['本体限免'] || [];
+    let iapApps = data.apps?.['内购限免'] || [];
+    let updated = data.last_updated || '';
 
-    let freeDeals = deals.filter(d =>
-      d.newPriceTier === 0 &&
-      d.oldPriceTier !== null &&
-      d.oldPriceTier > 0
-    );
-    if (!freeDeals.length) freeDeals = deals.filter(d => d.newPriceTier === 0);
-    freeDeals = freeDeals.slice(0, appCount);
-
-    if (!freeDeals.length) {
-      $done({ title: `${flag} 限免(0)`, content: '今日暂无限免' });
-      return;
-    }
-
-    // 视觉宽度计算：中文=2，英文/数字=1，emoji=2
-    function vw(s) {
-      let w = 0;
-      for (const ch of s) {
-        if (/[\u4e00-\u9fff\u3000-\u30ff\uff00-\uffef]/.test(ch)) w += 2;
-        else if (/[\u{1F000}-\u{1FFFF}]/u.test(ch)) w += 2; // emoji
-        else w += 1;
-      }
-      return w;
-    }
-
-    // 用中点「·」填充，精度为1vw（比全角空格2vw更精细）
-    const maxVw = Math.max(...freeDeals.map(d => vw((d.app?.title || ''))));
-    const targetVw = Math.min(maxVw + 4, 42);
     let lines = [];
-    for (const deal of freeDeals) {
-      const title = deal.app?.title || '未知';
-      const need = Math.max(0, targetVw - vw(title));
-      // 限免中标记取最短 "中"一字 = 2vw，但整体视觉保留
-      lines.push(`${flag} ${title}${'·'.repeat(need + 1)}限免中`);
+    
+    lines.push('━━━ 本体限免 ━━━');
+    if (bodyApps.length === 0) {
+      lines.push('  暂无');
+    } else {
+      bodyApps.slice(0, count).forEach((app, i) => {
+        let name = (app.name || '').replace(/\/\/.*$/, '').trim();
+        lines.push(`  ${i+1}. ${name}`);
+      });
+    }
+
+    lines.push('');
+    lines.push('━━━ 内购限免 ━━━');
+    if (iapApps.length === 0) {
+      lines.push('  暂无');
+    } else {
+      iapApps.slice(0, count).forEach((app, i) => {
+        let name = (app.name || '').replace(/\/\/.*$/, '').trim();
+        lines.push(`  ${i+1}. ${name}`);
+      });
+    }
+
+    if (updated) {
+      lines.push('');
+      lines.push(`更新时间: ${updated}`);
     }
 
     $done({
-      title: `${flag} 限免(${freeDeals.length}) | ${region.toUpperCase()}`,
-      content: lines.join('\n')
+      title: 'AppStore 限免',
+      content: lines.join('\n'),
+      icon: 'gift.circle',
+      'icon-color': '#FF2D55'
     });
-
   } catch (e) {
     $done({
-      title: `${flag} 限免`,
-      content: `❌ ${e.message || e}`
+      title: 'AppStore 限免',
+      content: '获取失败: ' + e.message,
+      icon: 'exclamationmark.circle',
+      'icon-color': '#FF3B30'
     });
   }
 })();

@@ -1,12 +1,12 @@
 #!name=AppStore 限免面板
-#!desc=🇨🇳🇺🇸 AppRaven 限免 | 支持国旗/参数实时生效
+#!desc=zxki.cn 数据源 | 本体/内购限免分开显示
 #!author=7452323
 #!homepage=https://github.com/7452323/QuantumultX
-#!arguments=appCount=8&region=cn
-#!arguments-desc=参数格式: appCount=数字&region=地区代码\n例: appCount=12&region=us  (美区12条)\n地区代码: cn/us/jp/kr/hk/tw/gb/de/fr 等
+#!arguments=appCount=8
+#!arguments-desc=显示条数，默认8条，最多30条
 
 [Panel]
 限免 = script-name=AppStore_Free_Panel, update-interval=600
 
 [Script]
-AppStore_Free_Panel = type=panel, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/AppStore_Free_Panel.js, argument={{{args}}}
+AppStore_Free_Panel = type=panel, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/AppStore_Free_Panel.js, argument=appCount=%appCount%
