@@ -1,105 +1,118 @@
-// AppStore 限免面板 - Surge Panel Script
-// 数据来源: https://api.zxki.cn/api/appfree
-// 参数: appCount=8 (显示条数), action=show|switch(换区), region=(目标地区), group=Proxy(策略组名)
-// 用法: 编辑参数 action=switch&region=日本 → 敲面板执行换区 → 改回 action=show 恢复
+// AppStore 限免面板 - Surge Module
+// 数据源: AppRaven GraphQL API (逆向自 AppRaven iOS 应用)
+// 价格: Apple Lookup API
+// 支持参数: appCount(显示条数), region(地区, 如 cn/us/jp)
 
 (async () => {
-  let args = {};
-  if (typeof $argument === 'string' && $argument) {
-    $argument.split('&').forEach(p => {
-      let [k, v] = p.split('=');
-      if (k && v) args[k.trim()] = v.trim();
-    });
+  const args = typeof $argument === 'string' ? JSON.parse($argument) : {};
+  const appCount = parseInt(args.appCount) || 8;
+  const region = (args.region || 'cn').toLowerCase();
+
+  const GRAPHQL_URL = 'https://appraven.net/appraven/graphql';
+
+  function getArtworkUrl(url) {
+    if (!url) return '';
+    return url.replace('{w}x{h}{c}.{f}', '120x120bb.png');
   }
 
-  // 换区模式
-  if (args.action === 'switch' && args.region) {
-    let group = args.group || 'Proxy';
-    try {
-      $surge.setSelectGroupPolicy(group, args.region);
-      $done({
-        title: '✅ 换区成功',
-        content: `策略组: ${group}\n已切换至: ${args.region}\n\n再次点击刷新面板`,
-        icon: 'checkmark.circle',
-        'icon-color': '#34C759'
-      });
-    } catch (e) {
-      $done({
-        title: '❌ 换区失败',
-        content: `策略组 [${group}] 或地区 [${args.region}] 不存在\n\n请检查参数`,
-        icon: 'xmark.circle',
-        'icon-color': '#FF3B30'
-      });
-    }
-    return;
-  }
-
-  // 显示模式（默认）
-  let count = parseInt(args.appCount) || 8;
-  count = Math.min(Math.max(count, 1), 30);
-  let group = args.group || 'Proxy';
+  const regionName = {
+    cn: '🇨🇳 中国', us: '🇺🇸 美国', jp: '🇯🇵 日本',
+    gb: '🇬🇧 英国', hk: '🇭🇰 香港', tw: '🇹🇼 台湾',
+    kr: '🇰🇷 韩国', de: '🇩🇪 德国', fr: '🇫🇷 法国',
+    ca: '🇨🇦 加拿大', au: '🇦🇺 澳大利亚'
+  }[region] || region.toUpperCase();
 
   try {
-    let data = await new Promise((resolve, reject) => {
-      $httpClient.get({
-        url: 'https://api.zxki.cn/api/appfree',
-        headers: { 'User-Agent': 'Surge/5.0' }
-      }, (err, resp, body) => {
-        if (err) reject(new Error(err));
-        else {
-          try { resolve(JSON.parse(body)); }
-          catch(e) { reject(new Error('JSON parse failed')); }
-        }
+    // 第1步: 获取 AppRaven 限免数据
+    const dealsData = await new Promise((resolve, reject) => {
+      $httpClient.post({
+        url: GRAPHQL_URL,
+        headers: { 'Content-Type': 'application/json', 'User-Agent': 'Surge/5.0' },
+        body: JSON.stringify({
+          query: `query GetDailyDeals($page: Int!) {
+            dailyDeals(page: $page) {
+              content {
+                id oldPriceTier newPriceTier sponsored released
+                startDate endDate
+                app { id title subtitle artworkUrl ITunesId game
+                  genres { ITunesId title } }
+              }
+              hasNext
+            }
+          }`,
+          variables: { page: 0 }
+        })
+      }, (err, resp, data) => {
+        if (err) reject(err);
+        else resolve(JSON.parse(data));
       });
     });
 
-    let bodyApps = data.apps?.['本体限免'] || [];
-    let iapApps = data.apps?.['内购限免'] || [];
-    let updated = data.last_updated || '';
-
-    let lines = [];
-    lines.push('━━━ 本体限免 ━━━');
-    if (bodyApps.length === 0) {
-      lines.push('  暂无');
-    } else {
-      bodyApps.slice(0, count).forEach((app, i) => {
-        let name = (app.name || '').replace(/\/\/.*$/, '').trim();
-        lines.push(`  ${i+1}. ${name}`);
-      });
+    let deals = dealsData?.data?.dailyDeals?.content || [];
+    if (!deals.length) {
+      $done({ title: 'AppStore 限免', content: '暂无数据' });
+      return;
     }
 
-    lines.push('');
-    lines.push('━━━ 内购限免 ━━━');
-    if (iapApps.length === 0) {
-      lines.push('  暂无');
-    } else {
-      iapApps.slice(0, count).forEach((app, i) => {
-        let name = (app.name || '').replace(/\/\/.*$/, '').trim();
-        lines.push(`  ${i+1}. ${name}`);
-      });
+    // 筛选限免 (newPriceTier === 0)
+    let freeDeals = deals.filter(d => d.newPriceTier === 0);
+    // 如果全免费(可能新上架app无原价), 尽量排除刚发布无原价的
+    let goodFreeDeals = freeDeals.filter(d => d.oldPriceTier > 0);
+    if (goodFreeDeals.length > 0) freeDeals = goodFreeDeals;
+    // 取前 appCount 个
+    freeDeals = freeDeals.slice(0, appCount);
+
+    // 第2步: iTunes Lookup 获取地区价格
+    const ids = freeDeals.map(d => d.app?.ITunesId).filter(Boolean).join(',');
+    let priceMap = {};
+    if (ids) {
+      try {
+        const lookupData = await new Promise((resolve, reject) => {
+          $httpClient.get(`https://itunes.apple.com/lookup?id=${ids}&country=${region}`, (err, resp, data) => {
+            if (err) resolve(null);
+            else resolve(JSON.parse(data));
+          });
+        });
+        if (lookupData?.results) {
+          for (const app of lookupData.results) {
+            priceMap[app.trackId] = app.formattedPrice || '';
+          }
+        }
+      } catch (e) {}
     }
 
-    if (updated) lines.push('');
-    if (updated) lines.push(`🕐 ${updated}`);
+    // 第3步: 构建输出
+    let lines = [`📱 AppStore 限免 · ${regionName}\n`];
 
-    lines.push('');
-    lines.push('━━━ 换区 ━━━');
-    lines.push('编辑参数换区:');
-    lines.push('  action=switch&region=日本');
-    lines.push(`  当前策略组: ${group}`);
+    for (const deal of freeDeals) {
+      const app = deal.app || {};
+      const itunesId = app.ITunesId;
+      const title = app.title || '未知';
+      const subtitle = app.subtitle || '';
+      const artworkUrl = getArtworkUrl(app.artworkUrl);
+      const genres = (app.genres || []).map(g => g.title).join(' / ') || '';
+      const curPrice = priceMap[itunesId] || 'Free';
+      const appStoreUrl = `https://apps.apple.com/${region}/app/id${itunesId}`;
+      const tag = deal.sponsored ? '💼' : '🔥';
+
+      lines.push(
+        `${tag} **[${title}](${appStoreUrl})**` +
+        (subtitle ? ` ${subtitle}` : '') +
+        `\n    ~~${curPrice}~~ → **免费**${genres ? ` · ${genres}` : ''}`
+      );
+    }
+
+    lines.push(`\n---\n数据: AppRaven · 更新: ${new Date().toLocaleString('zh-CN')}`);
 
     $done({
-      title: 'AppStore 限免',
-      content: lines.join('\n'),
-      icon: 'gift.circle',
-      'icon-color': '#FF2D55'
+      title: `AppStore 限免 (${freeDeals.length})`,
+      content: lines.join('\n')
     });
+
   } catch (e) {
     $done({
       title: 'AppStore 限免',
-      content: '获取失败: ' + e.message,
-      icon: 'exclamationmark.circle',
-      'icon-color': '#FF3B30'
+      content: `❌ 获取失败: ${e.message || e}`
     });
   }
 })();
