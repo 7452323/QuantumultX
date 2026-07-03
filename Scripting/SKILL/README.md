@@ -8,9 +8,9 @@
 
 ```
 SKILL/
-├── README.md          ← 就是这个文件，技能仓库总说明
-└── 杠精/              ← 生成杠精回复，抬杠找茬全能王
-    ├── SKILL.md       ← 技能定义文档
+├── README.md          ← 技能仓库总说明
+└── 杠精/              ← 7种风格·70+条贴吧实战模板
+    ├── SKILL.md       ← 技能定义文档（含模板库）
     ├── skill.json     ← 技能元数据（图标、配色）
     └── scripts/
         └── index.tsx  ← 可互动的 Scripting App 脚本
@@ -22,13 +22,13 @@ SKILL/
 
 ### 🎭 杠精 — 抬杠生成器
 
-> *看见什么都能杠两句*
+> *看见什么都能杠两句 · 基于英雄联盟吧 & CF贴吧真实对线素材打磨*
 
 | 属性 | 内容 |
 |------|------|
-| **功能** | 输入任意话题/帖子，一键生成祖安、CF技术杠、电竞粉杠、杠精课代表、阴阳怪气 5 种风格的怼人回复 |
-| **风格引擎** | 内置 15+ 条话术模板，随机组合，每次回复不重样 |
-| **运行方式** | 纯 LLM 文本生成 / Scripting App 互动界面 / MCP 工具三种模式 |
+| **风格数** | 7 种（祖安 / CF技术杠 / 电竞粉杠 / 杠精课代表 / 阴阳怪气 / 策划喷子 / 退坑老鸟） |
+| **模板量** | 70+ 条话术模板，全部来自贴吧实战金句 |
+| **运行方式** | 纯 LLM 文本生成 / Scripting App 互动界面 / MCP 工具 三种模式 |
 | **图标** | 💬 `bubble.left.and.exclamationmark.bubble.right` · 红色 |
 
 ---
@@ -47,7 +47,7 @@ SKILL/
   }
   ```
 - **`scripts/`** (可选) — 可执行的 Scripting App 脚本
-  - `index.tsx` — 主入口，`Navigation.present(View)` 模式
+  - `index.tsx` — 主入口，`Navigation.present()` 模式
   - `intent.tsx` — Shortcuts / Share Sheet 集成（可选）
   - `widget.tsx` — 桌面小组件（可选）
 
