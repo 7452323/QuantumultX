@@ -1,5 +1,17 @@
 {
+  "name": "百度",
+  "version": "2.0.0",
+  "description": "百度输入法皮肤制作器 — iOS .bdi / Android .bds 双平台支持",
   "icon": "keyboard",
   "color": "systemBlue",
-  "iconImage": null
+  "platforms": ["iOS", "Android"],
+  "author": "Scripting Community",
+  "tags": ["百度输入法", "皮肤制作", "bdi", "bds", "键盘主题"],
+  "scripts": [
+    {
+      "name": "index",
+      "file": "scripts/index.tsx",
+      "description": "主界面 — 输入名称/作者，选择配色和平台，一键生成"
+    }
+  ]
 }

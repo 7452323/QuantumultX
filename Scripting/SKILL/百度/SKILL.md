@@ -1,121 +1,199 @@
 ---
 name: 百度
-description: 百度输入法皮肤制作 — 输入主题名、作者、颜色，一键生成 .bds 皮肤包
+description: 百度输入法皮肤制作 — 输入主题名、作者、颜色，一键生成 iOS (.bdi) / Android (.bds) 皮肤包
 metadata:
   display_name: "百度输入法皮肤制作器"
-  intent_patterns: "百度输入法,输入法皮肤,baiduime,bds,键盘皮肤,皮肤制作,输入法主题"
-  required_tools: "file_tool,run_shell_command,scripting_reference"
+  icon: "keyboard"
+  color: "systemBlue"
+  intent_patterns: "百度输入法,输入法皮肤,baiduime,bds,bdi,iOS皮肤,键盘皮肤,皮肤制作"
+  platforms: ["iOS", "Android"]
 ---
 
 # Purpose
 
-用户想制作百度输入法皮肤时使用此技能。输入主题名、作者名称和主题颜色，一键生成完整的 .bds 格式皮肤包，可直接安装到百度输入法使用。
+制作百度输入法皮肤。原生支持 iOS (.bdi) 与 Android (.bds) 双平台，生成 ZIP 格式皮肤包，可直接通过 DocumentInteraction 分享到百度输入法应用。
 
 # Instructions
 
 ## 百度输入法皮肤制作器
 
-### 核心功能
+### 核心能力
 
-1. **输入主题信息** — 皮肤名称、作者名称
-2. **选择主题色** — RGB 配色方案
-3. **一键生成** — 自动生成完整的 Baidu IME Skin (.bds) 文件
-4. **文件结构** — 包含 land（横屏）和 port（竖屏）两种布局模式
+1. **输入主题信息** — 皮肤名称、作者
+2. **选择配色** — 8 套预设主题色
+3. **平台选择** — 默认 iOS，可选 Android
+4. **一键生成** — 输出完成 ZIP (.bdi/.bds) 到 Documents，并通过分享菜单发送到百度输入法
 
-### 文件结构说明
+### 文件结构
 
-百度输入法皮肤 .bds 本质是 ZIP 压缩包：
+百度皮肤本质是 **ZIP 压缩包**，iOS 后缀 `.bdi`，Android 后缀 `.bds`。
 
 ```
-MySkin.bds
-├── Info.txt          ← 皮肤元数据（名称/作者）
-├── res.ini           ← 样式注册表（资源索引）
-├── gen.ini           ← 全局配置
-├── def_26.ini        ← 26键键盘布局
-├── cand0.cnd         ← 候选词样式
-├── key_1.ini ... key_24.ini  ← 26个字母按键
-├── enter.ini         ← 回车键
-├── symbol.ini        ← 符号键
-└── res/
-    ├── bg.png        ← 键盘背景图（800×250）
-    ├── key_bg.png    ← 按键背景底图
-    ├── space_bg.png  ← 空格键背景
-    ├── enter.png     ← 回车键图
-    └── a_n.png ... z_n.png  ← 26个字母按键图
+MySkin.bdi                    # iOS
+├── Info.txt                  ← 皮肤元数据 (Name/Style/SupportPlatform/Author)
+├── res/
+│   ├── default.css           ← 614 个 STYLE 的配色/图片映射
+│   ├── back.til              ← 九宫格切片配置
+│   ├── back.png              ← 占位图（需替换为真实素材）
+│   ├── graph.png             ← 图标集
+│   ├── en.png                ← 26 字母+大小写
+│   ├── plus.png              ← 数字/符号
+│   ├── pluss.png             ← 小数字
+│   ├── bh6.png               ← 笔画
+│   ├── texts.png             ← 文字指示
+│   └── add_sp.png            ← 双拼
+├── land/                     ← 横屏布局
+│   ├── gen.ini               ← 全局输入区/候选词/面板/更多
+│   ├── def_26.ini            ← 26键默认键盘
+│   ├── cand0.cnd             ← 候选词样式
+│   ├── hint1.pop             ← 气泡提示
+│   └── [16 套输入法布局].ini   ← en_26/num_9/symbol/py_26/bh …
+└── port/                     ← 竖屏布局（同 land 结构）
+    └── ...
 ```
 
-### 调用方式
+### 核心 ini 格式
 
-#### 方式一：纯文本生成（无需脚本）
+#### Info.txt
 
-当用户给定要使用的名称、作者、颜色时，直接通过 run_shell_command 运行 Python 脚本生成 .bds 文件。
+```
+Name=我的皮肤
+Style=Default
+SupportPlatform=I        ← I=iOS, A=Android
+Author=Akino
+```
 
-#### 方式二：生成 Scripting 脚本（index.tsx）
+#### res/default.css（614 STYLE）
 
-创建 Scripting App 互动界面：
+```ini
+[GLOBAL]
+STYLE_NUM=614
+FOR=720
 
-1. 创建 `scripts/index.tsx`
-2. 包含：
-   - ✅ 皮肤名称输入框
-   - ✅ 作者名称输入框
-   - ✅ 主题色选择器
-   - ✅ 生成按钮 + 结果展示
-   - ✅ 预览和分享按钮
-3. 安装后可当独立应用使用
+[STYLE101]背景
+NM_COLOR=0f1729ff
+[STYLE102]字体
+NM_COLOR=e2e8f0ff
+FONT_CLEARTYPE=1
+FONT_SIZE=40
+...
+[STYLE211]=q
+NM_IMG=en,1
+HL_IMG=en,1
+...
+```
 
-### 生成器核心参数
+#### def_26.ini（26键键盘）
 
-```python
-create_skin(
-    name,       # 皮肤名称
-    author,     # 作者名称
-    output,     # 输出文件路径
-    style,      # 风格（默认 'default'）
-    desc        # 描述
-)
+```ini
+[INPUT]
+BACK_STYLE=101
+FORE_STYLE=102
+
+[CAND]
+VIEW_RECT=0,0,800,60
+LAYOUT_NAME=cand1
+TYPE=4
+
+[PANEL]
+BACK_STYLE=103
+FORE_STYLE=102
+SIZE=800,245
+
+[MORE]
+GRID=4,5
+SYM_LAYOUT=symbol
+CELL_STYLE=106
+CELL_SIZE=50,50
+
+[LIST]
+BACK_STYLE=121
+CELL_SIZE=57,60
+POS=33,43
+VIEW_RECT=0,0,800,118
+
+[KEY60]
+CELL_STYLE=133
+PADDING=10,10,10,10
+
+[KEY61]
+STYLE=106
+VIEW_RECT=10,452,96,70
+HOLD=F50
+
+[KEY65]
+STYLE=106
+VIEW_RECT=700,108,100,60
 ```
 
 ### 按键事件代码表
 
-| 功能 | 代码 |
+| 代码 | 功能 |
 |------|------|
-| 切换到符号 | F45 |
-| 中英切换 | F48 |
-| 符号面板 | F49 |
-| 长按切换 | F50 |
-| 居中显示文字 | CENTER="abc" |
+| F1 | 切换到符号 |
+| F4 | 返回 |
+| F45 | 中英切换 |
+| F48 | 符号面板 |
+| F49 | 换行 |
+| F50 | 长按切换 |
 
 ### 图片素材规范
 
-| 素材 | 格式 | 尺寸 | 说明 |
-|------|------|------|------|
-| bg.png | PNG 24bit | 800×250 | 键盘背景 |
-| key_bg.png | PNG | 70×60 | 按键背景 |
-| space_bg.png | PNG | 200×60 | 空格键背景 |
-| enter.png | PNG | 80×60 | 回车键图 |
-| a_n.png ~ z_n.png | PNG | 60×60 | 字母按键 |
+| 素材 | 格式 | 说明 |
+|------|------|------|
+| res/back.png | PNG 24bit | 键盘背景（含底色） |
+| res/graph.png | PNG 透明 | STYLE161-183 图标 |
+| res/en.png | PNG 透明 | 26 字母+大小写字图 |
+| res/plus.png | PNG 透明 | 数字/符号图 |
+| res/bh6.png | PNG 透明 | 笔画图 |
+| res/texts.png | PNG 透明 | 文字指示图 |
+| res/add_sp.png | PNG 透明 | 双拼图 |
+
+占位图是 1×1 像素灰色 PNG。正式打包时需按命名规范替换为真实素材。
 
 ### 安装与应用
 
-1. 把 skin.bds 文件传输到手机
-2. 百度输入法 → 超级皮肤 → 本地 → 选择文件
+#### iOS
+
+1. 生成的 .bdi 文件通过分享面板（DocumentInteraction）发送到百度输入法
+2. 或在文件 app 中选中 .bdi → 共享 → "百度输入法"
 3. 皮肤立即生效
 
-## 脚本示例
+#### Android
 
-### 生成基础皮肤包
-```python
-python3 scripts/make_skin.py "Ocean" "Akino" ocean.bds
-```
-
-### 应用到手机
+1. 把 .bds 文件传给手机
+2. 百度输入法 → 超级皮肤 → 本地 → 选择文件
+3. 或通过 adb:
 ```bash
 adb push skin.bds /sdcard/baidu/ime/skins/
-shell am broadcast -a com.baidu.inputmethod.SKIN_CHANGED
+shell am broadcast -a com.baidu.input.skin.REFRESH
 ```
 
-### 反编译已有皮肤
-```bash
-unzip some_skin.bds -d skin_src/
-cat skin_src/res.ini
-```
+### 自定义素材替换
+
+1. 生成的皮肤包中所有 res/*.png 都是 1×1 占位
+2. 按命名规范准备真实 PNG 素材
+3. 解压 .bdi/.bds → 替换 res/*.png → 重新 zip → 改后缀
+4. 或直接替换后再次通过本工具生成
+
+### 配色预设
+
+| 名称 | 背景色 | 前景色 | 强调色 |
+|------|--------|--------|--------|
+| 深海蓝 | #0F1729 | #E2E8F0 | #F87171 |
+| 星空紫 | #1E1143 | #EDE9FE | #A78BFA |
+| 森林绿 | #0A2E1A | #DCFCE7 | #FBBF24 |
+| 樱草粉 | #3B0E2A | #FCE7F3 | #FB7185 |
+| 深岩灰 | #1A1A1A | #F5F5F5 | #F97116 |
+| 碧海浪 | #0C2E3E | #CFEAFE | #06B6D4 |
+| 暖沙金 | #2E2810 | #FEF9C3 | #F59E0B |
+| 极光青 | #0A2E3E | #CCFBF1 | #14B8A6 |
+
+## 参考项目
+
+| 项目 | 说明 |
+|------|------|
+| Gearkey/baidu_input_skins ⭐17 | 最近活跃，有 BGtool |
+| vancolate/baidu-input-skin-saved | 纯皮肤包 |
+| bencn/BSkin | 制作工具 |
+| ShenHongFei/baidu-ime-skin-moui-pure | 纯净皮 |
