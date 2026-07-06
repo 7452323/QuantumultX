@@ -44,7 +44,6 @@ const receiptItem = {
 };
 
 if (/(analytics\/profiles|purchase\/app-store)/.test(url)) {
-    $notification.post('Yomu', 'Profile拦截', url.slice(-40));
     obj.data = {
         'type': 'profile_apple',
         'id': profileid,
@@ -71,7 +70,6 @@ if (/(analytics\/profiles|purchase\/app-store)/.test(url)) {
 }
 
 if (/(receipt\/validate|purchase-containers)/.test(url)) {
-    $notification.post('Yomu', 'Receipt拦截', url.slice(-40));
     obj.data = {
         'type': 'profile_apple',
         'id': profileid,
