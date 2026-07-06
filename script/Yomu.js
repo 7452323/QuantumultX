@@ -1,3 +1,7 @@
+/*
+Yomu 漫画阅读器 - Adapty会员解锁
+https://apps.apple.com/app/id6760745234
+
 [rewrite_local]
 ^https?:\/\/api\.adapty\.io\/api\/v\d\/sdk\/(analytics\/profiles|in-apps\/(apple\/receipt\/validate|purchase-containers)|purchase\/app-store) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Yomu.js
 
@@ -5,7 +9,7 @@
 hostname = api.adapty.io
 */
 
-const ddm = JSON.parse($response.body);
+const obj = JSON.parse($response.body);
 const headers = $request?.headers || {};
 const profileid = headers['adapty-sdk-profile-id'] || headers['ADAPTY-SDK-PROFILE-ID'] || "";
 
@@ -44,7 +48,7 @@ const receiptItem = {
 const subscription = Object.assign({}, premium);
 
 if (/(analytics\/profiles|purchase\/app-store)/.test($request.url)) {
-    ddm.data = {
+    obj.data = {
         'type': 'profile_apple',
         'id': profileid,
         'attributes': {
@@ -70,7 +74,7 @@ if (/(analytics\/profiles|purchase\/app-store)/.test($request.url)) {
 }
 
 if (/(receipt\/validate|purchase-containers)/.test($request.url)) {
-    ddm.data = {
+    obj.data = {
         'type': 'profile_apple',
         'id': profileid,
         'attributes': {
@@ -92,4 +96,4 @@ if (/(receipt\/validate|purchase-containers)/.test($request.url)) {
     };
 }
 
-$done({body: JSON.stringify(ddm)});
+$done({body: JSON.stringify(obj)});
