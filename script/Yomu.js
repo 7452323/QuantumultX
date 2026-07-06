@@ -1,17 +1,13 @@
-/*
-Yomu 漫画阅读器 - Adapty会员解锁
-https://apps.apple.com/app/id6760745234
-
 [rewrite_local]
-^https?:\/\/api\.adapty\.io\/api\/v\d\/sdk\/(analytics\/profiles|in-apps\/(apple\/receipt\/validate|purchase-containers)|purchase\/app-store) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Yomu.js
+^https?:\/\/api\.adapty\.io\/api\/v1\/sdk\/(analytics\/profiles|in-apps\/(apple\/receipt\/validate|purchase-containers)|purchase\/app-store) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Yomu.js
 
 [mitm]
 hostname = api.adapty.io
 */
 
 const obj = JSON.parse($response.body);
-const headers = $request?.headers || {};
-const profileid = headers['adapty-sdk-profile-id'] || headers['ADAPTY-SDK-PROFILE-ID'] || "";
+const profileid = ($request.headers['adapty-sdk-profile-id'] || $request.headers['ADAPTY-SDK-PROFILE-ID'] || '');
+const url = $request.url;
 
 const PRODUCT_ID = 'lifetime.yomu.app';
 const BUNDLE_ID = 'yuemian.app';
@@ -31,6 +27,8 @@ const premium = {
     'vendor_product_id': PRODUCT_ID
 };
 
+const subscription = Object.assign({}, premium);
+
 const receiptItem = {
     'quantity': '1',
     'transaction_id': '490001271881589',
@@ -45,9 +43,8 @@ const receiptItem = {
     'product_id': PRODUCT_ID
 };
 
-const subscription = Object.assign({}, premium);
-
-if (/(analytics\/profiles|purchase\/app-store)/.test($request.url)) {
+if (/(analytics\/profiles|purchase\/app-store)/.test(url)) {
+    $notification.post('Yomu', 'Profile拦截', url.slice(-40));
     obj.data = {
         'type': 'profile_apple',
         'id': profileid,
@@ -73,7 +70,8 @@ if (/(analytics\/profiles|purchase\/app-store)/.test($request.url)) {
     };
 }
 
-if (/(receipt\/validate|purchase-containers)/.test($request.url)) {
+if (/(receipt\/validate|purchase-containers)/.test(url)) {
+    $notification.post('Yomu', 'Receipt拦截', url.slice(-40));
     obj.data = {
         'type': 'profile_apple',
         'id': profileid,
