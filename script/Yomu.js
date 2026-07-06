@@ -10,12 +10,21 @@ https://apps.apple.com/app/id6760745234
 hostname = api.adapty.io
 */
 
-let url = $request.url;
+// 切换产品: monthly | yearly | lifetime
+const PRODUCT = 'yearly';
+
+const url = $request.url;
 
 if (url.match(/\/api\/v1\/sdk\/analytics\/profiles\//)) {
   // Profile 接口 - 注入 premium 会员信息
   let obj = JSON.parse($response.body);
   
+  const PRODUCT_ID = {
+    monthly: 'monthly.yomu.app',
+    yearly: 'yearly.yomu.app',
+    lifetime: 'lifetime.yomu.app'
+  }[PRODUCT];
+
   obj.data = {
     "type": "adapty_analytics_profile",
     "id": "3b59ff29-3ca4-40e3-8518-e2598fdef60a",
@@ -25,10 +34,10 @@ if (url.match(/\/api\/v1\/sdk\/analytics\/profiles\//)) {
       "customer_user_id": null,
       "total_revenue_usd": 0,
       "subscriptions": {
-        "yearly.yomu.app": {
+        [PRODUCT_ID]: {
           "vendor_transaction_id": "2077000000000001",
           "vendor_original_transaction_id": "2077000000000001",
-          "is_lifetime": false,
+          "is_lifetime": PRODUCT === 'lifetime',
           "store": "app_store",
           "activated_at": "2026-07-07T00:00:00.000000+0000",
           "renewed_at": "2026-07-07T00:00:00.000000+0000",
@@ -37,11 +46,11 @@ if (url.match(/\/api\/v1\/sdk\/analytics\/profiles\//)) {
           "is_in_grace_period": false,
           "is_refund": false,
           "is_sandbox": false,
-          "vendor_product_id": "yearly.yomu.app",
+          "vendor_product_id": PRODUCT_ID,
           "offer_id": null,
           "access_levels": {
             "premium": {
-              "vendor_product_id": "yearly.yomu.app",
+              "vendor_product_id": PRODUCT_ID,
               "store": "app_store",
               "activated_at": "2026-07-07T00:00:00.000000+0000",
               "renewed_at": "2026-07-07T00:00:00.000000+0000",
@@ -62,7 +71,7 @@ if (url.match(/\/api\/v1\/sdk\/analytics\/profiles\//)) {
       },
       "access_levels": {
         "premium": {
-          "vendor_product_id": "yearly.yomu.app",
+          "vendor_product_id": PRODUCT_ID,
           "store": "app_store",
           "activated_at": "2026-07-07T00:00:00.000000+0000",
           "renewed_at": "2026-07-07T00:00:00.000000+0000",
