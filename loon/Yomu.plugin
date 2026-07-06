@@ -1,0 +1,10 @@
+[Plugin]
+# Yomu 漫画阅读器 - Adapty会员破解
+# 拦截Adapty SDK三个端点注入premium授权
+
+[Script]
+^https?:\/\/api\.adapty\.io\/api\/v\d\/sdk\/(analytics\/profiles|purchase\/app-store) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Yomu.js
+^https?:\/\/api\.adapty\.io\/api\/v\d\/sdk\/in-apps\/(apple\/receipt\/validate|purchase-containers) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Yomu.js
+
+[MitM]
+hostname = api.adapty.io

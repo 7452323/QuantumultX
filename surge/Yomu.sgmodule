@@ -1,0 +1,12 @@
+#!name = Yomu 漫画阅读器 - Adapty会员破解
+#!desc = 拦截Adapty SDK的receipt validate端点注入premium授权
+#!author = Akino
+#!version = 1.0.0
+#!system = ios
+
+[MITM]
+hostname = api.adapty.io
+
+[Script]
+yomu-adapty-profile = type=http-response,pattern=^https?:\/\/api\.adapty\.io\/api\/v\d\/sdk\/(analytics\/profiles|purchase\/app-store),requires-body=1,script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Yomu.js
+yomu-adapty-receipt = type=http-response,pattern=^https?:\/\/api\.adapty\.io\/api\/v\d\/sdk\/in-apps\/(apple\/receipt\/validate|purchase-containers),requires-body=1,script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Yomu.js
