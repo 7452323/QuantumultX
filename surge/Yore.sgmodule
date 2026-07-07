@@ -1,0 +1,10 @@
+#!name=Yore
+#!desc=Yore - Your Second Brain 解锁 VIP
+#!system=ios
+
+[Script]
+YoreResponse = type=http-response, pattern=^https:\/\/(api\.yore\.code-abc\.com\/api\/v1\/(current_user|app_configs|current_member|reward_video)|api\.yore\.code-abc\.com\/v1\/app_configs\/status\?.*type=receipt_validator), script-path=Yore.js, requires-body=1, max-size=-1
+YoreBody = type=http-request, pattern=^https:\/\/c\.team\/commerce\/v1\/subscription\/user, script-path=Yore.js
+
+[Mitm]
+hostname = %APPEND% api.yore.code-abc.com, c.team, assets.5a8.org
