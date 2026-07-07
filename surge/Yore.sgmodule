@@ -1,9 +1,10 @@
-#!name=Yore
-#!desc=Yore - Your Second Brain, Simplified.
+#!name=Yore VIP Unlock
+#!desc=Yore AI productivity VIP unlock.
+#!author=7452323
+#!homepage=https://github.com/7452323/QuantumultX
 
 [Script]
-YoreResponse = type=http-response, pattern=^https:\/\/(api\.yore\.code-abc\.com\/api\/v1\/(current_user|app_configs|current_member|reward_video)|api\.yore\.code-abc\.com\/v1\/app_configs\/status\?.*type=receipt_validator), script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Yore.js, requires-body=true, max-size=-1, timeout=60
-YoreRequest = type=http-request, pattern=^https:\/\/c\.team\/commerce\/v1\/subscription\/user, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Yore.js, timeout=60
+YoreResponse = type=http-response, pattern=^https?:\/\/api\.yore\.code-abc\.com, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Yore.js, requires-body=true, max-size=-1, timeout=60
 
 [MITM]
 hostname = %APPEND% api.yore.code-abc.com, c.team, assets.5a8.org
