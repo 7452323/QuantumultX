@@ -2,5 +2,5 @@
 hostname = api.yore.code-abc.com, c.team, assets.5a8.org
 
 [Script]
-http-response ^https:\/\/(api\.yore\.code-abc\.com\/api\/v1\/(current_user|app_configs|current_member|reward_video)|api\.yore\.code-abc\.com\/v1\/app_configs\/status\?.*type=receipt_validator) script-path=Yore.js, requires-body=true, tag=YoreResponse
-http-request ^https:\/\/c\.team\/commerce\/v1\/subscription\/user script-path=Yore.js, tag=YoreRequest
+http-response ^https:\/\/(api\.yore\.code-abc\.com\/api\/v1\/(current_user|app_configs|current_member|reward_video)|api\.yore\.code-abc\.com\/v1\/app_configs\/status\?.*type=receipt_validator) script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Yore.fixed.js, requires-body=true, tag=YoreResponse
+http-request ^https:\/\/c\.team\/commerce\/v1\/subscription\/user script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Yore.fixed.js, tag=YoreRequest
