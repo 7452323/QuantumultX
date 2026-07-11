@@ -49,17 +49,6 @@ async function listGists(token: string): Promise<Gist[]> {
   return (await r.json()) as Gist[]
 }
 
-async function fetchGitHubUsername(token: string): Promise<string | null> {
-  try {
-    const r = await ghAPI(token, "/user")
-    if (!r.ok) return null
-    const data = (await r.json()) as { login: string }
-    return data.login || null
-  } catch {
-    return null
-  }
-}
-
 interface GitHubUserInfo {
   login: string
   avatar_url: string
@@ -625,6 +614,7 @@ function SettingsTab() {
   const [token, setToken] = useState(existing)
   const [saved, setSaved] = useState(!!existing)
   const [showToken, setShowToken] = useState(false)
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     setSaved(!!Storage.get(TOKEN_KEY))
@@ -633,95 +623,113 @@ function SettingsTab() {
   return (
     <NavigationStack>
       <List navigationTitle="设置">
-        <Section
-          header={<Text font="headline">GitHub 认证</Text>}
-          footer={<Text font="caption" foregroundStyle="tertiaryLabel">令牌仅保存在本地，不会上传到任何服务器</Text>}
-        >
-          <HStack spacing={8} padding={{ vertical: 4 }}>
-            <Image
-              systemName={saved ? "checkmark.seal.fill" : "exclamationmark.triangle.fill"}
-              foregroundStyle={saved ? "systemGreen" : "systemOrange"}
-              font="body"
-            />
-            <VStack spacing={0}>
-              <Text font="body">{saved ? "已登录" : "未配置"}</Text>
-              <Text font="caption" foregroundStyle="secondaryLabel">
-                {saved ? "Token 已保存" : "请填写下方的个人访问令牌"}
-              </Text>
-            </VStack>
-            <Spacer />
-          </HStack>
-
-          {showToken ? (
-            <TextField
-              title="Token"
-              prompt="输入 ghp_ 开头的令牌"
-              value={token}
-              onChanged={(v: string) => setToken(v)}
-            />
-          ) : (
-            <SecureField
-              title="Token"
-              prompt="输入 ghp_ 开头的令牌"
-              value={token}
-              onChanged={(v: string) => setToken(v)}
-            />
-          )}
-
-          <HStack spacing={8} padding={{ vertical: 2 }}>
-            <Button
-              title={showToken ? "隐藏" : "显示"}
-              action={() => setShowToken(!showToken)}
-            />
-            <Spacer />
-          </HStack>
-
-          <Button
-            title="保存令牌"
-            action={() => {
-              Storage.set(TOKEN_KEY, token.trim())
-              setSaved(true)
-            }}
-            disabled={!token.trim()}
-            frame={{ maxWidth: "infinity" }}
-          />
-          <Button
-            title="清除令牌"
-            action={() => {
-              setToken("")
-              Storage.set(TOKEN_KEY, null)
-              setSaved(false)
-            }}
-            frame={{ maxWidth: "infinity" }}
-          />
-        </Section>
-
-        <Section header={<Text font="headline">使用说明</Text>}>
-          <VStack padding={{ top: 4 }} spacing={6}>
-            <HStack spacing={8}>
-              <Text font="caption" foregroundStyle="tertiaryLabel">1.</Text>
-              <Text font="caption" foregroundStyle="secondaryLabel">打开 github.com/settings/tokens</Text>
+        {/* Token 输入 */}
+        <Section title="GitHub 认证">
+          <VStack padding={12} spacing={12} frame={{ maxWidth: "infinity" }}>
+            {/* 状态指示 */}
+            <HStack spacing={8} frame={{ maxWidth: "infinity" }}>
+              <Image
+                systemName={saved ? "checkmark.seal.fill" : "exclamationmark.triangle.fill"}
+                foregroundStyle={saved ? "systemGreen" : "systemOrange"}
+                font="body"
+              />
+              <VStack spacing={0}>
+                <Text font="body" bold>{saved ? "已连接" : "未配置"}</Text>
+                <Text font="caption" foregroundStyle="secondaryLabel">{saved ? "Token 已保存" : "请输入个人访问令牌"}</Text>
+              </VStack>
+              <Spacer />
             </HStack>
-            <HStack spacing={8}>
-              <Text font="caption" foregroundStyle="tertiaryLabel">2.</Text>
-              <Text font="caption" foregroundStyle="secondaryLabel">点击 "Generate new token (classic)"</Text>
-            </HStack>
-            <HStack spacing={8}>
-              <Text font="caption" foregroundStyle="tertiaryLabel">3.</Text>
-              <Text font="caption" foregroundStyle="secondaryLabel">勾选 "gist" 权限后生成</Text>
-            </HStack>
-            <HStack spacing={8}>
-              <Text font="caption" foregroundStyle="tertiaryLabel">4.</Text>
-              <Text font="caption" foregroundStyle="secondaryLabel">粘贴到上方，点击保存</Text>
-            </HStack>
+
+            {/* Token 已保存 */}
+            {saved ? (
+              <HStack spacing={8} padding={{ vertical: 8 }}>
+                <Image systemName="checkmark.circle.fill" foregroundStyle="systemGreen" font="body" />
+                <Text font="body" foregroundStyle="systemGreen">Token 已保存 ✓</Text>
+                <Spacer />
+                <Button
+                  title="清除 Token"
+                  action={() => {
+                    Storage.set(TOKEN_KEY, null)
+                    setToken("")
+                    setSaved(false)
+                  }}
+                  buttonStyle="plain"
+                  font="subheadline"
+                />
+              </HStack>
+            ) : (
+              <>
+                <HStack spacing={8}>
+                  {showToken ? (
+                    <TextField
+                      title="Token"
+                      prompt="输入 ghp_ 开头的令牌"
+                      value={token}
+                      onChanged={(v: string) => setToken(v)}
+                    />
+                  ) : (
+                    <SecureField
+                      title="Token"
+                      prompt="输入 ghp_ 开头的令牌"
+                      value={token}
+                      onChanged={(v: string) => setToken(v)}
+                    />
+                  )}
+                  <Button
+                    title={showToken ? "🙈" : "👁"}
+                    action={() => setShowToken(!showToken)}
+                    font="title2"
+                    frame={{ width: 36, height: 36 }}
+                    buttonStyle="plain"
+                  />
+                </HStack>
+                <HStack spacing={8}>
+                  <Button
+                    title={saving ? "保存中..." : "保存令牌"}
+                    action={() => {
+                      setSaving(true)
+                      Storage.set(TOKEN_KEY, token.trim())
+                      setSaved(true)
+                      setSaving(false)
+                    }}
+                    disabled={!token.trim() || saving}
+                    frame={{ maxWidth: "infinity" }}
+                  />
+                </HStack>
+              </>
+            )}
           </VStack>
         </Section>
 
-        <Section header={<Text font="headline">关于</Text>}>
+        <Section header={<Text font="subheadline" foregroundStyle="secondaryLabel">使用指南</Text>}>
+          {[
+            "访问 github.com/settings/tokens",
+            "点击 Generate new token (classic)",
+            "勾选 gist 权限",
+            "粘贴令牌并点击保存",
+          ].map((step, i) => (
+            <HStack spacing={10} padding={{ vertical: 6 }} key={i}>
+              <Text
+                font="caption"
+                foregroundStyle="secondaryLabel"
+                frame={{ width: 22, height: 22 }}
+              >
+                {String(i + 1)}
+              </Text>
+              <Text font="caption" foregroundStyle="secondaryLabel">{step}</Text>
+              <Spacer />
+            </HStack>
+          ))}
+        </Section>
+
+        <Section footer={<Text font="caption" foregroundStyle="tertiaryLabel">令牌仅保存在本地设备，不会上传到任何服务器</Text>}>
           <HStack>
-            <Text font="caption" foregroundStyle="secondaryLabel">Gist 客户端</Text>
+            <VStack spacing={2}>
+              <Text font="body" fontWeight="semibold">Gist 客户端</Text>
+              <Text font="caption" foregroundStyle="tertiaryLabel">© 2026</Text>
+            </VStack>
             <Spacer />
-            <Text font="caption" foregroundStyle="tertiaryLabel">v1.0.0</Text>
+            <Text font="caption" foregroundStyle="secondaryLabel">v2.0.0</Text>
           </HStack>
         </Section>
       </List>
