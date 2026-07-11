@@ -1,45 +1,45 @@
 {
-  "runInApp" : true,
   "name" : "Gist客户端",
+  "runInApp" : true,
+  "localizedDescriptions" : {
+    "ja" : "",
+    "en" : "",
+    "ru" : "",
+    "pt" : "",
+    "de" : "",
+    "fr" : "",
+    "it" : "",
+    "es" : "",
+    "zh" : ""
+  },
+  "icon" : "doc.text.fill",
   "intentInputTypes" : [
 
   ],
-  "localizedDescriptions" : {
-    "zh" : "",
-    "fr" : "",
-    "ru" : "",
-    "de" : "",
-    "en" : "",
-    "ja" : "",
-    "it" : "",
-    "es" : "",
-    "pt" : ""
-  },
-  "remoteResource" : {
-    "url" : "https:\/\/github.com\/7452323\/QuantumultX\/tree\/main\/Scripting\/Scripts\/gist%20%E5%AE%A2%E6%88%B7%E7%AB%AF",
-    "hash" : "eaa116a5adeffa29edee1480ee0e78f9",
-    "autoUpdateInterval" : 300
-  },
-  "color" : "rgba(51, 51, 51, 1)",
-  "permissions" : null,
-  "entry" : "index.tsx",
-  "version" : "1.0.0",
-  "localizedNames" : {
-    "zh" : "",
-    "fr" : "",
-    "ru" : "",
-    "de" : "",
-    "en" : "",
-    "ja" : "",
-    "it" : "",
-    "es" : "",
-    "pt" : ""
-  },
-  "author" : null,
-  "iconImage" : null,
   "contributors" : [
 
   ],
+  "version" : "1.0.0",
+  "remoteResource" : {
+    "url" : "https:\/\/github.com\/7452323\/QuantumultX\/tree\/main\/Scripting\/Scripts\/Gist%E5%AE%A2%E6%88%B7%E7%AB%AF",
+    "autoUpdateInterval" : 300,
+    "hash" : "9748843e7a05f9814122473372db178e"
+  },
+  "entry" : "index.tsx",
+  "color" : "rgba(51, 51, 51, 1)",
+  "permissions" : null,
+  "author" : null,
+  "iconImage" : null,
   "description" : "GitHub Gist 私密仓库管理器 - 列出\/创建\/编辑\/删除 Gist",
-  "icon" : "doc.text.fill"
+  "localizedNames" : {
+    "ja" : "",
+    "it" : "",
+    "es" : "",
+    "ru" : "",
+    "en" : "",
+    "de" : "",
+    "zh" : "",
+    "fr" : "",
+    "pt" : ""
+  }
 }
