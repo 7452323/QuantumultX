@@ -1,6 +1,6 @@
 import {
   fetch, useState, useEffect, useMemo, Navigation,
-  HStack, VStack, Text, Button, List, Section, ScrollView,
+  HStack, VStack, Text, Button, List, Section,
   TextField, SecureField, NavigationStack, Script, TabView, Tab, Spacer, Image, Markdown,
   Editor,
 } from "scripting"
@@ -55,6 +55,22 @@ async function fetchGitHubUsername(token: string): Promise<string | null> {
     if (!r.ok) return null
     const data = (await r.json()) as { login: string }
     return data.login || null
+  } catch {
+    return null
+  }
+}
+
+interface GitHubUserInfo {
+  login: string
+  avatar_url: string
+}
+
+async function fetchGitHubUser(token: string): Promise<GitHubUserInfo | null> {
+  try {
+    const r = await ghAPI(token, "/user")
+    if (!r.ok) return null
+    const data = (await r.json()) as GitHubUserInfo
+    return data || null
   } catch {
     return null
   }
@@ -467,6 +483,7 @@ function HomeTab({ onClose }: { onClose: () => void }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [username, setUsername] = useState<string | null>(null)
+  const [userAvatar, setUserAvatar] = useState<string | null>(null)
 
   const loadGists = async () => {
     const token = (Storage.get(TOKEN_KEY) as string) || ""
@@ -477,12 +494,14 @@ function HomeTab({ onClose }: { onClose: () => void }) {
     setLoading(true)
     setError(null)
     try {
-      // 同时获取 username 和 gists
       const [userData, data] = await Promise.all([
-        fetchGitHubUsername(token),
+        fetchGitHubUser(token),
         listGists(token),
       ])
-      if (userData) setUsername(userData)
+      if (userData) {
+        setUsername(userData.login)
+        setUserAvatar(userData.avatar_url)
+      }
       setGists(data.filter(g => !g.public))
     } catch (e: any) {
       setError(e.message || "加载失败")
@@ -526,7 +545,7 @@ function HomeTab({ onClose }: { onClose: () => void }) {
   return (
     <NavigationStack>
       <List
-        navigationTitle={username || "我的 Gist"}
+        navigationTitle=""
         toolbar={{
           topBarLeading: (
             <Button title="关闭" action={onClose} />
@@ -539,6 +558,31 @@ function HomeTab({ onClose }: { onClose: () => void }) {
           ),
         }}
       >
+        {/* 用户头像和用户名 */}
+        {username ? (
+          <Section>
+            <HStack spacing={8} padding={{ vertical: 4 }}>
+              {userAvatar ? (
+                <Image
+                  imageUrl={userAvatar}
+                  resizable
+                  scaleToFill
+                  frame={{ width: 28, height: 28 }}
+                  clipShape={{ type: "rect", cornerRadius: 14 }}
+                />
+              ) : (
+                <Image
+                  systemName="person.circle.fill"
+                  foregroundStyle="systemBlue"
+                  font="title2"
+                />
+              )}
+              <Text font={14} foregroundStyle="secondaryLabel">{username}</Text>
+              <Spacer />
+            </HStack>
+          </Section>
+        ) : null}
+
         {error ? (
           <Section>
             <VStack padding={16} spacing={8}>
