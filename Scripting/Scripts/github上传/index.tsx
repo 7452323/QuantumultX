@@ -302,14 +302,14 @@ function UploadPage() {
     const failCount = results.filter(r => r.status === 'error').length
     setResultMessage(`✅ 成功: ${successCount}   ❌ 失败: ${failCount}`)
 
+    if (successfulIndices.size > 0) {
+      setFiles(prev => prev.filter((_, i) => !successfulIndices.has(i)))
+    }
+
     await alert({
       title: '上传完成',
       message: `✅ 成功: ${successCount} 个\n❌ 失败: ${failCount} 个`,
     })
-
-    if (successfulIndices.size > 0) {
-      setFiles(prev => prev.filter((_, i) => !successfulIndices.has(i)))
-    }
   }
 
   function clearHistory() {
