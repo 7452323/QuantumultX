@@ -7,6 +7,9 @@ import {
 
 const TOKEN_KEY = "github_gist_token"
 
+// ─── 内容缓存 ───────────────────────────────────────────────────
+const contentCache = new Map<string, string>()
+
 // ─── Types ─────────────────────────────────────────────────────
 interface GistFile {
   filename: string
@@ -142,8 +145,16 @@ function DetailPage({
 
   // 加载 raw 内容
   useEffect(() => {
-    if (isNew || !firstFile) {
+    if (isNew || !firstFile || !gist) {
       setContent("")
+      setLoading(false)
+      return
+    }
+    // 检查缓存
+    const cached = contentCache.get(gist.id)
+    if (cached !== undefined) {
+      setContent(cached)
+      editorController.content = cached
       setLoading(false)
       return
     }
@@ -153,6 +164,7 @@ function DetailPage({
         if (!cancelled) {
           setContent(text)
           editorController.content = text
+          contentCache.set(gist.id, text)
         }
       })
       .catch(() => {
@@ -185,6 +197,7 @@ function DetailPage({
         if (fname !== firstFn) files[firstFn] = null
         files[fname] = { content: currentContent }
         await updateGist(token, gist.id, desc, files)
+        contentCache.delete(gist.id)
       }
       dismiss()
     } catch (e: any) {
@@ -249,6 +262,7 @@ function DetailPage({
                         setBusy(true)
                         try {
                           await deleteGist(token, gist.id)
+                          contentCache.delete(gist.id)
                           dismiss()
                         } catch (e: any) {
                           setError(e.message || "删除失败")
@@ -370,9 +384,7 @@ function DetailPage({
                   useDefaultHighlighterTheme
                 />
               ) : content.trim() ? (
-                <ScrollView frame={{ maxWidth: "infinity", maxHeight: 400 }}>
-                  <Text font="caption" foregroundStyle="label">{content}</Text>
-                </ScrollView>
+                <Text font="caption" foregroundStyle="label">{content}</Text>
               ) : (
                 <Text font="caption" foregroundStyle="tertiaryLabel">（文件为空）</Text>
               )}
