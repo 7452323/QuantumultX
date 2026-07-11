@@ -49,6 +49,17 @@ async function listGists(token: string): Promise<Gist[]> {
   return (await r.json()) as Gist[]
 }
 
+async function fetchGitHubUsername(token: string): Promise<string | null> {
+  try {
+    const r = await ghAPI(token, "/user")
+    if (!r.ok) return null
+    const data = (await r.json()) as { login: string }
+    return data.login || null
+  } catch {
+    return null
+  }
+}
+
 async function fetchRawContent(rawUrl: string): Promise<string> {
   const r = await fetch(rawUrl)
   if (!r.ok) throw new Error(`获取内容失败: HTTP ${r.status}`)
@@ -455,6 +466,7 @@ function HomeTab({ onClose }: { onClose: () => void }) {
   const [gists, setGists] = useState<Gist[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [username, setUsername] = useState<string | null>(null)
 
   const loadGists = async () => {
     const token = (Storage.get(TOKEN_KEY) as string) || ""
@@ -465,7 +477,12 @@ function HomeTab({ onClose }: { onClose: () => void }) {
     setLoading(true)
     setError(null)
     try {
-      const data = await listGists(token)
+      // 同时获取 username 和 gists
+      const [userData, data] = await Promise.all([
+        fetchGitHubUsername(token),
+        listGists(token),
+      ])
+      if (userData) setUsername(userData)
       setGists(data.filter(g => !g.public))
     } catch (e: any) {
       setError(e.message || "加载失败")
@@ -509,7 +526,7 @@ function HomeTab({ onClose }: { onClose: () => void }) {
   return (
     <NavigationStack>
       <List
-        navigationTitle="私密 Gist"
+        navigationTitle={username || "我的 Gist"}
         toolbar={{
           topBarLeading: (
             <Button title="关闭" action={onClose} />
