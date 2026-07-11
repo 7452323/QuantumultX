@@ -1,0 +1,9 @@
+{
+  "name": "Gist客户端",
+  "entry": "index.tsx",
+  "version": "1.0.0",
+  "icon": "doc.text.fill",
+  "color": "rgba(51, 51, 51, 1)",
+  "runInApp": true,
+  "description": "GitHub Gist 私密仓库管理器 - 列出/创建/编辑/删除 Gist"
+}
