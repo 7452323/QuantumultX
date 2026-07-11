@@ -476,7 +476,7 @@ function UploadPage() {
             >
               {uploadHistory.slice(0, 20).map((record, index) => {
                 const encodedPath = record.path.split('/').map(p => encodeURIComponent(p)).join('/')
-                const githubUrl = `https://github.com/${record.owner}/${record.repo}/blob/${record.branch || 'main'}/${encodedPath}`
+                const githubUrl = `https://raw.githubusercontent.com/${record.owner}/${record.repo}/${record.branch || 'main'}/${encodedPath}`
                 return (
                   <VStack key={index}>
                     <HStack padding={{ vertical: 2 }}>
