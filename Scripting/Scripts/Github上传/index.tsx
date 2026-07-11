@@ -35,6 +35,7 @@ interface UploadRecord {
   fileName: string
   owner: string
   repo: string
+  branch: string
   status: 'success' | 'error'
   message: string
   time: string
@@ -219,6 +220,7 @@ function UploadPage() {
     setResultMessage('')
 
     const results: UploadRecord[] = []
+    const successfulIndices = new Set<number>()
     const now = new Date().toLocaleString('zh-CN')
     const branchVal = branch.trim() || undefined
 
@@ -265,11 +267,14 @@ function UploadPage() {
           return next
         })
 
+        successfulIndices.add(i)
+
         results.push({
           path: destPath,
           fileName: file.name,
           owner: owner.trim(),
           repo: repo.trim(),
+          branch: branch.trim() || 'main',
           status: 'success',
           message: `${action} ${destPath}`,
           time: now,
@@ -281,6 +286,7 @@ function UploadPage() {
           fileName: file.name,
           owner: owner.trim(),
           repo: repo.trim(),
+          branch: branch.trim() || 'main',
           status: 'error',
           message: `❌ ${e?.message ?? String(e)}`,
           time: now,
@@ -299,14 +305,14 @@ function UploadPage() {
     const failCount = results.filter(r => r.status === 'error').length
     setResultMessage(`✅ 成功: ${successCount}   ❌ 失败: ${failCount}`)
 
+    if (successfulIndices.size > 0) {
+      setFiles(prev => prev.filter((_, i) => !successfulIndices.has(i)))
+    }
+
     await alert({
       title: '上传完成',
       message: `✅ 成功: ${successCount} 个\n❌ 失败: ${failCount} 个`,
     })
-
-    if (failCount === 0) {
-      setFiles([])
-    }
   }
 
   function clearHistory() {
@@ -468,24 +474,41 @@ function UploadPage() {
                 </HStack>
               }
             >
-              {uploadHistory.slice(0, 20).map((record, index) => (
-                <VStack key={index}>
-                  <HStack padding={{ vertical: 2 }}>
-                    <Image
-                      systemName={record.status === 'success' ? 'checkmark.circle.fill' : 'xmark.circle.fill'}
-                      foregroundStyle={record.status === 'success' ? 'systemGreen' : 'systemRed'}
-                      font={16}
-                    />
-                    <Text lineLimit={1}>{record.fileName}</Text>
-                    <Spacer />
-                    <Text font={11} foregroundStyle="tertiaryLabel">{record.time}</Text>
-                  </HStack>
-                  {record.status === 'error' ? (
-                    <Text font={12} foregroundStyle="systemRed">{record.message}</Text>
-                  ) : null}
-                  <Divider />
-                </VStack>
-              ))}
+              {uploadHistory.slice(0, 20).map((record, index) => {
+                const encodedPath = record.path.split('/').map(p => encodeURIComponent(p)).join('/')
+                const githubUrl = `https://raw.githubusercontent.com/${record.owner}/${record.repo}/${record.branch || 'main'}/${encodedPath}`
+                return (
+                  <VStack key={index}>
+                    <HStack padding={{ vertical: 2 }}>
+                      <Image
+                        systemName={record.status === 'success' ? 'checkmark.circle.fill' : 'xmark.circle.fill'}
+                        foregroundStyle={record.status === 'success' ? 'systemGreen' : 'systemRed'}
+                        font={16}
+                      />
+                      {record.status === 'success' ? (
+                        <Button
+                          title={record.fileName}
+                          action={() => Safari.present(githubUrl)}
+                        />
+                      ) : (
+                        <Text lineLimit={1}>{record.fileName}</Text>
+                      )}
+                      <Spacer />
+                      <Text font={11} foregroundStyle="tertiaryLabel">{record.time}</Text>
+                    </HStack>
+                    {record.status === 'error' ? (
+                      <Text font={12} foregroundStyle="systemRed">{record.message}</Text>
+                    ) : (
+                      <HStack padding={{ top: 2 }}>
+                        <Text font={11} foregroundStyle="tertiaryLabel">{record.message}</Text>
+                        <Spacer />
+                        <Text font={11} foregroundStyle="systemBlue">查看 →</Text>
+                      </HStack>
+                    )}
+                    <Divider />
+                  </VStack>
+                )
+              })}
             </Section>
           )}
         </List>
