@@ -56,7 +56,7 @@ async function fetchAll(key: string): Promise<{ now: WD; aqi: AD | null; hourly:
 }
 
 const D = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"]
-const D2 = ["今天", "明天", "后天"]
+const D2 = ["明天", "后天", "大后天"]
 
 function DetailItem({ val, label }: { val: string; label: string }) {
   return (
