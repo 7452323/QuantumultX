@@ -12,18 +12,13 @@ function icon(c: string, n: boolean): string {
   if (v >= 101 && v <= 103) return n ? "cloud.moon.fill" : "cloud.sun.fill"
   if (v === 104) return "cloud.fill"
   if (v >= 150 && v <= 153) return "moon.stars.fill"
-  if (v >= 300 && v <= 302) return "cloud.drizzle.fill"
-  if (v >= 400 && v <= 406) return "wind"
-  if (v >= 500 && v <= 515) return "cloud.fog.fill"
-  if (v >= 700 && v <= 702) return "cloud.rain.fill"
-  if (v >= 703 && v <= 704) return "cloud.heavyrain.fill"
-  if (v >= 705 && v <= 706) return "cloud.bolt.rain.fill"
-  if (v >= 707 && v <= 710) return "cloud.rain.fill"
-  if (v >= 711 && v <= 712) return "cloud.heavyrain.fill"
-  if (v >= 713 && v <= 715) return "cloud.bolt.rain.fill"
-  if (v >= 800 && v <= 807) return "cloud.snow.fill"
+  if (v >= 200 && v <= 399) return "cloud.drizzle.fill"
+  if (v >= 400 && v <= 499) return "wind"
+  if (v >= 500 && v <= 699) return "cloud.fog.fill"
+  if (v >= 700 && v <= 799) return "cloud.rain.fill"
+  if (v >= 800 && v <= 899) return "cloud.snow.fill"
   if (v === 900) return "thermometer.snowflake"
-  return "questionmark"
+  return "cloud.sun.fill"
 }
 
 const DAY_G = { colors: ["rgba(26,115,232,1)", "rgba(79,195,247,1)"], startPoint: "top", endPoint: "bottom" } as any
@@ -114,7 +109,7 @@ function HC({ h, i, lo, hi }: { h: HF; i: number; lo: number; hi: number }) {
   const fill = Math.max(6, ((t - lo) / r) * 34)
   const lb = i === 0 ? "现在" : h.fxTime.slice(11, 13).replace(/^0/, "") + "时"
   return (
-    <VStack spacing={1} alignment="center" frame={{ width: 26 }}>
+    <VStack spacing={1} alignment="center" frame={{ width: 30 }}>
       <Text font="caption2" foregroundStyle="white" opacity={0.65}>{lb}</Text>
       <ZStack frame={{ width: 8, height: 34 }}>
         <VStack frame={{ width: 8, height: 34 }} background={"rgba(255,255,255,0.12)" as any} />
@@ -161,27 +156,17 @@ function MW({ nw, daily, hourly }: { nw: NW; daily: DF[]; hourly: HF[] }) {
 
   return (
     <VStack spacing={0} frame={{ maxWidth: "infinity", maxHeight: "infinity" }} padding={{ top: 26, leading: 12, bottom: 12, trailing: 12 }}>
-      <HStack frame={{ maxWidth: "infinity" }} alignment="firstTextBaseline">
-        <VStack spacing={0} frame={{ alignment: "leading" }}>
-          <Text font="caption2" foregroundStyle="white" fontWeight="medium">
-            {nd.getFullYear()}年{nd.getMonth()+1}月{nd.getDate()}日 第{wn(nd)}周
-          </Text>
-          <Text font="caption2" foregroundStyle="white" opacity={0.6}>
-            {D[nd.getDay()]} {lunar}
-          </Text>
-        </VStack>
-        <Spacer />
-        <HStack spacing={3} frame={{ alignment: "trailing" }}>
-          {hourly.slice(0, 6).map((h, i) => (
-            <Text key={i} font="caption2" foregroundStyle="white" opacity={0.5} frame={{ width: 26, alignment: "center" }}>
-              {i === 0 ? "现在" : h.fxTime.slice(11, 13).replace(/^0/, "") + "时"}
-            </Text>
-          ))}
-        </HStack>
-      </HStack>
-      <Spacer minLength={4} />
       <HStack spacing={6} frame={{ maxWidth: "infinity", maxHeight: "infinity" }}>
-        <VStack spacing={1} frame={{ width: 115, maxHeight: "infinity", alignment: "leading" }}>
+        <VStack spacing={1} frame={{ width: 95, maxHeight: "infinity", alignment: "leading" }}>
+          <VStack spacing={0} frame={{ alignment: "leading" }}>
+            <Text font="caption2" foregroundStyle="white" fontWeight="medium">
+              {nd.getFullYear()}年{nd.getMonth()+1}月{nd.getDate()}日
+            </Text>
+            <Text font="caption2" foregroundStyle="white" opacity={0.6}>
+              {D[nd.getDay()]} {lunar}
+            </Text>
+          </VStack>
+          <Spacer minLength={4} />
           <HStack spacing={4} alignment="center">
             <Image systemName={icon(nw.icon, n)} frame={{ width: 22, height: 22 }} foregroundStyle="white" />
             <HStack alignment="firstTextBaseline" spacing={0}>
@@ -200,26 +185,21 @@ function MW({ nw, daily, hourly }: { nw: NW; daily: DF[]; hourly: HF[] }) {
         </VStack>
         <VStack frame={{ width: 1, maxHeight: "infinity" }} background={"rgba(255,255,255,0.12)" as any} />
         <VStack spacing={2} frame={{ maxWidth: "infinity", maxHeight: "infinity" }}>
-          <HStack spacing={3} frame={{ maxWidth: "infinity", alignment: "leading" }}>
+          <HStack spacing={7} frame={{ maxWidth: "infinity", alignment: "leading" }}>
             {hourly.slice(0, 6).map((h, i) => <HC key={i} h={h} i={i} lo={lo} hi={hi} />)}
           </HStack>
           <Spacer />
-          <HStack frame={{ maxWidth: "infinity" }}>
-            {daily.slice(1, 4).map((d, i) => {
-              const dt = new Date(d.fxDate)
-              const item = (
-                <VStack key={i} spacing={1} alignment="center" frame={{ width: 48 }}>
-                  <Text font="caption2" foregroundStyle="white" opacity={0.7}>{D[dt.getDay()]}</Text>
-                  <Image systemName={icon(d.iconDay, n)} frame={{ width: 16, height: 16 }} foregroundStyle="white" opacity={0.8} />
-                  <HStack spacing={2}>
-                    <Text font="caption2" foregroundStyle="white" opacity={0.55}>{d.tempMin}°</Text>
-                    <Text font="caption2" foregroundStyle="white" fontWeight="semibold">{d.tempMax}°</Text>
-                  </HStack>
-                </VStack>
-              )
-              if (i === 0) return item
-              return <><Spacer />{item}</>
-            })}
+          <HStack spacing={0} frame={{ maxWidth: "infinity" }}>
+            {daily.slice(1, 4).map((d, i) => (
+              <VStack key={i} spacing={1} alignment="center" frame={{ maxWidth: "infinity" }}>
+                <Text font="caption2" foregroundStyle="white" opacity={0.7}>{["明天", "后天", "大后天"][i]}</Text>
+                <Image systemName={icon(d.iconDay, n)} frame={{ width: 16, height: 16 }} foregroundStyle="white" opacity={0.8} />
+                <HStack spacing={2}>
+                  <Text font="caption2" foregroundStyle="white" opacity={0.55}>{d.tempMin}°</Text>
+                  <Text font="caption2" foregroundStyle="white" fontWeight="semibold">{d.tempMax}°</Text>
+                </HStack>
+              </VStack>
+            ))}
           </HStack>
         </VStack>
       </HStack>
@@ -277,7 +257,7 @@ function LW({ nw, daily, hourly, ct, aqi, warn }: {
       <HStack spacing={12} frame={{ maxWidth: "infinity", alignment: "center" }}>
         {daily.slice(0, 3).map((d, i) => {
           const dt = new Date(d.fxDate)
-          const lb = i === 0 ? "今天" : i === 1 ? "明天" : D[dt.getDay()]
+          const lb = i === 0 ? "今天" : i === 1 ? "明天" : "后天"
           return (
             <VStack key={i} spacing={3} alignment="center" frame={{ maxWidth: "infinity" }}>
               <Text font="callout" foregroundStyle="white" opacity={0.8}>{lb}</Text>
