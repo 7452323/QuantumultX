@@ -1,45 +1,45 @@
 {
+  "contributors" : [
+
+  ],
+  "description" : "镜花水月",
+  "remoteResource" : null,
   "localizedNames" : {
-    "ru" : "",
-    "it" : "",
-    "ja" : "",
-    "es" : "",
-    "zh" : "",
-    "pt" : "",
     "fr" : "",
-    "de" : "",
-    "en" : ""
-  },
-  "name" : "镜花水月",
-  "icon" : "livephoto",
-  "author" : {
-    "name" : "7452323",
-    "email" : "7452323@gmail.com",
-    "homepage" : "https:\/\/github.com\/7452323"
-  },
-  "description" : null,
-  "localizedDescriptions" : {
     "zh" : "",
-    "fr" : "",
-    "it" : "",
-    "ja" : "",
-    "es" : "",
-    "de" : "",
     "en" : "",
+    "de" : "",
+    "ja" : "",
+    "es" : "",
+    "it" : "",
     "ru" : "",
     "pt" : ""
   },
+  "localizedDescriptions" : {
+    "fr" : "",
+    "ja" : "",
+    "it" : "",
+    "ru" : "",
+    "es" : "",
+    "pt" : "",
+    "de" : "",
+    "en" : "",
+    "zh" : ""
+  },
   "permissions" : null,
+  "icon" : "livephoto",
+  "version" : "1.0.0",
+  "name" : "镜花水月",
+  "runInApp" : false,
+  "iconImage" : "",
+  "entry" : "index.tsx",
   "intentInputTypes" : [
 
   ],
   "color" : "rgba(28, 140, 255,1)",
-  "contributors" : [
-
-  ],
-  "version" : "1.0.0",
-  "runInApp" : false,
-  "iconImage" : null,
-  "entry" : "index.tsx",
-  "remoteResource" : null
+  "author" : {
+    "name" : "7452323",
+    "homepage" : "https:\/\/github.com\/7452323",
+    "email" : "7452323@gmail.com"
+  }
 }
