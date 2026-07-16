@@ -563,24 +563,35 @@ function VideoPreviewView({ video }: { video: VideoInfo }) {
     <GeometryReader>{({ size: { width, height } }) => (
       <VStack frame={{ width, height }} background="black">
         {isImagePost ? (
-          <ScrollView axes="horizontal" scrollTargetBehavior="paging">
-            <HStack spacing={0}>
-              {video.images.map((imgInfo, i) => (
-                <AnimatedImagePage key={i} imgInfo={imgInfo} pageWidth={width} pageHeight={height} />
-              ))}
+          <VStack frame={{ maxWidth: "infinity", maxHeight: "infinity" }} spacing={0}>
+            <ScrollView axes="horizontal" scrollTargetBehavior="paging" frame={{ width, height: height - 56 }}>
+              <HStack spacing={0}>
+                {video.images.map((imgInfo, i) => (
+                  <AnimatedImagePage key={i} imgInfo={imgInfo} pageWidth={width} pageHeight={height - 56} />
+                ))}
+              </HStack>
+            </ScrollView>
+            <HStack frame={{ maxWidth: "infinity" }} padding={{ horizontal: 16, vertical: 8 }} spacing={16}>
+              <Button action={() => shareVideo(video, true)}>
+                <Image systemName="square.and.arrow.up" font="title3" foregroundStyle="white" opacity={0.85} />
+              </Button>
+              <Spacer />
+              <Button action={dismiss}>
+                <Image systemName="xmark.circle.fill" font="title" foregroundStyle="white" opacity={0.8} />
+              </Button>
             </HStack>
-          </ScrollView>
+          </VStack>
         ) : player ? (
           <VideoPlayer
             player={player}
             overlay={
-              <VStack frame={{ maxWidth: "infinity", maxHeight: "infinity", alignment: "bottom" }} padding={16}>
+              <VStack frame={{ maxWidth: "infinity", maxHeight: "infinity", alignment: "bottom" }} padding={{ horizontal: 16, bottom: 16 }}>
                 <HStack frame={{ maxWidth: "infinity" }} spacing={16}>
                   <Button action={() => shareVideo(video, false)}>
                     <Image systemName="square.and.arrow.up" font="title3" foregroundStyle="white" opacity={0.85} />
                   </Button>
                   <Spacer />
-                  <Button action={() => { try { player.stop(); player.dispose() } catch {}; dismiss() }}>
+                  <Button action={() => { try { player.stop(); player.dispose() } catch (_) {} dismiss() }}>
                     <Image systemName="xmark.circle.fill" font="title" foregroundStyle="white" opacity={0.8} />
                   </Button>
                 </HStack>
@@ -603,17 +614,6 @@ function VideoPreviewView({ video }: { video: VideoInfo }) {
             </VStack>
           </VStack>
         )}
-        {isImagePost ? (
-          <HStack frame={{ maxWidth: "infinity" }} padding={{ horizontal: 16, top: 16 }} spacing={16}>
-            <Button action={() => shareVideo(video, true)}>
-              <Image systemName="square.and.arrow.up" font="title3" foregroundStyle="white" opacity={0.85} />
-            </Button>
-            <Spacer />
-            <Button action={dismiss}>
-              <Image systemName="xmark.circle.fill" font="title" foregroundStyle="white" opacity={0.8} />
-            </Button>
-          </HStack>
-        ) : null}
       </VStack>
     )}</GeometryReader>
   )
@@ -1492,7 +1492,7 @@ function HomeView({ dismissApp }: { dismissApp: () => void }) {
                 {videos.map((v, idx) => (
                     <VStack key={v.aweme_id} spacing={3} onTapGesture={() => openVideo(v, idx)}>
                       <VStack frame={{ maxWidth: "infinity", height: 200 }} background="systemGray5" clipShape={{ type: "rect", cornerRadius: 8 }}>
-                        {v.cover ? <Image imageUrl={v.cover} resizable aspectRatio={{ value: null, contentMode: 'fit' }} frame={{ maxWidth: "infinity", height: 200 }} overlay={{ alignment: "bottom", content: (
+                        {v.cover ? <Image imageUrl={v.cover} resizable aspectRatio={{ value: 9/16, contentMode: 'fit' }} frame={{ maxWidth: "infinity", height: 200 }} overlay={{ alignment: "bottom", content: (
                           <VStack padding={3} spacing={3}>
                             <HStack>
                               {v.duration > 0 ? (
@@ -1516,7 +1516,7 @@ function HomeView({ dismissApp }: { dismissApp: () => void }) {
                             </HStack>
                           </VStack>
                         )}} />
-                      : <VStack frame={{ maxWidth: "infinity", maxHeight: "infinity" }} alignment="center"><Image systemName="play.rectangle" font="largeTitle" foregroundStyle="tertiaryLabel" /></VStack>}
+                      : <VStack frame={{ maxWidth: "infinity", height: 200 }} alignment="center"><Image systemName="play.rectangle" font="largeTitle" foregroundStyle="tertiaryLabel" /></VStack>}
                       </VStack>
                     <Text font="caption2" lineLimit={2} padding={{ horizontal: 2 }}>{v.desc}</Text>
                   </VStack>
@@ -1548,8 +1548,30 @@ function HomeView({ dismissApp }: { dismissApp: () => void }) {
   )
 }
 
+function HistoryItemCard({ item, idx, history, setHistory }: { item: HistoryItem; idx: number; history: HistoryItem[]; setHistory: (h: HistoryItem[]) => void }) {
+  const onPlay = () => openVideo(item, idx)
+  const onDelete = () => { const u = history.filter((h) => h.aweme_id !== item.aweme_id); saveHistory(u); setHistory(u) }
+  return (
+    <VStack spacing={3}>
+      <VStack frame={{ maxWidth: "infinity", height: 200 }} background="systemGray5" clipShape={{ type: "rect", cornerRadius: 8 }}>
+        {item.cover ? (
+          <Image imageUrl={item.cover} resizable aspectRatio={{ value: 9/16, contentMode: 'fit' }} frame={{ maxWidth: "infinity", height: 200 }} overlay={{ alignment: "bottomTrailing", content: (
+            <VStack onTapGesture={onDelete} padding={4}>
+              <Image systemName="xmark.circle.fill" font="title3" foregroundStyle="white" />
+            </VStack>
+          )}} onTapGesture={onPlay} />
+        ) : (
+          <VStack frame={{ maxWidth: "infinity", height: 200 }} alignment="center" onTapGesture={onPlay}><Image systemName="play.rectangle" font="largeTitle" foregroundStyle="tertiaryLabel" /></VStack>
+        )}
+      </VStack>
+      <Text font="caption2" lineLimit={2} padding={{ horizontal: 2 }}>{item.desc}</Text>
+      <Text font="caption2" foregroundStyle="tertiaryLabel" padding={{ horizontal: 2 }}>{new Date(item.viewed_at).toLocaleDateString("zh-CN")}</Text>
+    </VStack>
+  )
+}
+
 // ─── 历史 ───
-function HistoryView() {
+function HistoryView({ dismissApp }: { dismissApp: () => void }) {
   const [history, setHistory] = useState<HistoryItem[]>(() => loadHistory())
   useEffect(() => {
     const h = loadHistory()
@@ -1561,6 +1583,7 @@ function HistoryView() {
       <List
         navigationTitle="观看历史"
         toolbar={{
+          topBarLeading: <Button title="关闭" action={() => dismissApp()} />,
           topBarTrailing: history.length > 0 ? (
             <Button title="清空" action={() => { saveHistory([]); setHistory([]) }} />
           ) : undefined,
@@ -1583,20 +1606,7 @@ function HistoryView() {
                 { size: { type: "flexible", min: 100, max: 200 }, spacing: 6 },
               ]} spacing={6}>
                 {history.map((item, idx) => (
-                  <VStack key={item.aweme_id} spacing={3} onTapGesture={() => openVideo(item, idx)}>
-                    <VStack frame={{ maxWidth: "infinity", height: 200 }} background="systemGray5" clipShape={{ type: "rect", cornerRadius: 8 }}>
-                      {item.cover ? <Image imageUrl={item.cover} resizable aspectRatio={{ value: null, contentMode: 'fit' }} frame={{ maxWidth: "infinity", height: 200 }} overlay={{ alignment: "bottomTrailing", content: (
-                        <VStack spacing={3}>
-                          <Button action={() => { const u = history.filter((h) => h.aweme_id !== item.aweme_id); saveHistory(u); setHistory(u) }}>
-                            <Image systemName="xmark.circle.fill" font="title3" foregroundStyle="white" />
-                          </Button>
-                          {item.duration > 0 ? <HStack padding={{ horizontal: 6, vertical: 2 }} background="black" opacity={0.6} frame={{ maxWidth: "infinity", alignment: "bottom" }}><Spacer /><Text font="caption2" foregroundStyle="white">{formatDuration(item.duration)}</Text></HStack> : null}
-                        </VStack>
-                      )}} /> : <VStack frame={{ maxWidth: "infinity", maxHeight: "infinity" }} alignment="center"><Image systemName="play.rectangle" font="largeTitle" foregroundStyle="tertiaryLabel" /></VStack>}
-                    </VStack>
-                    <Text font="caption2" lineLimit={2} padding={{ horizontal: 2 }}>{item.desc}</Text>
-                    <Text font="caption2" foregroundStyle="tertiaryLabel" padding={{ horizontal: 2 }}>{new Date(item.viewed_at).toLocaleDateString("zh-CN")}</Text>
-                  </VStack>
+                  <HistoryItemCard item={item} idx={idx} history={history} setHistory={setHistory} />
                 ))}
               </LazyVGrid>
             </VStack>
@@ -1976,7 +1986,7 @@ function App() {
         <HomeView dismissApp={() => dismiss()} />
       </Tab>
       <Tab title="历史" systemImage="clock">
-        <HistoryView />
+        <HistoryView dismissApp={() => dismiss()} />
       </Tab>
       <Tab title="设置" systemImage="gear">
         <SettingsView />
