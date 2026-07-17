@@ -1,2 +1,6 @@
-# Camoufox JSDOM Env Patches
-## JSDOM environment patches
+# jsdom 环境补丁知识库
+
+## 概述
+
+当 JSVMP 选择路径 B（环境伪装）在 jsdom 中运行时，jsdom 与真实浏览器存在大量差异。
+本文档提供系统化的环境补丁方案，按检测影响分级，所有代码模板可直接复用。
