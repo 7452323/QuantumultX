@@ -21,23 +21,17 @@ function icon(c: string, n: boolean): string {
   return "cloud.sun.fill"
 }
 
-const DAY_G = { colors: ["rgba(26,115,232,1)", "rgba(79,195,247,1)"], startPoint: "top", endPoint: "bottom" } as any
-const NIGHT_G = { colors: ["rgba(12,20,69,1)", "rgba(26,26,46,1)"], startPoint: "top", endPoint: "bottom" } as any
 function night(): boolean { const h = new Date().getHours(); return h < 6 || h >= 18 }
 function aqic(lv: string): any {
   const n = parseInt(lv)
-  if (n <= 1) return "rgba(0,228,0,1)"
-  if (n <= 2) return "rgba(248,197,10,1)"
-  if (n <= 3) return "rgba(255,126,0,1)"
-  if (n <= 4) return "rgba(255,0,0,1)"
+  if (n <= 1) return "systemGreen"
+  if (n <= 2) return "systemYellow"
+  if (n <= 3) return "systemOrange"
+  if (n <= 4) return "systemRed"
   if (n <= 5) return "rgba(186,0,51,1)"
   return "rgba(126,0,35,1)"
 }
 const D = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"]
-function wn(d: Date): number {
-  const s = new Date(d.getFullYear(), 0, 1)
-  return Math.ceil(((d.getTime() - s.getTime()) / 86400000 + s.getDay() + 1) / 7)
-}
 function getApiKey(): string { return Storage.get<string>("qweather_api_key") || "" }
 
 function getLunarDate(): string {
@@ -110,12 +104,12 @@ function HC({ h, i, lo, hi }: { h: HF; i: number; lo: number; hi: number }) {
   const lb = i === 0 ? "现在" : h.fxTime.slice(11, 13).replace(/^0/, "") + "时"
   return (
     <VStack spacing={1} alignment="center" frame={{ width: 30 }}>
-      <Text font="caption2" foregroundStyle="white" opacity={0.65}>{lb}</Text>
+      <Text font="caption2" foregroundStyle="secondaryLabel">{lb}</Text>
       <ZStack frame={{ width: 8, height: 34 }}>
-        <VStack frame={{ width: 8, height: 34 }} background={"rgba(255,255,255,0.12)" as any} />
-        <VStack frame={{ width: 8, height: fill, alignment: "bottom" }} background={parseFloat(h.precip) >= 0.06 ? "rgba(255,255,255,0.6)" as any : "white" as any} opacity={0.6} />
+        <VStack frame={{ width: 8, height: 34 }} background={"quaternarySystemFill" as any} />
+        <VStack frame={{ width: 8, height: fill, alignment: "bottom" }} background={"tintColor" as any} opacity={0.6} />
       </ZStack>
-      <Text font="caption2" foregroundStyle="white" opacity={0.65}>{t}°</Text>
+      <Text font="caption2" foregroundStyle="label" fontWeight="medium">{t}°</Text>
     </VStack>
   )
 }
@@ -124,18 +118,18 @@ function SW({ nw, ct }: { nw: NW; ct: string }) {
   return (
     <VStack spacing={0} frame={{ maxWidth: "infinity", maxHeight: "infinity" }} padding={{ horizontal: 14, vertical: 12 }}>
       <HStack frame={{ maxWidth: "infinity" }}>
-        <Image systemName={icon(nw.icon, night())} frame={{ width: 22, height: 22 }} foregroundStyle="white" />
+        <Image systemName={icon(nw.icon, night())} frame={{ width: 22, height: 22 }} foregroundStyle="label" />
         <Spacer />
-        <Text font="callout" foregroundStyle="white" opacity={0.9} fontWeight="medium" lineLimit={1}>{ct}</Text>
+        <Text font="callout" foregroundStyle="label" fontWeight="medium" lineLimit={1}>{ct}</Text>
       </HStack>
       <Spacer />
-      <Text font={48} foregroundStyle="white" fontWeight="semibold">{nw.temp}°</Text>
-      <Text font="subheadline" foregroundStyle="white" opacity={0.7}>{nw.text}</Text>
+      <Text font={48} foregroundStyle="label" fontWeight="semibold">{nw.temp}°</Text>
+      <Text font="subheadline" foregroundStyle="secondaryLabel">{nw.text}</Text>
       <Spacer />
       <HStack frame={{ maxWidth: "infinity" }}>
-        <Text font="caption2" foregroundStyle="white" opacity={0.55}>{nw.windDir} {nw.windScale}级</Text>
+        <Text font="caption2" foregroundStyle="tertiaryLabel">{nw.windDir} {nw.windScale}级</Text>
         <Spacer />
-        <Text font="caption2" foregroundStyle="white" opacity={0.55}>湿度 {nw.humidity}%</Text>
+        <Text font="caption2" foregroundStyle="tertiaryLabel">湿度 {nw.humidity}%</Text>
       </HStack>
     </VStack>
   )
@@ -159,31 +153,31 @@ function MW({ nw, daily, hourly }: { nw: NW; daily: DF[]; hourly: HF[] }) {
       <HStack spacing={6} frame={{ maxWidth: "infinity", maxHeight: "infinity" }}>
         <VStack spacing={1} frame={{ width: 95, maxHeight: "infinity", alignment: "leading" }}>
           <VStack spacing={0} frame={{ alignment: "leading" }}>
-            <Text font="caption2" foregroundStyle="white" fontWeight="medium">
+            <Text font="caption2" foregroundStyle="label" fontWeight="medium">
               {nd.getFullYear()}年{nd.getMonth()+1}月{nd.getDate()}日
             </Text>
-            <Text font="caption2" foregroundStyle="white" opacity={0.6}>
+            <Text font="caption2" foregroundStyle="secondaryLabel">
               {D[nd.getDay()]} {lunar}
             </Text>
           </VStack>
           <Spacer minLength={4} />
           <HStack spacing={4} alignment="center">
-            <Image systemName={icon(nw.icon, n)} frame={{ width: 22, height: 22 }} foregroundStyle="white" />
+            <Image systemName={icon(nw.icon, n)} frame={{ width: 22, height: 22 }} foregroundStyle="label" />
             <HStack alignment="firstTextBaseline" spacing={0}>
-              <Text font={36} foregroundStyle="white" fontWeight="regular">{t}</Text>
-              <Text font={14} foregroundStyle="white" opacity={0.5}>°</Text>
+              <Text font={36} foregroundStyle="label" fontWeight="regular">{t}</Text>
+              <Text font={14} foregroundStyle="tertiaryLabel">°</Text>
             </HStack>
           </HStack>
           <HStack spacing={3} alignment="center">
-            <Image systemName={icon(daily[0]?.iconDay || nw.icon, n)} frame={{ width: 12, height: 12 }} foregroundStyle="white" opacity={0.7} />
-            <Text font="caption2" foregroundStyle="white" opacity={0.8}>{daily[0]?.tempMin || lo}°/{daily[0]?.tempMax || hi}° {textDay}</Text>
+            <Image systemName={icon(daily[0]?.iconDay || nw.icon, n)} frame={{ width: 12, height: 12 }} foregroundStyle="secondaryLabel" />
+            <Text font="caption2" foregroundStyle="secondaryLabel">{daily[0]?.tempMin || lo}°/{daily[0]?.tempMax || hi}° {textDay}</Text>
           </HStack>
           <VStack spacing={0} padding={{ top: 2 }}>
-            <Text font="caption2" foregroundStyle="white" opacity={0.6} lineLimit={1}>宜：{almanac.slice(0, 14)}</Text>
+            <Text font="caption2" foregroundStyle="tertiaryLabel" lineLimit={1}>宜：{almanac.slice(0, 14)}</Text>
           </VStack>
-          <Text font="caption2" foregroundStyle="white" opacity={0.7}>{textDay}</Text>
+          <Text font="caption2" foregroundStyle="secondaryLabel">{textDay}</Text>
         </VStack>
-        <VStack frame={{ width: 1, maxHeight: "infinity" }} background={"rgba(255,255,255,0.12)" as any} />
+        <VStack frame={{ width: 1, maxHeight: "infinity" }} background={"separator" as any} />
         <VStack spacing={2} frame={{ maxWidth: "infinity", maxHeight: "infinity" }}>
           <HStack spacing={7} frame={{ maxWidth: "infinity", alignment: "leading" }}>
             {hourly.slice(0, 6).map((h, i) => <HC key={i} h={h} i={i} lo={lo} hi={hi} />)}
@@ -192,11 +186,11 @@ function MW({ nw, daily, hourly }: { nw: NW; daily: DF[]; hourly: HF[] }) {
           <HStack spacing={0} frame={{ maxWidth: "infinity" }}>
             {daily.slice(1, 4).map((d, i) => (
               <VStack key={i} spacing={1} alignment="center" frame={{ maxWidth: "infinity" }}>
-                <Text font="caption2" foregroundStyle="white" opacity={0.7}>{["明天", "后天", "大后天"][i]}</Text>
-                <Image systemName={icon(d.iconDay, n)} frame={{ width: 16, height: 16 }} foregroundStyle="white" opacity={0.8} />
+                <Text font="caption2" foregroundStyle="secondaryLabel">{["明天", "后天", "大后天"][i]}</Text>
+                <Image systemName={icon(d.iconDay, n)} frame={{ width: 16, height: 16 }} foregroundStyle="label" opacity={0.8} />
                 <HStack spacing={2}>
-                  <Text font="caption2" foregroundStyle="white" opacity={0.55}>{d.tempMin}°</Text>
-                  <Text font="caption2" foregroundStyle="white" fontWeight="semibold">{d.tempMax}°</Text>
+                  <Text font="caption2" foregroundStyle="tertiaryLabel">{d.tempMin}°</Text>
+                  <Text font="caption2" foregroundStyle="label" fontWeight="semibold">{d.tempMax}°</Text>
                 </HStack>
               </VStack>
             ))}
@@ -204,7 +198,7 @@ function MW({ nw, daily, hourly }: { nw: NW; daily: DF[]; hourly: HF[] }) {
         </VStack>
       </HStack>
       <Spacer minLength={2} />
-      <Text font="caption2" foregroundStyle="white" opacity={0.5} frame={{ maxWidth: "infinity", alignment: "center" }}>
+      <Text font="caption2" foregroundStyle="tertiaryLabel" frame={{ maxWidth: "infinity", alignment: "center" }}>
         {rainText}
       </Text>
     </VStack>
@@ -225,16 +219,16 @@ function LW({ nw, daily, hourly, ct, aqi, warn }: {
   return (
     <VStack spacing={0} frame={{ maxWidth: "infinity", maxHeight: "infinity" }} padding={{ horizontal: 14, vertical: 10 }}>
       <HStack frame={{ maxWidth: "infinity" }}>
-        <Text font="headline" foregroundStyle="white" fontWeight="medium">{ct}</Text>
+        <Text font="headline" foregroundStyle="label" fontWeight="medium">{ct}</Text>
         <Spacer />
-        <Text font="callout" foregroundStyle="white" fontWeight="medium">{nd.getFullYear()}年{nd.getMonth()+1}月{nd.getDate()}日 {D[nd.getDay()]}</Text>
+        <Text font="callout" foregroundStyle="label" fontWeight="medium">{nd.getFullYear()}年{nd.getMonth()+1}月{nd.getDate()}日 {D[nd.getDay()]}</Text>
       </HStack>
       <Spacer minLength={8} />
       <HStack spacing={8} frame={{ maxWidth: "infinity" }}>
-        <Image systemName={icon(nw.icon, n)} frame={{ width: 40, height: 40 }} foregroundStyle="white" />
+        <Image systemName={icon(nw.icon, n)} frame={{ width: 40, height: 40 }} foregroundStyle="label" />
         <HStack alignment="firstTextBaseline" spacing={0}>
-          <Text font={56} foregroundStyle="white" fontWeight="regular">{t}</Text>
-          <Text font={20} foregroundStyle="white" opacity={0.5}>°</Text>
+          <Text font={56} foregroundStyle="label" fontWeight="regular">{t}</Text>
+          <Text font={20} foregroundStyle="tertiaryLabel">°</Text>
         </HStack>
         <Spacer />
         {aqi ? (<VStack spacing={0} background={aqic(aqi.level)} padding={{ horizontal: 8, vertical: 3 }}><Text font="caption" foregroundStyle="white" fontWeight="bold">AQI {aqi.aqi}</Text></VStack>) : null}
@@ -248,28 +242,27 @@ function LW({ nw, daily, hourly, ct, aqi, warn }: {
         <DI icon="drop.fill" label="降水" val={`${nw.precip}mm`} />
       </HStack>
       <Spacer minLength={6} />
-      <VStack frame={{ maxWidth: "infinity", height: 1 }} background={"rgba(255,255,255,0.15)" as any} />
+      <VStack frame={{ maxWidth: "infinity", height: 1 }} background={"separator" as any} />
       <Spacer minLength={6} />
       <HStack spacing={6} frame={{ maxWidth: "infinity" }}>{hourly.slice(0, 8).map((h, i) => <HC key={i} h={h} i={i} lo={lo} hi={hi} />)}</HStack>
       <Spacer minLength={6} />
-      <VStack frame={{ maxWidth: "infinity", height: 1 }} background={"rgba(255,255,255,0.1)" as any} />
+      <VStack frame={{ maxWidth: "infinity", height: 1 }} background={"separator" as any} />
       <Spacer minLength={4} />
       <HStack spacing={12} frame={{ maxWidth: "infinity", alignment: "center" }}>
         {daily.slice(0, 3).map((d, i) => {
-          const dt = new Date(d.fxDate)
           const lb = i === 0 ? "今天" : i === 1 ? "明天" : "后天"
           return (
             <VStack key={i} spacing={3} alignment="center" frame={{ maxWidth: "infinity" }}>
-              <Text font="callout" foregroundStyle="white" opacity={0.8}>{lb}</Text>
-              <Image systemName={icon(d.iconDay, n)} frame={{ width: 24, height: 24 }} foregroundStyle="white" />
-              <Text font="body" foregroundStyle="white" fontWeight="semibold">{d.tempMax}°/{d.tempMin}°</Text>
-              <Text font="caption2" foregroundStyle="white" opacity={0.6}>{d.textDay}</Text>
+              <Text font="callout" foregroundStyle="secondaryLabel">{lb}</Text>
+              <Image systemName={icon(d.iconDay, n)} frame={{ width: 24, height: 24 }} foregroundStyle="label" />
+              <Text font="body" foregroundStyle="label" fontWeight="semibold">{d.tempMax}°/{d.tempMin}°</Text>
+              <Text font="caption2" foregroundStyle="tertiaryLabel">{d.textDay}</Text>
             </VStack>
           )
         })}
       </HStack>
       <Spacer minLength={3} />
-      <Text font="footnote" foregroundStyle="white" opacity={0.7} frame={{ maxWidth: "infinity", alignment: "center" }}>{desc}</Text>
+      <Text font="footnote" foregroundStyle="secondaryLabel" frame={{ maxWidth: "infinity", alignment: "center" }}>{desc}</Text>
     </VStack>
   )
 }
@@ -277,9 +270,9 @@ function LW({ nw, daily, hourly, ct, aqi, warn }: {
 function DI({ icon: ic, label, val }: { icon: string; label: string; val: string }) {
   return (
     <VStack spacing={2} alignment="center" frame={{ maxWidth: "infinity" }}>
-      <Image systemName={ic} frame={{ width: 16, height: 16 }} foregroundStyle="white" opacity={0.7} />
-      <Text font="caption" foregroundStyle="white" fontWeight="medium">{val}</Text>
-      <Text font="caption2" foregroundStyle="white" opacity={0.5}>{label}</Text>
+      <Image systemName={ic} frame={{ width: 16, height: 16 }} foregroundStyle="secondaryLabel" />
+      <Text font="caption" foregroundStyle="label" fontWeight="medium">{val}</Text>
+      <Text font="caption2" foregroundStyle="tertiaryLabel">{label}</Text>
     </VStack>
   )
 }
@@ -287,9 +280,8 @@ function DI({ icon: ic, label, val }: { icon: string; label: string; val: string
 interface AD { now: NW; daily: DF[]; hourly: HF[]; city: string; dist: string; str: string; aqi: AQ | null; warn: WW[] }
 
 function WV({ d }: { d: AD }) {
-  const bg = night() ? NIGHT_G : DAY_G
   return (
-    <VStack frame={{ maxWidth: "infinity", maxHeight: "infinity" }} background={bg}>
+    <VStack frame={{ maxWidth: "infinity", maxHeight: "infinity" }}>
       {Widget.family === "systemSmall" ? (
         <SW nw={d.now} ct={d.dist || d.city} />
       ) : Widget.family === "systemMedium" ? (
@@ -304,25 +296,25 @@ function WV({ d }: { d: AD }) {
 async function main() {
   const key = getApiKey()
   if (!key) {
-    Widget.present(<VStack spacing={8} alignment="center" frame={{ maxWidth: "infinity", maxHeight: "infinity" }} background={NIGHT_G} padding={20}>
+    Widget.present(<VStack spacing={8} alignment="center" frame={{ maxWidth: "infinity", maxHeight: "infinity" }} padding={20}>
       <Image systemName="key.fill" frame={{ width: 36, height: 36 }} foregroundStyle="systemOrange" />
-      <Text font="body" foregroundStyle="white" opacity={0.8} frame={{ maxWidth: "infinity", alignment: "center" }}>请先在配置页设置 API Key</Text>
+      <Text font="body" foregroundStyle="secondaryLabel" frame={{ maxWidth: "infinity", alignment: "center" }}>请先在配置页设置 API Key</Text>
     </VStack>)
     return
   }
   const loc = await gl()
   if (!loc) {
-    Widget.present(<VStack spacing={8} alignment="center" frame={{ maxWidth: "infinity", maxHeight: "infinity" }} background={NIGHT_G} padding={20}>
+    Widget.present(<VStack spacing={8} alignment="center" frame={{ maxWidth: "infinity", maxHeight: "infinity" }} padding={20}>
       <Image systemName="location.slash.fill" frame={{ width: 36, height: 36 }} foregroundStyle="systemRed" />
-      <Text font="body" foregroundStyle="white" opacity={0.8} frame={{ maxWidth: "infinity", alignment: "center" }}>无法获取位置</Text>
+      <Text font="body" foregroundStyle="secondaryLabel" frame={{ maxWidth: "infinity", alignment: "center" }}>无法获取位置</Text>
     </VStack>)
     return
   }
   const w = await fw(loc.s, key)
   if (!w) {
-    Widget.present(<VStack spacing={8} alignment="center" frame={{ maxWidth: "infinity", maxHeight: "infinity" }} background={NIGHT_G} padding={20}>
+    Widget.present(<VStack spacing={8} alignment="center" frame={{ maxWidth: "infinity", maxHeight: "infinity" }} padding={20}>
       <Image systemName="wifi.slash" frame={{ width: 36, height: 36 }} foregroundStyle="systemRed" />
-      <Text font="body" foregroundStyle="white" opacity={0.8} frame={{ maxWidth: "infinity", alignment: "center" }}>天气数据获取失败</Text>
+      <Text font="body" foregroundStyle="secondaryLabel" frame={{ maxWidth: "infinity", alignment: "center" }}>天气数据获取失败</Text>
     </VStack>)
     return
   }
