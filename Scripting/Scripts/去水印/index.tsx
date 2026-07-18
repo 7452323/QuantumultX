@@ -117,7 +117,10 @@ async function parseTwitter(url: string): Promise<MediaResult> {
   try {
     const tweetId = url.match(/status\/(\d+)/)?.[1]
     if (!tweetId) { result.error = '无法提取推文ID'; return result }
+
+    // ─── 策略 1: Twitter GraphQL API ─────────────────────
     try {
+      // 获取 guest token
       const guestResp = await fetch('https://x.com/', {
         headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' },
         timeout: 10
@@ -126,6 +129,7 @@ async function parseTwitter(url: string): Promise<MediaResult> {
       const guestToken = guestHtml.match(/cookie="gt=(\d+)/)?.[1]
         || guestHtml.match(/"gt=(\d+)/)?.[1]
         || guestHtml.match(/gt=(\d+)/)?.[1]
+
       if (guestToken) {
         const features = JSON.stringify({
           creator_subscriptions_tweet_preview_api_enabled: true,
@@ -157,6 +161,7 @@ async function parseTwitter(url: string): Promise<MediaResult> {
           tweetId, withCommunity: false, includePromotedContent: false, withVoice: false
         })
         const fieldToggles = JSON.stringify({ withArticleRichContentState: true, withArticlePlainText: false })
+
         const gqlUrl = `https://api.twitter.com/graphql/kPLTRmMnzbPTv70___D06w/TweetResultByRestId?variables=${encodeURIComponent(variables)}&features=${encodeURIComponent(features)}&fieldToggles=${encodeURIComponent(fieldToggles)}`
         const gqlResp = await fetch(gqlUrl, {
           headers: {
@@ -169,19 +174,25 @@ async function parseTwitter(url: string): Promise<MediaResult> {
           timeout: 12,
         })
         const gqlData = await gqlResp.json()
+
         if (!gqlData.errors) {
           const tweetResult = gqlData?.data?.tweetResult?.result
           const tweet = tweetResult?.tweet || tweetResult
           const legacy = tweet?.legacy
+
           if (legacy) {
+            // 提取文本
             const noteTweet = tweet?.note_tweet
             result.title = noteTweet?.note_tweet_results?.result?.text
               || legacy.full_text || ''
             result.title = (result.title || '').replace(/https?:\/\/t\.co\/[^\s,]+$/g, '').trim()
+
+            // 提取媒体
             const mediaEntities = legacy.entities?.media || legacy.extended_entities?.media || []
             for (const m of mediaEntities) {
               if (m.type === 'video' || m.type === 'animated_gif') {
                 const variants = m.video_info?.variants || []
+                // 选择最高码率的 mp4
                 const mp4s = variants.filter((v: any) => v.content_type === 'video/mp4' && v.url)
                 if (mp4s.length) {
                   mp4s.sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0))
@@ -202,7 +213,11 @@ async function parseTwitter(url: string): Promise<MediaResult> {
           }
         }
       }
-    } catch {}
+    } catch {
+      // GraphQL 失败 → 继续 fxtwitter
+    }
+
+    // ─── 策略 2: fxtwitter 备用 ──────────────────────────
     try {
       const resp = await fetch(`https://api.fxtwitter.com/status/${tweetId}`, {
         headers: { 'User-Agent': 'Mozilla/5.0' },
@@ -210,8 +225,10 @@ async function parseTwitter(url: string): Promise<MediaResult> {
       })
       const data = await resp.json()
       const tweet = data.tweet || data
+
       result.title = result.title || tweet.text || ''
       result.author = result.author || tweet.author?.screen_name || tweet.user_screen_name || ''
+
       const all = tweet.media?.all || tweet.media_extended || []
       for (const m of all) {
         if ((m.type === 'video' || m.type === 'gif') && m.url) {
@@ -226,7 +243,11 @@ async function parseTwitter(url: string): Promise<MediaResult> {
       }
       if (!result.video_url && tweet.mediaURLs?.length) result.video_url = tweet.mediaURLs[0]
       result.success = !!(result.video_url || result.images?.length)
-    } catch {}
+    } catch {
+      // fxtwitter 也失败
+    }
+
+    // ─── 策略 3: og:video 兜底 ───────────────────────────
     if (!result.success) {
       try {
         const pageResp = await fetch(url, {
