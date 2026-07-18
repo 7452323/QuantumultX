@@ -61,8 +61,8 @@ const D2 = ["明天", "后天", "大后天"]
 function DetailItem({ val, label }: { val: string; label: string }) {
   return (
     <VStack spacing={1} alignment="center" frame={{ maxWidth: "infinity" }}>
-      <Text font="caption2" foregroundStyle="white" fontWeight="medium">{val}</Text>
-      <Text font="caption2" foregroundStyle="white" opacity={0.4}>{label}</Text>
+      <Text font="caption2" foregroundStyle="label" fontWeight="medium">{val}</Text>
+      <Text font="caption2" foregroundStyle="label" opacity={0.4}>{label}</Text>
     </VStack>
   )
 }
@@ -119,31 +119,30 @@ function Page() {
           <VStack
             spacing={0}
             frame={{ maxWidth: "infinity" }}
-            background={n ? NIGHT_G : DAY_G}
             padding={{ top: 14, leading: 14, bottom: 12, trailing: 14 }}
           >
             <HStack frame={{ maxWidth: "infinity" }}>
-              <Text font="headline" foregroundStyle="white" fontWeight="medium">{city || "当前位置"}</Text>
+              <Text font="headline" foregroundStyle="label" fontWeight="medium">{city || "当前位置"}</Text>
               <Spacer />
-              <Text font="callout" foregroundStyle="white" opacity={0.8}>{nd.getFullYear()}年{nd.getMonth()+1}月{nd.getDate()}日 {D[nd.getDay()]}</Text>
+              <Text font="callout" foregroundStyle="label" opacity={0.8}>{nd.getFullYear()}年{nd.getMonth()+1}月{nd.getDate()}日 {D[nd.getDay()]}</Text>
             </HStack>
             <Spacer minLength={8} />
             <HStack spacing={10} frame={{ maxWidth: "infinity" }}>
-              <Image systemName={w ? icon(w.icon, n) : "sun.max.fill"} frame={{ width: 40, height: 40 }} foregroundStyle="white" />
+              <Image systemName={w ? icon(w.icon, n) : "sun.max.fill"} frame={{ width: 40, height: 40 }} foregroundStyle="label" />
               <HStack alignment="firstTextBaseline" spacing={0}>
-                <Text font={52} foregroundStyle="white" fontWeight="regular">{t !== null ? t : "--"}</Text>
-                <Text font={20} foregroundStyle="white" opacity={0.5}>°</Text>
+                <Text font={52} foregroundStyle="label" fontWeight="regular">{t !== null ? t : "--"}</Text>
+                <Text font={20} foregroundStyle="label" opacity={0.5}>°</Text>
               </HStack>
               <Spacer />
               <VStack spacing={0} alignment="trailing">
-                <Text font="title2" foregroundStyle="white" fontWeight="semibold">{w ? `${Math.round(parseFloat(w.tempMax))}°` : "--"}</Text>
-                <Text font="subheadline" foregroundStyle="white" opacity={0.6}>{w ? `${Math.round(parseFloat(w.tempMin))}°` : "--"}</Text>
+                <Text font="title2" foregroundStyle="label" fontWeight="semibold">{w ? `${Math.round(parseFloat(w.tempMax))}°` : "--"}</Text>
+                <Text font="subheadline" foregroundStyle="label" opacity={0.6}>{w ? `${Math.round(parseFloat(w.tempMin))}°` : "--"}</Text>
               </VStack>
             </HStack>
             <Spacer minLength={6} />
             {aqi ? (
               <HStack spacing={4} background={aqic(aqi.level)} padding={{ horizontal: 8, vertical: 2 }}>
-                <Text font="caption" foregroundStyle="white" fontWeight="bold">{aqi.aqi} · {aqi.category}</Text>
+                <Text font="caption" foregroundStyle="label" fontWeight="bold">{aqi.aqi} · {aqi.category}</Text>
                 <Spacer />
               </HStack>
             ) : null}
@@ -159,9 +158,9 @@ function Page() {
             <HStack spacing={0} frame={{ maxWidth: "infinity" }}>
               {hourly.slice(0, 6).map((h, i) => (
                 <VStack key={i} spacing={2} alignment="center" frame={{ maxWidth: "infinity" }}>
-                  <Text font="caption2" foregroundStyle="white" opacity={0.5}>{i === 0 ? "现在" : h.fxTime.slice(11, 13).replace(/^0/, "") + "时"}</Text>
-                  <Image systemName={icon(h.icon, n)} frame={{ width: 14, height: 14 }} foregroundStyle="white" opacity={0.8} />
-                  <Text font="caption2" foregroundStyle="white" fontWeight="medium">{Math.round(parseFloat(h.temp))}°</Text>
+                  <Text font="caption2" foregroundStyle="label" opacity={0.5}>{i === 0 ? "现在" : h.fxTime.slice(11, 13).replace(/^0/, "") + "时"}</Text>
+                  <Image systemName={icon(h.icon, n)} frame={{ width: 14, height: 14 }} foregroundStyle="label" opacity={0.8} />
+                  <Text font="caption2" foregroundStyle="label" fontWeight="medium">{Math.round(parseFloat(h.temp))}°</Text>
                 </VStack>
               ))}
             </HStack>
@@ -169,17 +168,17 @@ function Page() {
             <HStack spacing={0} frame={{ maxWidth: "infinity" }}>
               {daily.slice(1, 4).map((d, i) => (
                 <VStack key={i} spacing={2} alignment="center" frame={{ maxWidth: "infinity" }}>
-                  <Text font="caption2" foregroundStyle="white" opacity={0.7} fontWeight="medium">{D2[i]}</Text>
-                  <Image systemName={icon(d.iconDay, false)} frame={{ width: 16, height: 16 }} foregroundStyle="white" opacity={0.8} />
+                  <Text font="caption2" foregroundStyle="label" opacity={0.7} fontWeight="medium">{D2[i]}</Text>
+                  <Image systemName={icon(d.iconDay, false)} frame={{ width: 16, height: 16 }} foregroundStyle="label" opacity={0.8} />
                   <HStack spacing={3}>
-                    <Text font="caption2" foregroundStyle="white" opacity={0.45}>{Math.round(parseFloat(d.tempMin))}°</Text>
-                    <Text font="caption2" foregroundStyle="white" fontWeight="semibold">{Math.round(parseFloat(d.tempMax))}°</Text>
+                    <Text font="caption2" foregroundStyle="label" opacity={0.45}>{Math.round(parseFloat(d.tempMin))}°</Text>
+                    <Text font="caption2" foregroundStyle="label" fontWeight="semibold">{Math.round(parseFloat(d.tempMax))}°</Text>
                   </HStack>
                 </VStack>
               ))}
             </HStack>
             <Spacer minLength={4} />
-            <Text font="footnote" foregroundStyle="white" opacity={0.4} frame={{ maxWidth: "infinity", alignment: "center" }}>
+            <Text font="footnote" foregroundStyle="label" opacity={0.4} frame={{ maxWidth: "infinity", alignment: "center" }}>
               {loading ? "加载中…" : w ? w.text : "保存 API Key 后自动加载"}
             </Text>
           </VStack>
