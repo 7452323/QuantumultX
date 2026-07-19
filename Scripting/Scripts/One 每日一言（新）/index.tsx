@@ -83,22 +83,42 @@ function MainPage() {
             )}
 
             {/* 引言内容 */}
-            {article?.desc ? (
-              <VStack padding={{ horizontal: 16, vertical: 14 }} spacing={6}>
-                <Image systemName="quote.opening" font="title3" foregroundStyle="systemGray2" />
-                <Text font="body" fontWeight="medium" lineSpacing={4}>
-                  {article.desc}
-                </Text>
-                {article.author ? (
-                  <HStack>
-                    <Text font="caption" foregroundStyle="systemGray">— </Text>
-                    <Text font="caption" fontWeight="medium" foregroundStyle="systemGray">
-                      {article.author}
-                    </Text>
-                  </HStack>
-                ) : null}
-              </VStack>
-            ) : null}
+            {article?.desc ? (() => {
+              let mainColor: any = "label"
+              let subColor: any = "systemGray"
+              if (imgPath) {
+                const img = UIImage.fromFile(imgPath)
+                if (img) {
+                  const c = img.averageColor()
+                  if (c) {
+                    const lum = 0.2126 * c.red + 0.7152 * c.green + 0.0722 * c.blue
+                    if (lum > 0.6) {
+                      mainColor = "rgba(0,0,0,0.88)"
+                      subColor = "rgba(0,0,0,0.55)"
+                    } else {
+                      mainColor = "rgba(255,255,255,0.92)"
+                      subColor = "rgba(255,255,255,0.55)"
+                    }
+                  }
+                }
+              }
+              return (
+                <VStack padding={{ horizontal: 16, vertical: 14 }} spacing={6}>
+                  <Image systemName="quote.opening" font="title3" foregroundStyle={subColor} />
+                  <Text font="body" fontWeight="medium" lineSpacing={4} foregroundStyle={mainColor}>
+                    {article.desc}
+                  </Text>
+                  {article.author ? (
+                    <HStack>
+                      <Text font="caption" foregroundStyle={subColor}>— </Text>
+                      <Text font="caption" fontWeight="medium" foregroundStyle={subColor}>
+                        {article.author}
+                      </Text>
+                    </HStack>
+                  ) : null}
+                </VStack>
+              )
+            })() : null}
           </VStack>
         </Section>
 
@@ -146,6 +166,7 @@ function MainPage() {
 
 async function run() {
   await Navigation.present(<MainPage />)
+  Script.exit()
 }
 
 run()
