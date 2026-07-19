@@ -41,5 +41,5 @@
     "de" : "",
     "it" : ""
   },
-  "runInApp" : false
+  "runInApp" : true,
 }
