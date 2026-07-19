@@ -17,24 +17,25 @@ async function fetchArticle(): Promise<Article> {
   return { author: d.author || "", desc: d.desc || "", image: d.image || "" }
 }
 
-function brightness(img: UIImage): number | null {
-  const t = img.preparingThumbnail({ width: 1, height: 1 }); if (!t) return null
-  const png = t.toPNGBase64String(); if (!png) return null
-  const px = Data.fromBase64String(png)?.toIntArray(); if (!px || px.length < 4) return null
-  return Math.round(0.2126 * px[1] + 0.7152 * px[2] + 0.0722 * px[3])
+/** 自适应文字颜色 */
+function adaptiveTextColor(img: UIImage): { main: string; sub: string } {
+  const c = img.averageColor()
+  if (!c) return { main: "rgba(255,255,255,0.92)", sub: "rgba(255,255,255,0.55)" }
+  const lum = 0.2126 * c.red + 0.7152 * c.green + 0.0722 * c.blue
+  if (lum > 0.6) return { main: "rgba(0,0,0,0.88)", sub: "rgba(0,0,0,0.55)" }
+  return { main: "rgba(255,255,255,0.92)", sub: "rgba(255,255,255,0.55)" }
 }
 
-function OneWidget(props: { desc: string; author: string; filePath: string | null; bright: number | null }) {
+function OneWidget(props: { desc: string; author: string; bgImage: UIImage | null; textColor: string; subColor: string }) {
   const f = Widget.family
   const s = Widget.displaySize
   const sm = f === "systemSmall"
   const md = f === "systemMedium"
-  const light = props.bright != null && props.bright > 128
-  const tc = light ? "rgba(0,0,0,0.85)" : "rgba(255,255,255,0.92)"
-  const sc = light ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.55)"
+  const tc = props.textColor as any
+  const sc = props.subColor as any
   return (
     <ZStack>
-      {props.filePath ? <Image filePath={props.filePath} resizable scaleToFill frame={{ width: s.width, height: s.height }} /> : null}
+      {props.bgImage ? <Image image={props.bgImage} resizable scaleToFill frame={{ width: s.width, height: s.height }} /> : null}
       <VStack>
         <Text font={sm ? 8 : md ? 9 : 11} foregroundStyle={sc} padding={{ horizontal: sm ? 8 : 12, vertical: sm ? 4 : 6 }}>ONE · 每日一言</Text>
         <Spacer />
@@ -54,35 +55,37 @@ function OneWidget(props: { desc: string; author: string; filePath: string | nul
     const imgPath = `${dir}/one_bg_${day}.jpg`
     const metaPath = `${dir}/one_meta_${day}.json`
 
-    let filePath: string | null = null
-    let bright: number | null = null
+    let bgImage: UIImage | null = null
     let article: Article
 
     // 缓存命中
     if (await FileManager.exists(imgPath) && await FileManager.exists(metaPath)) {
       const meta = JSON.parse(await FileManager.readAsString(metaPath))
-      filePath = imgPath; bright = meta.bright; article = meta.article
+      bgImage = UIImage.fromFile(imgPath)
+      article = meta.article
     } else {
       article = await fetchArticle()
       if (article.image) {
-        // Worker 直接返回 data:image/jpeg;base64,... → 解码保存
         const b64 = article.image.split(",")[1] || article.image
         const raw = Data.fromBase64String(b64)
         if (raw) {
           const img = UIImage.fromData(raw)
           if (img) {
-            bright = brightness(img)
+            bgImage = img
             const ws = Widget.displaySize, sc = Device.screen.scale
             const thumb = img.preparingThumbnail({ width: Math.round(ws.width * sc), height: Math.round(ws.height * sc) })
-            if (thumb) { const jpg = thumb.toJPEGData(0.8); if (jpg) { try { await FileManager.remove(imgPath) } catch {}; await FileManager.writeAsData(imgPath, jpg); filePath = imgPath } }
+            if (thumb) { const jpg = thumb.toJPEGData(0.8); if (jpg) { try { await FileManager.remove(imgPath) } catch {}; await FileManager.writeAsData(imgPath, jpg) } }
           }
         }
       }
-      await FileManager.writeAsString(metaPath, JSON.stringify({ article, bright }))
+      await FileManager.writeAsString(metaPath, JSON.stringify({ article }))
     }
 
+    // 自适应文字颜色
+    const colors = bgImage ? adaptiveTextColor(bgImage) : { main: "rgba(255,255,255,0.92)", sub: "rgba(255,255,255,0.55)" }
+
     Widget.present(
-      <OneWidget desc={article.desc} author={article.author} filePath={filePath} bright={bright} />,
+      <OneWidget desc={article.desc} author={article.author} bgImage={bgImage} textColor={colors.main} subColor={colors.sub} />,
       { policy: "after", date: new Date(Date.now() + 4 * 3600 * 1000) }
     )
   } catch (e: unknown) {
