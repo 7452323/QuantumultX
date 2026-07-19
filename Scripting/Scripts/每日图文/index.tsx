@@ -25,12 +25,27 @@ async function fetchHitokoto(): Promise<Hitokoto> {
   return JSON.parse(await r.text())
 }
 
+const MAX_IMAGE_SIDE = 800
+const JPEG_QUALITY = 0.9
+
 /** 计算图片亮度 */
 function brightness(img: UIImage): number | null {
   const t = img.preparingThumbnail({ width: 1, height: 1 }); if (!t) return null
   const png = t.toPNGBase64String(); if (!png) return null
   const px = Data.fromBase64String(png)?.toIntArray(); if (!px || px.length < 4) return null
   return Math.round(0.2126 * px[1] + 0.7152 * px[2] + 0.0722 * px[3])
+}
+
+/** 缩放图片到最大边长限制 */
+function resizeImage(img: UIImage, maxSide: number): UIImage {
+  const w = img.width
+  const h = img.height
+  if (w <= maxSide && h <= maxSide) return img
+  const ratio = Math.min(maxSide / w, maxSide / h)
+  const newW = Math.round(w * ratio)
+  const newH = Math.round(h * ratio)
+  const thumb = img.preparingThumbnail({ width: newW, height: newH })
+  return thumb || img
 }
 
 /** 自适应文字颜色：深色背景→浅色文字，浅色背景→深色文字 */
@@ -83,14 +98,16 @@ function MainPage() {
       const imgData = await imgRes.data()
       if (!imgData) return { image: null, bright: null }
 
-      const img = UIImage.fromData(imgData)
-      if (!img) return { image: null, bright: null }
+      const original = UIImage.fromData(imgData)
+      if (!original) return { image: null, bright: null }
 
+      // 缩放到安全尺寸，避免 widget 内存溢出
+      const img = resizeImage(original, MAX_IMAGE_SIDE)
       const b = brightness(img)
 
       // 写入共享缓存（widget.tsx 读取同一文件）
       try {
-        const jpg = img.toJPEGData(0.75)
+        const jpg = img.toJPEGData(JPEG_QUALITY)
         if (jpg) {
           try { await FileManager.remove(cachePath) } catch {}
           await FileManager.writeAsData(cachePath, jpg)
@@ -207,7 +224,7 @@ function MainPage() {
     const dir = FileManager.appGroupDocumentsDirectory
     const fixedPath = `${dir}/daily_quote_fixed.jpg`
     try {
-      const jpg = bgImage.toJPEGData(0.8)
+      const jpg = bgImage.toJPEGData(JPEG_QUALITY)
       if (jpg) {
         try { await FileManager.remove(fixedPath) } catch {}
         await FileManager.writeAsData(fixedPath, jpg)
