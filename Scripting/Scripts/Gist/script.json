@@ -1,0 +1,47 @@
+{
+  "color" : "rgba(28, 140, 255,1)",
+  "runInApp" : false,
+  "remoteResource" : {
+    "url" : "",
+    "hash" : "a7bb7f17bf32571e0bb8b07da2c11778",
+    "autoUpdateInterval" : 600
+  },
+  "name" : "Gist",
+  "contributors" : [
+
+  ],
+  "iconImage" : null,
+  "intentInputTypes" : [
+
+  ],
+  "description" : null,
+  "version" : "1.0.0",
+  "icon" : "link",
+  "author" : {
+    "email" : null,
+    "homepage" : "https:\/\/github.com\/001ProMax",
+    "name" : "001"
+  },
+  "localizedNames" : {
+    "it" : "",
+    "zh" : "",
+    "ja" : "",
+    "de" : "",
+    "es" : "",
+    "en" : "",
+    "pt" : "",
+    "ru" : "",
+    "fr" : ""
+  },
+  "localizedDescriptions" : {
+    "pt" : "",
+    "it" : "",
+    "fr" : "",
+    "es" : "",
+    "zh" : "",
+    "ja" : "",
+    "de" : "",
+    "en" : "",
+    "ru" : ""
+  }
+}
