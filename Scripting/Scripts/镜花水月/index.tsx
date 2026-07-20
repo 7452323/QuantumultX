@@ -81,17 +81,335 @@ function pickBestUrl(urls?: string[]): string {
 function formatDuration(ms: number): string { const s = Math.floor(ms / 1000); const m = Math.floor(s / 60); return `${m}:${String(s % 60).padStart(2, "0")}` }
 function formatCount(n: number): string { if (n >= 10000) return (n / 10000).toFixed(1) + "w"; if (n >= 1000) return (n / 1000).toFixed(1) + "k"; return String(n) }
 
-// ─── 去水印 API 配置 ───
-const DEWATERMARK_APIS = [
-  { type: "jx", url: "https://apis.jxcxin.cn/api/douyin" },
-  { type: "hybrid", url: "http://47.116.14.174:8080" },
-  { type: "hybrid", url: "http://124.221.224.159:9000" },
-  { type: "hybrid", url: "http://129.154.217.183:9000" },
-]
-
 /** 从 aweme_id 构造抖音分享链接 */
 function getShareUrl(video: VideoInfo): string {
   return `https://www.douyin.com/video/${video.aweme_id}`
+}
+
+/**
+ * 安全解析 JSON（容错多种格式）
+ */
+function safeJSONParse(text: string | null | undefined): unknown | null {
+  if (!text) return null
+  const candidates = [
+    text,
+    text.trim(),
+    text.replace(/\u2028|\u2029/g, ""),
+    text.replace(/\\u002F/g, "/"),
+  ]
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate)
+      if (typeof parsed === "string") {
+        try { return JSON.parse(parsed) } catch { return parsed }
+      }
+      return parsed
+    } catch {}
+  }
+  return null
+}
+
+/**
+ * 从 aweme_detail 中提取无水印视频 URL
+ * 将 /playwm/ 替换为 /play/ 获取无水印版本
+ */
+function extractVideoUrlFromAweme(awemeDetail: any): string | null {
+  if (!awemeDetail?.video) return null
+  const video = awemeDetail.video
+  
+  // 优先使用 play_addr_h264 > play_addr > play_addr_265
+  let urlList = video.play_addr_h264?.url_list || []
+  if (!urlList.length) urlList = video.play_addr?.url_list || []
+  if (!urlList.length) urlList = video.play_addr_265?.url_list || []
+  
+  if (urlList.length > 0) {
+    // 取最高画质（最后一个）的 URL
+    let url = urlList[urlList.length - 1] || urlList[0]
+    // playwm → play 转换获取无水印版本
+    if (url.includes("/playwm/")) {
+      url = url.replace("/playwm/", "/play/")
+    }
+    return url
+  }
+  
+  // 尝试 bit_rate
+  if (video.bit_rate?.length > 0) {
+    for (const br of video.bit_rate) {
+      if (br.play_addr?.url_list?.length > 0) {
+        let url = br.play_addr.url_list[br.play_addr.url_list.length - 1]
+        if (url.includes("/playwm/")) {
+          url = url.replace("/playwm/", "/play/")
+        }
+        return url
+      }
+    }
+  }
+  
+  return null
+}
+
+/**
+ * 从 aweme_detail 中提取图片 URL 列表（图文作品）
+ */
+function extractImagesFromAweme(awemeDetail: any): string[] {
+  if (!awemeDetail?.images || !Array.isArray(awemeDetail.images)) return []
+  
+  const urls: string[] = []
+  for (const img of awemeDetail.images) {
+    if (img?.url_list?.length > 0) {
+      // 取最高画质（最后一个 HTTPS URL）
+      const httpsUrls = img.url_list.filter((u: string) => u.startsWith("https://"))
+      urls.push(httpsUrls.length > 0 ? httpsUrls[httpsUrls.length - 1] : img.url_list[0])
+    }
+  }
+  return urls
+}
+
+/**
+ * 从 _ROUTER_DATA 中提取 aweme_detail
+ * 支持多种嵌套结构：
+ * - loaderData.*.videoInfoRes.data.aweme_detail
+ * - loaderData.*.aweme_detail
+ * - 直接 aweme_detail
+ */
+function extractAwemeFromRouterData(routerData: any): any {
+  if (!routerData) return null
+  
+  // 直接包含 aweme_detail
+  if (routerData.aweme_detail) return routerData.aweme_detail
+  
+  // 从 loaderData 中提取
+  const loaderData = routerData.loaderData || {}
+  for (const key of Object.keys(loaderData)) {
+    const loader = loaderData[key]
+    if (!loader || typeof loader !== "object") continue
+    
+    // videoInfoRes 路径
+    if (loader.videoInfoRes?.data?.aweme_detail) {
+      return loader.videoInfoRes.data.aweme_detail
+    }
+    // 直接 aweme_detail
+    if (loader.aweme_detail) {
+      return loader.aweme_detail
+    }
+  }
+  
+  return null
+}
+
+/**
+ * 通过 WebView 加载抖音分享页面，解析 _ROUTER_DATA 获取无水印资源 URL
+ * 替代不稳定的第三方去水印 API
+ * 
+ * @param video 视频信息（需要 aweme_id）
+ * @param isImage 是否提取图片（可选，自动检测）
+ * @returns { url: 无水印URL, imageUrls: 图文作品的图片列表 }
+ */
+async function extractNoWatermarkUrl(
+  video: VideoInfo,
+  isImage?: boolean
+): Promise<{ url: string; imageUrls: string[] }> {
+  const shareUrl = getShareUrl(video)
+  const webView = new WebViewController({ ephemeral: true })
+  
+  try {
+    webView.setCustomUserAgent(MOBILE_UA)
+    await webView.loadURL(shareUrl)
+    await webView.waitForLoad()
+    // 等待 JS 渲染和数据加载
+    await sleep(3000)
+    
+    // 提取页面中的 _ROUTER_DATA 和 video 元素
+    const extracted = await webView.evaluateJavaScript<{
+      routerDataJSON: string | null
+      videoSrc: string | null
+      pageTitle: string
+    }>(`
+      (function() {
+        let routerDataJSON = null
+        try {
+          if (typeof window._ROUTER_DATA !== 'undefined') {
+            routerDataJSON = JSON.stringify(window._ROUTER_DATA)
+          }
+        } catch (e) {}
+        
+        let videoSrc = null
+        try {
+          var videoEl = document.querySelector('video')
+          if (videoEl) {
+            videoSrc = videoEl.currentSrc || videoEl.src || null
+          }
+        } catch (e) {}
+        
+        return {
+          routerDataJSON,
+          videoSrc,
+          pageTitle: document.title || ''
+        }
+      })()
+    `)
+    
+    // 解析 _ROUTER_DATA
+    if (extracted?.routerDataJSON) {
+      const routerData = safeJSONParse(extracted.routerDataJSON)
+      const awemeDetail = extractAwemeFromRouterData(routerData)
+      
+      if (awemeDetail) {
+        // 检测是否是图文作品
+        const hasImages = awemeDetail.images && awemeDetail.images.length > 0
+        const hasVideo = awemeDetail.video && (awemeDetail.video.play_addr || awemeDetail.video.play_addr_h264)
+        
+        // 提取图片
+        const imageUrls = extractImagesFromAweme(awemeDetail)
+        
+        // 如果是图文作品或明确要求图片，返回图片 URL
+        if ((isImage || (hasImages && !hasVideo)) && imageUrls.length > 0) {
+          return { url: imageUrls[0], imageUrls }
+        }
+        
+        // 提取视频 URL
+        const videoUrl = extractVideoUrlFromAweme(awemeDetail)
+        if (videoUrl) {
+          return { url: videoUrl, imageUrls }
+        }
+      }
+    }
+    
+    // 回退：使用页面 video 元素的 src
+    if (extracted?.videoSrc) {
+      let url = extracted.videoSrc
+      if (url.includes("/playwm/")) {
+        url = url.replace("/playwm/", "/play/")
+      }
+      return { url, imageUrls: [] }
+    }
+    
+    return { url: "", imageUrls: [] }
+  } finally {
+    webView.dispose()
+  }
+}
+
+/**
+ * 格式化字节数为人类可读格式
+ */
+function formatBytes(bytes: number): string {
+  if (bytes >= 1024 * 1024 * 1024) return (bytes / (1024 * 1024 * 1024)).toFixed(1) + "G"
+  if (bytes >= 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + "M"
+  if (bytes >= 1024) return (bytes / 1024).toFixed(0) + "K"
+  return bytes + "B"
+}
+
+/**
+ * 带实时进度的分块下载函数
+ * 使用 Range header 分块下载，每下载一块更新进度
+ * 如果服务器不支持 Range，回退到普通下载
+ */
+async function downloadWithProgress(
+  url: string,
+  headers: Record<string, string>,
+  onProgress: (downloaded: number, total: number) => void
+): Promise<Data> {
+  const CHUNK_SIZE = 1024 * 512 // 512KB 每块
+  
+  // 1. 先发起普通请求获取 Content-Length
+  const resp = await fetch(url, { headers })
+  if (!resp.ok) {
+    throw new Error(`下载 HTTP ${resp.status}`)
+  }
+  
+  // 尝试从 headers 获取 Content-Length
+  const contentLengthStr = resp.headers?.get?.("Content-Length") || resp.headers?.get?.("content-length")
+  const totalSize = contentLengthStr ? parseInt(contentLengthStr) : 0
+  
+  // 如果无法获取文件大小或服务器不支持 Range，回退普通下载
+  if (!totalSize) {
+    onProgress(0, 0)
+    const arrayBuf = await resp.arrayBuffer()
+    const data = Data.fromArrayBuffer(arrayBuf)
+    if (!data) throw new Error("下载数据转换失败")
+    onProgress(data.size, data.size)
+    return data
+  }
+  
+  // 2. 分块下载
+  const chunks: Data[] = []
+  let downloaded = 0
+  
+  while (downloaded < totalSize) {
+    const end = Math.min(downloaded + CHUNK_SIZE - 1, totalSize - 1)
+    const rangeHeader = { ...headers, Range: `bytes=${downloaded}-${end}` }
+    
+    const chunkResp = await fetch(url, { headers: rangeHeader })
+    if (!chunkResp.ok && chunkResp.status !== 206) {
+      // 服务器不支持 Range，回退普通下载
+      const arrayBuf = await resp.arrayBuffer()
+      const data = Data.fromArrayBuffer(arrayBuf)
+      if (!data) throw new Error("下载数据转换失败")
+      onProgress(data.size, data.size)
+      return data
+    }
+    
+    const chunkArrayBuf = await chunkResp.arrayBuffer()
+    const chunkData = Data.fromArrayBuffer(chunkArrayBuf)
+    if (!chunkData) throw new Error("分块数据转换失败")
+    
+    chunks.push(chunkData)
+    downloaded += chunkData.size
+    
+    // 更新进度
+    onProgress(downloaded, totalSize)
+    
+    // 防止 UI 更新过快，小延时
+    if (totalSize > 1024 * 1024) {
+      await sleep(50)
+    }
+  }
+  
+  // 3. 合并所有块
+  // 使用 ObjC 桥接合并 Data 数组
+  // 方案：将所有 chunk 转为 Uint8Array，然后合并
+  let totalBytes = 0
+  for (const c of chunks) {
+    totalBytes += c.size
+  }
+  
+  // 使用 writeToFile 然后 read 的方式
+  const tempPath = FileManager.documentsDirectory + `.download_tmp_${Date.now()}`
+  
+  // 逐块写入文件
+  for (let i = 0; i < chunks.length; i++) {
+    const chunk = chunks[i]
+    if (i === 0) {
+      // 第一块：创建新文件
+      // @ts-ignore
+      await FileManager.writeAsBytes(tempPath, chunk.toUint8Array())
+    } else {
+      // 后续块：追加到文件
+      const existing = await FileManager.readAsBytes(tempPath)
+      if (!existing) throw new Error("读取临时文件失败")
+      const chunkBytes = chunk.toUint8Array()
+      if (!chunkBytes) throw new Error("分块数据转换失败")
+      const newArray = new Uint8Array(existing.length + chunkBytes.length)
+      newArray.set(existing, 0)
+      newArray.set(chunkBytes, existing.length)
+      // @ts-ignore
+      await FileManager.writeAsBytes(tempPath, newArray)
+    }
+  }
+  
+  // 读取合并后的文件
+  const mergedBytes = await FileManager.readAsBytes(tempPath)
+  // @ts-ignore - Uint8Array.buffer 在某些情况下被标记为 nullable，但实际有值
+  const mergedData = Data.fromArrayBuffer(mergedBytes.buffer)
+  if (!mergedData) {
+    throw new Error("合并下载数据失败")
+  }
+  
+  // 清理临时文件
+  try { await FileManager.remove(tempPath) } catch {}
+  
+  return mergedData
 }
 
 /**
@@ -129,148 +447,26 @@ function ShareProgressView({ video, shareUrl, isImage, originalUrl, imageVideoUr
   useEffect(() => {
     ;(async () => {
       try {
-        // 步骤1：尝试去水印接口
+        // 步骤1：通过 WebView 解析抖音页面获取无水印资源
         setStep(1)
-        setProgressText("正在尝试去水印接口...")
-        
-        let targetUrl: string | null = null
+        setProgressText("正在解析抖音页面...")
         
         setApiStatus(prev => [...prev, `🔗 视频链接: ${shareUrl}`])
+        setApiStatus(prev => [...prev, `⏳ 正在加载页面并解析资源地址...`])
         
-        // 依次尝试4个接口，显示详细诊断
-        for (let i = 0; i < DEWATERMARK_APIS.length; i++) {
-          const api = DEWATERMARK_APIS[i]
-          setApiStatus(prev => [...prev, `⏳ 接口 ${i+1}/${DEWATERMARK_APIS.length} 尝试中...`])
-          
-          try {
-            let requestUrl: string
-            if (api.type === "jx") {
-              requestUrl = `${api.url}?url=${encodeURIComponent(shareUrl)}`
-            } else {
-              requestUrl = `${api.url}/api/hybrid/video_data?url=${encodeURIComponent(shareUrl)}&minimal=false`
-            }
-            
-            setApiStatus(prev => [...prev, `  请求: ${requestUrl.substring(0, 80)}...`])
-            
-            const resp = await fetch(requestUrl, {
-              headers: { "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15" }
-            })
-            
-            const statusText = `  HTTP ${resp.status} ${resp.statusText}`
-            setApiStatus(prev => [...prev, statusText])
-            
-            if (!resp.ok) {
-              setApiStatus(prev => [...prev, `  ❌ HTTP 状态码错误`])
-              continue
-            }
-            
-            const rawText = await resp.text()
-            let json: any
-            try { json = JSON.parse(rawText) } catch {
-              setApiStatus(prev => [...prev, `  ❌ JSON 解析失败，返回不是 JSON`])
-              continue
-            }
-            
-            // 检查 detail 错误响应（Douyin_TikTok_Download_API 的错误格式）
-            if (json.detail) {
-              const errCode = json.detail.code || "?"
-              const errMsg = json.detail.message || JSON.stringify(json.detail).substring(0, 100)
-              setApiStatus(prev => [...prev, `  ❌ API 错误 [${errCode}]: ${errMsg}`])
-              continue
-            }
-            
-            // 宽松检查 code
-            const respCode = json.code
-            const codeOk = respCode === 200 || respCode === "200" || Number(respCode) === 200
-            
-            if (!codeOk) {
-              setApiStatus(prev => [...prev, `  ❌ 返回 code=${respCode}，期待 200`])
-              continue
-            }
-            
-            if (!json.data) {
-              setApiStatus(prev => [...prev, `  ❌ 返回无 data 字段`])
-              continue
-            }
-            
-            // --- 提取无水印 URL ---
-            let extractedUrl: string | null = null
-            
-            if (api.type === "jx") {
-              // apis.jxcxin.cn: data.url
-              if (json.data.url) {
-                extractedUrl = json.data.url
-              } else {
-                setApiStatus(prev => [...prev, `  ❌ data 格式不符，无 url 字段`])
-                continue
-              }
-            } else {
-              // Douyin_TikTok_Download_API hybrid 接口
-              // 实际返回结构是 aweme_detail 的原始数据，在 data 顶层：
-              // data.video.play_addr.url_list[] — 视频
-              // data.images[].url_list[] — 图文
-              // 也可能有 data.aweme_detail.video.play_addr.url_list[] 嵌套
-              // 或 data.video_data.play_addr.url_list[]
-              const vd = json.data
-              
-              // 根据 isImage 分开提取视频/图片路径，避免图文作品误取视频 URL
-              if (isImage) {
-                // 图片：只看图片路径
-                const imagePaths = [
-                  () => vd.images?.[0]?.url_list,
-                  () => vd.image_data?.[0]?.url_list,
-                  () => vd.aweme_detail?.images?.[0]?.url_list,
-                ]
-                for (const getList of imagePaths) {
-                  try {
-                    const list = getList()
-                    if (list?.length > 0) {
-                      extractedUrl = list[list.length - 1]
-                      break
-                    }
-                  } catch {}
-                }
-              } else {
-                // 视频：只看视频路径
-                const videoPaths = [
-                  () => vd.video?.play_addr?.url_list,
-                  () => vd.video_data?.play_addr?.url_list,
-                  () => vd.aweme_detail?.video?.play_addr?.url_list,
-                  () => vd.aweme_detail?.video_data?.play_addr?.url_list,
-                ]
-                for (const getList of videoPaths) {
-                  try {
-                    const list = getList()
-                    if (list?.length > 0) {
-                      extractedUrl = list[list.length - 1]
-                      break
-                    }
-                  } catch {}
-                }
-              }
-              
-              if (extractedUrl) {
-                // 成功
-              } else {
-                const dataStr = JSON.stringify(vd).substring(0, 300)
-                setApiStatus(prev => [...prev, `  ❌ 未找到视频/图片 URL，data 结构: ${dataStr}`])
-                continue
-              }
-            }
-            
-            if (extractedUrl) {
-              targetUrl = extractedUrl
-              setApiStatus(prev => [...prev, `  ✅ 接口 ${i+1} 成功！`])
-              break
-            }
-          } catch (e: any) {
-            setApiStatus(prev => [...prev, `  ❌ 异常: ${e.message || e}`])
-          }
-        }
+        // 使用 WebView 解析抖音页面内嵌数据（不依赖第三方 API）
+        const result = await extractNoWatermarkUrl(video, isImage)
         
+        setApiStatus(prev => [...prev, `📋 解析完成，URL 长度: ${result.url.length} 字符`] )
+        
+        let targetUrl = result.url || ""
+        
+        // 如果解析失败，回退到原始地址
         if (!targetUrl) {
-          setApiStatus(prev => [...prev, `⚠️ 所有去水印接口失败，回退原始地址`])
+          setApiStatus(prev => [...prev, `⚠️ 页面解析未获取到无水印地址，回退原始地址`])
           targetUrl = originalUrl
+        } else {
+          setApiStatus(prev => [...prev, `✅ 获取到无水印地址${result.imageUrls.length > 0 ? "（图文作品，共 " + result.imageUrls.length + " 张）" : ""}`])
         }
         
         if (!targetUrl) {
@@ -298,24 +494,37 @@ function ShareProgressView({ video, shareUrl, isImage, originalUrl, imageVideoUr
         
         setApiStatus(prev => [...prev, `📦 文件名: ${fileName}${isGif ? " (检测到 GIF 动图)" : ""}`])
         
-        // 用 fetch + Data + FileManager 下载（绕过不存在的 download 函数）
-        setApiStatus(prev => [...prev, `📥 开始下载...`])
+        // 步骤2：带实时进度的分块下载
+        setApiStatus(prev => [...prev, `📥 开始下载（分块获取实时进度）...`])
         
-        const downloadResp = await fetch(downloadUrl, {
-          headers: { "User-Agent": MOBILE_UA }
-        })
-        if (!downloadResp.ok) {
-          throw new Error(`下载 HTTP ${downloadResp.status}`)
-        }
+        // 使用分块下载获取实时进度（512KB/块）
+        const data = await downloadWithProgress(
+          downloadUrl,
+          { "User-Agent": MOBILE_UA },
+          (downloaded, total) => {
+            if (total > 0) {
+              // 有总大小时显示 "36.5/50.0 M" 格式
+              setProgressText(`${formatBytes(downloaded)}/${formatBytes(total)}`)
+              setApiStatus(prev => {
+                // 只更新最后一条状态，避免日志过多
+                const last = prev[prev.length - 1]
+                if (last?.startsWith("📊")) {
+                  return [...prev.slice(0, -1), `📊 ${formatBytes(downloaded)}/${formatBytes(total)} (${(downloaded / total * 100).toFixed(0)}%)`]
+                }
+                return [...prev, `📊 ${formatBytes(downloaded)}/${formatBytes(total)} (${(downloaded / total * 100).toFixed(0)}%)`]
+              })
+            } else {
+              // 无总大小时显示已下载量
+              setProgressText(`已下载 ${formatBytes(downloaded)}`)
+            }
+          }
+        )
         
-        setProgressText("正在下载... 接收数据中")
-        const arrayBuf = await downloadResp.arrayBuffer()
-        const data = Data.fromArrayBuffer(arrayBuf)
         if (!data) {
-          throw new Error("将下载数据转换为 Data 失败")
+          throw new Error("下载数据为空")
         }
         
-        setProgressText(`正在下载... ${data.size} 字节`)
+        setApiStatus(prev => [...prev, `📥 下载完成，共 ${formatBytes(data.size)}`])
         
         // 如果下载后发现是 GIF（magic bytes 检测），修正扩展名
         const actuallyGif = isGif || isGifData(data)
