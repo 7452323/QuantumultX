@@ -3,7 +3,7 @@ import { VStack, ZStack, Text, Image, Spacer, Widget, fetch } from "scripting"
 
 const IMG_API = "https://imgapi.cn/cos.php"
 const HITOKOTO_API = "https://v1.hitokoto.cn"
-const MAX_IMAGE_SIDE = 800  // 限制最长边，避免 widget 内存溢出
+const MAX_IMAGE_SIDE = 1200 // 限制最长边，覆盖 @3x 大屏需求，避免 widget 内存溢出
 const JPEG_QUALITY = 0.9    // 高质量缓存，接近无损
 
 function today(): string {
