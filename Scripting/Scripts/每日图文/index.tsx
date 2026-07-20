@@ -25,7 +25,7 @@ async function fetchHitokoto(): Promise<Hitokoto> {
   return JSON.parse(await r.text())
 }
 
-const MAX_IMAGE_SIDE = 800
+const MAX_IMAGE_SIDE = 1200
 const JPEG_QUALITY = 0.9
 
 /** 计算图片亮度 */
