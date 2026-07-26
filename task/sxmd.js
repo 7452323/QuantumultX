@@ -1,5 +1,6 @@
 /*
 书香门第论坛签到 — www.txtnovel.vip
+Surge/QX 通用版
 
 Cookie 变量名：sxmd_data
 单账号
@@ -66,18 +67,32 @@ function ts() {
     'Accept-Language': 'zh-CN,zh;q=0.9'
   };
 
-  // 1. 访问签到页获取 formhash 和用户名
+  // 1. 访问签到页获取 formhash 和 uid
   $.log('步骤1: 访问签到页');
   const pageRes = await httpGet(`${BASE_URL}/plugin.php?id=dsu_paulsign:sign`, commonHeaders);
   const pageBody = pageRes.body || '';
   const formhashMatch = pageBody.match(/name="formhash" value="([^"]+)"/);
   const formhash = formhashMatch ? formhashMatch[1] : '';
 
-  // 提取用户名
+  // 从页面链接提取 uid（如 space&amp;uid=6149）
+  const uidMatch = pageBody.match(/uid=(\d+)/);
+  const uid = uidMatch ? uidMatch[1] : '';
+
+  // 获取用户名（从个人资料页）
   let nickname = '';
-  const nameMatch = pageBody.match(/欢迎\s+<strong>([^<]+)<\/strong>/) || pageBody.match(/<span class="vwmy">([^<]+)<\/span>/) || pageBody.match(/uid\.php\?username=([^"&]+)/);
-  if (nameMatch) nickname = nameMatch[1];
-  if (!nickname) nickname = 'txtnovel';
+  if (uid) {
+    const profileRes = await httpGet(`${BASE_URL}/home.php?mod=space&uid=${uid}`, commonHeaders);
+    const profileBody = profileRes.body || '';
+    // 标题格式: "flyker的个人资料 - 书香门第 - 手机版"
+    const titleMatch = profileBody.match(/<title>([^<]+)<\/title>/);
+    if (titleMatch) {
+      const title = titleMatch[1];
+      const atIdx = title.indexOf('的');
+      if (atIdx > 0) nickname = title.substring(0, atIdx);
+    }
+  }
+  if (!nickname) nickname = uid ? `UID ${uid}` : 'txtnovel';
+  $.log(`用户: ${nickname} (uid: ${uid})`);
 
   if (!formhash) {
     $.log('❌ 未获取到 formhash');
@@ -86,7 +101,7 @@ function ts() {
     $.done();
     return;
   }
-  $.log(`formhash: ${formhash}, 用户: ${nickname}`);
+  $.log(`formhash: ${formhash}`);
 
   // 2. POST 签到
   $.log('步骤2: 执行签到');
@@ -101,20 +116,41 @@ function ts() {
     `formhash=${formhash}&qdxq=kx`
   );
   const signBody = signRes.body || '';
-  $.log(`签到响应(前500): ${signBody.substring(0, 500)}`);
+  if (DEBUG) $.log(`签到响应(长度: ${signBody.length}): ${signBody.substring(0, 800)}`);
 
   // 3. 解析结果
   let notifyBody;
-  const t = ts();
+  let isRepeat = false;
 
-  if (signBody.includes('签到成功') || signBody.includes('已经签到') || signBody.includes('今日已经签到')) {
-    let totalCoin = '?', gainedCoin = '?';
-    const totalMatch = signBody.match(/总奖励为:金币\s*(\d+)\s*枚/);
-    const gainedMatch = signBody.match(/获得随机奖励\s*金币\s*(\d+)\s*枚/) || signBody.match(/今日签到获得随机奖励\s*金币\s*(\d+)\s*枚/);
-    if (totalMatch) totalCoin = totalMatch[1];
-    if (gainedMatch) gainedCoin = gainedMatch[1];
+  if (signBody.includes('已经签到') || signBody.includes('今日已经签到')) {
+    // 已经签到过：重复签到
+    isRepeat = true;
+    $.log('ℹ️ 今日已签到（重复签到）');
+  }
 
-    $.log(`✅ 签到成功`);
+  // 提取金币信息
+  let totalCoin = '?', gainedCoin = '?';
+
+  // 总奖励
+  const totalMatch = signBody.match(/总奖励.{0,10}金币\s*(\d+)\s*枚/);
+  if (totalMatch) totalCoin = totalMatch[1];
+
+  // 随机奖励（本次获得）
+  const gainedMatch = signBody.match(/获得随机奖励\s*金币\s*(\d+)\s*枚/) || signBody.match(/随机奖励\s*金币\s*(\d+)\s*枚/);
+  if (gainedMatch) gainedCoin = gainedMatch[1];
+
+  // 尝试从页面查找当前积分（用于重复签到场景）
+  if (isRepeat && totalCoin === '?') {
+    // 在签到页查找当前积分
+    const creditMatch = pageBody.match(/金币.?(\d+)/) || signBody.match(/金币.?(\d+)/);
+    if (creditMatch) totalCoin = creditMatch[1];
+  }
+
+  if (isRepeat) {
+    $.log(`✅ 重复签到，总金币: ${totalCoin}`);
+    notifyBody = `「${nickname}」重复签到 ${totalCoin}`;
+  } else if (signBody.includes('签到成功')) {
+    $.log(`✅ 签到成功，总金币: ${totalCoin}，本次: ${gainedCoin}`);
     notifyBody = `「${nickname}」签到成功 ${totalCoin}+${gainedCoin}`;
   } else {
     const err = signBody.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().substring(0, 200);
