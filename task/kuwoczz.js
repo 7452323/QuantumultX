@@ -1,6 +1,5 @@
 /*
 酷我音乐 每日任务 — integralapi.kuwo.cn
-Surge/QX 通用版
 
 Cookie 变量名：kuwo_data
 多账号用 & 分隔
@@ -9,7 +8,7 @@ Cookie 变量名：kuwo_data
 ^https?:\/\/integralapi\.kuwo\.cn\/api\/v1\/online\/sign\/v1\/music\/userBase url script-request-header https://raw.githubusercontent.com/7452323/QuantumultX/main/task/kuwoczz.js
 
 [task_local]
-30 8 * * * https://raw.githubusercontent.com/7452323/QuantumultX/main/task/kuwoczz.js, tag=酷我音乐(每日任务), enabled=true
+30 8-16/2 * * * https://raw.githubusercontent.com/7452323/QuantumultX/main/task/kuwoczz.js, tag=酷我音乐(每日任务), enabled=true
 
 [MITM]
 hostname = integralapi.kuwo.cn
