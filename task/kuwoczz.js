@@ -1,8 +1,8 @@
 /*
-酷我音乐 每日任务 — integralapi.kuwo.cn
-Surge/QX 通用版
+酷我音乐 每日任务 
 
 Cookie 变量名：kuwo_data
+
 多账号用 & 分隔
 
 [rewrite_local]
