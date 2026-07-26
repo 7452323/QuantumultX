@@ -1,8 +1,8 @@
 /*
-酷我音乐 每日任务 
+酷我音乐 每日任务 — integralapi.kuwo.cn
+Surge/QX 通用版
 
 Cookie 变量名：kuwo_data
-
 多账号用 & 分隔
 
 [rewrite_local]
@@ -156,22 +156,35 @@ function handleCookie() {
     }
     await rwait(1000, 3000);
 
-    // 3. 创意视频
+    // 3. 创意视频 — 分次执行（cron 跑 5 次，每次 1 个视频）
     if (true) {
       const t = st('advert');
-      const total = t?.total || 5;
+      const total = 5;
+      const progKey = `kuwo_video_${uid}`;
+      let done = parseInt($.getdata(progKey) || '0');
+
+      if (done >= total) done = 0; // 防溢出
+
       if (t && t.status === 1) {
-        res[`视频 ${total}/${total}`] = '✓';
-        $.log(`视频: ✅ 已完成 ${total}/${total}`);
+        // 已全部完成
+        done = total;
+        $.setdata(String(done), progKey);
+        res[`视频 ${done}/${total}`] = '✓';
+        $.log(`视频: ✅ 已完成 ${done}/${total}`);
       } else {
-        let okCnt = 0;
-        for (let i = 0; i < total; i++) {
-          await doListen(uid, sid, 'videoadver', 58);
-          okCnt++;
-          await rwait(2000, 5000);
+        // 执行 1 个视频
+        await doListen(uid, sid, 'videoadver', 58);
+        done++;
+        $.setdata(String(done), progKey);
+        $.log(`视频: ✅ 第 ${done}/${total} 次`);
+
+        if (done >= total) {
+          // 满 5 次领奖
+          const advOk = await finishTask(uid, sid, 'advert', 10);
+          res[`视频 ${done}/${total}`] = advOk ? '✓' : '✗';
+        } else {
+          res[`视频 ${done}/${total}`] = '✓';
         }
-        const advOk = await finishTask(uid, sid, 'advert', 10);
-        res[`视频 ${okCnt}/${total}`] = advOk ? '✓' : '✗';
       }
       logTime.push(ts());
     }
