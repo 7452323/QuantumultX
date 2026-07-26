@@ -1,6 +1,5 @@
 /*
 书香门第论坛签到 — www.txtnovel.vip
-Surge/QX 通用版
 
 Cookie 变量名：sxmd_data
 单账号
