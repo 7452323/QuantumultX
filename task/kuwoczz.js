@@ -2,7 +2,7 @@
 酷我音乐 每日任务 — integralapi.kuwo.cn
 Surge/QX 通用版
 
-Cookie 变量名：kuwo_uid_sid
+Cookie 变量名：kuwo_data
 多账号用 & 分隔
 
 [rewrite_local]
@@ -16,7 +16,7 @@ hostname = integralapi.kuwo.cn
 */
 
 const API = 'https://integralapi.kuwo.cn';
-const KEY = 'kuwo_uid_sid';
+const KEY = 'kuwo_data';
 const SEP = '&';  // 多账号分隔符
 
 let $ = typeof $environment !== 'undefined' ? new Env('酷我音乐') : null;
