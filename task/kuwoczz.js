@@ -1,20 +1,19 @@
-// ==UserScript==
-// @name         酷我音乐·每日任务
-// @namespace    kuwo_daily
-// @version      1.2.0
-// @description  签到+评论+看视频 三合一
-// @author       Hermes
-// ==/UserScript==
-//
-// Cookie 采集 + cron 任务
-//
-// Surge 配置:
-// [Script]
-// 酷我音乐采集 = type=http-request, pattern=^https?:\/\/integralapi\.kuwo\.cn\/api\/v1\/online\/sign\/v1\/music\/userBase, script-path=kuwoczz.js
-// 酷我每日任务 = type=cron, cronexp=0 8 * * *, script-path=kuwoczz.js
-//
-// [MITM]
-// hostname = integralapi.kuwo.cn
+/*
+酷我音乐 每日任务 — integralapi.kuwo.cn
+Surge/QX 通用版
+
+Cookie 变量名：kuwo_uid_sid
+多账号用 & 分隔
+
+[rewrite_local]
+^https?:\/\/integralapi\.kuwo\.cn\/api\/v1\/online\/sign\/v1\/music\/userBase url script-request-header https://raw.githubusercontent.com/7452323/QuantumultX/main/task/kuwoczz.js
+
+[task_local]
+30 8 * * * https://raw.githubusercontent.com/7452323/QuantumultX/main/task/kuwoczz.js, tag=酷我音乐(每日任务), enabled=true
+
+[MITM]
+hostname = integralapi.kuwo.cn
+*/
 
 const API = 'https://integralapi.kuwo.cn';
 const KEY = 'kuwo_uid_sid';
