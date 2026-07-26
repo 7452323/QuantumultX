@@ -1,5 +1,6 @@
 /*
 书香门第论坛签到 — www.txtnovel.vip
+Surge/QX 通用版
 
 Cookie 变量名：sxmd_data
 单账号
@@ -115,7 +116,7 @@ function ts() {
     `formhash=${formhash}&qdxq=kx`
   );
   const signBody = signRes.body || '';
-  if (DEBUG) $.log(`签到响应(长度: ${signBody.length}): ${signBody.substring(0, 800)}`);
+  $.log(`签到响应(长度: ${signBody.length}): ${signBody.substring(0, 500)}`);
 
   // 3. 解析结果
   let notifyBody;
@@ -128,21 +129,27 @@ function ts() {
   }
 
   // 提取金币信息
+  // 签到页 HTML: 总奖励为:金币 <font color=#ff00cc><b>892</b></font> 枚 , 上次获得的奖励为:金币 <font color=#ff00cc><b>2</b></font> 枚
   let totalCoin = '?', gainedCoin = '?';
 
-  // 总奖励
-  const totalMatch = signBody.match(/总奖励.{0,10}金币\s*(\d+)\s*枚/);
-  if (totalMatch) totalCoin = totalMatch[1];
+  // 从页面提取总金币（标签内有数字：总奖励...<b>892</b>）
+  const pageTotalMatch = pageBody.match(/总奖励.{0,100}?<b[^>]*>(\d+)<\/b>/);
+  if (pageTotalMatch) totalCoin = pageTotalMatch[1];
 
-  // 随机奖励（本次获得）
-  const gainedMatch = signBody.match(/获得随机奖励\s*金币\s*(\d+)\s*枚/) || signBody.match(/随机奖励\s*金币\s*(\d+)\s*枚/);
-  if (gainedMatch) gainedCoin = gainedMatch[1];
+  // 从页面提取上次获得的奖励
+  const pageGainedMatch = pageBody.match(/上次获得.{0,50}?<b[^>]*>(\d+)<\/b>/);
+  if (pageGainedMatch) gainedCoin = pageGainedMatch[1];
 
-  // 尝试从页面查找当前积分（用于重复签到场景）
-  if (isRepeat && totalCoin === '?') {
-    // 在签到页查找当前积分
-    const creditMatch = pageBody.match(/金币.?(\d+)/) || signBody.match(/金币.?(\d+)/);
-    if (creditMatch) totalCoin = creditMatch[1];
+  // 如果签到了，也尝试从响应中取（可能更新了）
+  const respTotalMatch = signBody.match(/总奖励.{0,100}?<b[^>]*>(\d+)<\/b>/);
+  if (respTotalMatch) totalCoin = respTotalMatch[1];
+  const respGainedMatch = signBody.match(/上次获得.{0,50}?<b[^>]*>(\d+)<\/b>/);
+  if (respGainedMatch) gainedCoin = respGainedMatch[1];
+
+  // 如果还是找不到，从 profile 页积分取
+  if (totalCoin === '?') {
+    const profileCreditMatch = profileBody.match(/金币<\/em>(\d+)/) || profileBody.match(/积分.*?(\d+)/);
+    if (profileCreditMatch) totalCoin = profileCreditMatch[1];
   }
 
   if (isRepeat) {
