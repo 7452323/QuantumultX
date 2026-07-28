@@ -71,6 +71,7 @@ function saveAuth() {
     if (key === 'user-agent') auth.ua = h[k];
   }
   $.setdata(JSON.stringify(auth), AUTH_KEY);
+  $.msg('WeRead', '凭证已采集', `vid=${vid}\nskey=${skey.substring(0,8)}...`);
   $.log('[WeRead] auth saved');
 }
 
