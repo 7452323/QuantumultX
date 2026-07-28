@@ -88,6 +88,7 @@ async function fetchNickname(auth) {
       'vid': auth.vid,
       'skey': auth.skey,
       'User-Agent': auth.ua || 'WeRead/7.0.0 WRBrand/huawei Dalvik/2.1.0',
+      'v': '7.4.2.23',
       'Content-Type': 'application/json'
     };
     const resp = await get('https://i.weread.qq.com/user/profile', headers);
