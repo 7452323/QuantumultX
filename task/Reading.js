@@ -11,7 +11,7 @@
 ^https?:\/\/i\.weread\.qq\.com\/ url script-request-header https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading.js
 
 [task_local]
- * 0 9 * * * https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading.js, tag=微信读书(每日领奖励), enabled=true
+0 9 * * * https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading.js, tag=微信读书(每日领奖励), enabled=true
 
 [MITM]
 hostname = i.weread.qq.com
