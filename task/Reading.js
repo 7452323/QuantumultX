@@ -8,10 +8,10 @@
  * 备用：web cookie 模式，通过 /web/login/renewal 刷新
  * 
  * [rewrite_local]
- * ^https?:\/\/i\.weread\.qq\.com\/ url script-request-header https://raw.githubusercontent.com/7452323/QuantumultX/main/task/weread_auto_claim.js
+ * ^https?:\/\/i\.weread\.qq\.com\/ url script-request-header https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading.js
  * 
  * [task_local]
- * 0 9 * * * https://raw.githubusercontent.com/7452323/QuantumultX/main/task/weread_auto_claim.js, tag=微信读书(每日领奖励), enabled=true
+ * 0 9 * * * https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading.js, tag=微信读书(每日领奖励), enabled=true
  * 
  * [MITM]
  * hostname = i.weread.qq.com

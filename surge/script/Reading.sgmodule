@@ -6,8 +6,8 @@
 #!arguments-desc=\n1️⃣ choiceType\n\n1=体验卡, 2=书币\n默认为体验卡\n\n2️⃣ cron\n\n定时运行\n默认10 23 * * 7\n\n3️⃣ Cookie\n\n获取ck开关\n0=关闭, 1=打开\n默认为打开\n\n
 
 [Script]
-微信读书 = type=cron, cronexp="{{{cron}}}", wake-system=1, timeout=60, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/weread_auto_claim.js, argument="choiceType={{{choiceType}}}&Cookie={{{Cookie}}}"
-微信读书_cookie = type=http-request, pattern=^https?://i\.weread\.qq\.com/, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/weread_auto_claim.js, requires-body=1
+微信读书 = type=cron, cronexp="{{{cron}}}", wake-system=1, timeout=60, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading.js, argument="choiceType={{{choiceType}}}&Cookie={{{Cookie}}}"
+微信读书_cookie = type=http-request, pattern=^https?://i\.weread\.qq\.com/, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading.js, requires-body=1
 
 [MITM]
 hostname = %APPEND% i.weread.qq.com
