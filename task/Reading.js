@@ -61,6 +61,9 @@ async function saveAuth() {
   if (!vid || !skey) return;
 
   const existing = getAuth();
+  // 保留已有的 refreshToken
+  const existingToken = existing?.refreshToken || '';
+
   if (existing && existing.vid === vid && existing.skey === skey) return;
 
   const auth = { vid, skey };
@@ -70,6 +73,8 @@ async function saveAuth() {
     if (key === 'channelid') auth.channelid = h[k];
     if (key === 'user-agent') auth.ua = h[k];
   }
+  if (existingToken) auth.refreshToken = existingToken;
+
   const nickname = await fetchNickname(auth);
   if (nickname) auth.nickname = nickname;
   $.setdata(JSON.stringify(auth), AUTH_KEY);
@@ -114,11 +119,16 @@ async function runClaim() {
   let result = await claimWithApp(auth);
   
   if (!result.success && result.needRefresh) {
-    const newSkey = await refreshWebCookie(auth.vid);
-    if (newSkey) {
-      auth.skey = newSkey;
-      $.setdata(JSON.stringify(auth), AUTH_KEY);
-      result = await claimWithApp(auth);
+    const newAuth = await refreshAppAuth(auth);
+    if (newAuth) {
+      result = await claimWithApp(newAuth);
+    } else {
+      const newSkey = await refreshWebCookie(auth.vid);
+      if (newSkey) {
+        auth.skey = newSkey;
+        $.setdata(JSON.stringify(auth), AUTH_KEY);
+        result = await claimWithApp(auth);
+      }
     }
   }
 
@@ -198,6 +208,39 @@ async function claimWithApp(auth) {
     before,
     detail: claimed > 0 ? `+${claimed}个` : '暂无可领取'
   };
+}
+
+/* ======== APP 凭证刷新（refreshToken） ======== */
+async function refreshAppAuth(auth) {
+  try {
+    const body = JSON.stringify({
+      deviceId: '1',
+      refCgi: '',
+      refreshToken: auth.refreshToken || ''
+    });
+    const res = await post(APP_API + '/login', body, {
+      'User-Agent': auth.ua || 'WeRead/7.0.0 WRBrand/huawei Dalvik/2.1.0',
+      'Content-Type': 'application/json'
+    });
+
+    if (res.status !== 200) return null;
+
+    const data = JSON.parse(res.body);
+    if (data.errcode !== 0 || !data.data) return null;
+
+    const d = data.data;
+    auth.vid = d.vid;
+    auth.skey = d.skey;
+    if (d.refreshToken) auth.refreshToken = d.refreshToken;
+    if (d.user?.name) auth.nickname = d.user.name;
+
+    $.setdata(JSON.stringify(auth), AUTH_KEY);
+    $.log('[WeRead] auth refreshed');
+    return auth;
+  } catch (e) {
+    $.log('[WeRead] refresh error: ' + e.message);
+    return null;
+  }
 }
 
 /* ======== Web Cookie 刷新（备用） ======== */
