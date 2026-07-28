@@ -22,6 +22,15 @@ const WEB_API = 'https://weread.qq.com';
 const AUTH_KEY = 'weread_auth';
 const PF = 'weread_wx-2001-iap-2001-iphone';
 
+// 奖励类型: 1=体验卡, 2=书币 — 通过 Surge 模块参数或修改此变量配置
+const CHOICE_TYPE = (() => {
+    if (typeof $argument !== 'undefined') {
+        const m = $argument.match(/(?:type|choiceType)\s*=\s*(\d+)/);
+        if (m) return parseInt(m[1]);
+    }
+    return 1; // 默认体验卡
+})();
+
 let $ = new Env('微信读书');
 
 (async () => {
@@ -132,8 +141,7 @@ async function claimWithApp(auth) {
     for (const item of awards) {
         if (item.awardStatus !== 1) continue;
         const choices = item.awardChoices || [];
-        const choice = choices.find(x => x.choiceType === 2 && x.canChoice === 1) ||
-                       choices.find(x => x.choiceType === 1 && x.canChoice === 1);
+        const choice = choices.find(x => x.choiceType === CHOICE_TYPE && x.canChoice === 1);
         if (!choice) continue;
 
         const r = await post(APP_API + '/weekly/exchange', encode({

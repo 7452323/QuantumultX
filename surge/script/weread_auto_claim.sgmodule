@@ -2,12 +2,13 @@
 #!desc=打开微信读书APP自动采集凭证，定时领取体验卡/书币
 #!author=7452323
 #!category=签到
+#!argument=奖励类型, type=select, options=1=体验卡&2=书币, default=1
 
 [Script]
 # 采集凭证：打开微信读书APP随便刷一下即可
-http-request ^https?://i\.weread\.qq\.com/ script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/weread_auto_claim.js, tag=微信读书(采集凭证), enable=true
-
-# 定时领取：每天早上9点
+http-request ^https?://i\.weread\.qq\.com/ script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/weread_auto_claim.js, tag=微信读书(采集凭证)
+# 每日定时领取
+cron 0 9 * * * script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/weread_auto_claim.js, tag=微信读书(每日领奖励)
 cron "0 9 * * *" script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/weread_auto_claim.js, tag=微信读书(每日领奖励), enable=true
 
 [MITM]
