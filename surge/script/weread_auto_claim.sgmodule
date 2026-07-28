@@ -2,7 +2,7 @@
 #!desc=打开微信读书APP自动采集凭证，定时领取体验卡/书币
 #!author=7452323
 #!category=签到
-#!argument=奖励类型, type=select, options=1=体验卡&2=书币, default=1
+#!arguments=choiceType=1
 
 [Script]
 # 采集凭证：打开微信读书APP随便刷一下即可
