@@ -1,13 +1,13 @@
 #!name=微信读书(每日领奖励)
-#!desc=自动采集登录凭证并领取体验卡/书币
+#!desc=浏览器登录weread.qq.com自动采集Cookie，领取体验卡/书币（APP有SSL Pinning无法采集）
 #!author=7452323
 #!category=签到
-#!arguments=cron:30 8 * * *,hostname:i.weread.qq.com
+#!arguments=cron:30 8 * * *,hostname:weread.qq.com
 #!arguments-desc=签到模块参数设置\n├ cron: 定时运行时间\n└ hostname: MITM域名
 
 [Script]
 weread_auto_claim = type=cron,cronexp="{{{cron}}}",wake-system=1,timeout=120,script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/weread_auto_claim.js
-weread_token_collector = type=http-request,pattern=^https?:\/\/i\.weread\.qq\.com\/,script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/weread_auto_claim.js,requires-body=0
+weread_token_collector = type=http-request,pattern=^https?:\/\/weread\.qq\.com\/,script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/weread_auto_claim.js,requires_body=0
 
 [MITM]
 hostname = %APPEND% {{{hostname}}}
