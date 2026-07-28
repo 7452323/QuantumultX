@@ -50,7 +50,7 @@ let $ = new Env('微信读书');
 })();
 
 /* ======== 采集 APP 凭证 ======== */
-function saveAuth() {
+async function saveAuth() {
   const h = $request.headers || {};
   let vid, skey;
   for (let k in h) {
@@ -70,16 +70,44 @@ function saveAuth() {
     if (key === 'channelid') auth.channelid = h[k];
     if (key === 'user-agent') auth.ua = h[k];
   }
+  const nickname = await fetchNickname(auth);
+  if (nickname) auth.nickname = nickname;
   $.setdata(JSON.stringify(auth), AUTH_KEY);
-  $.msg('「微信读书」', '凭证采集成功', '');
+  $.msg(`「${nickname || '微信读书'}」`, '凭证采集成功', '');
   $.log('[WeRead] auth saved');
+}
+
+function notify(name, sub, body) {
+  $.msg(`「${name || '微信读书'}」`, sub, body);
+}
+
+/* ======== 获取账号昵称 ======== */
+async function fetchNickname(auth) {
+  try {
+    const headers = {
+      'vid': auth.vid,
+      'skey': auth.skey,
+      'User-Agent': auth.ua || 'WeRead',
+      'Content-Type': 'application/json'
+    };
+    const res = await post(APP_API + '/user/profile', '{}', headers);
+    if (res.status === 200) {
+      const data = decode(res.body);
+      if (data?.nickname) return data.nickname;
+      if (data?.nickName) return data.nickName;
+      if (data?.name) return data.name;
+    }
+  } catch (e) {}
+  return null;
 }
 
 /* ======== 主流程：领取奖励 ======== */
 async function runClaim() {
   const auth = getAuth();
+  const name = auth?.nickname || '微信读书';
+
   if (!auth) {
-    $.msg('「微信读书」', '请重新获取凭证', '');
+    notify(name, '请重新获取凭证', '');
     return;
   }
 
@@ -95,18 +123,18 @@ async function runClaim() {
   }
 
   if (!result.success && result.needRefresh) {
-    $.msg('「微信读书」', '请重新获取凭证', '');
+    notify(name, '请重新获取凭证', '');
     return;
   }
 
   if (result.claimed > 0) {
     if (CHOICE_TYPE === 2) {
-      $.msg('「微信读书」', '领取书币', `${result.before}+${result.claimed}`);
+      notify(name, '领取书币', `${result.before}+${result.claimed}`);
     } else {
-      $.msg('「微信读书」', '领取体验卡', `${result.before}+${result.claimed}`);
+      notify(name, '领取体验卡', `${result.before}+${result.claimed}`);
     }
   } else {
-    $.msg('「微信读书」', '重复领取', '');
+    notify(name, '重复领取', '');
   }
 }
 
