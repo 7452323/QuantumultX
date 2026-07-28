@@ -1,254 +1,202 @@
 /*
  * 微信读书 每日领取阅读奖励
  * 
- * ⚠️ 微信读书APP有SSL Pinning，代理无法拦截
- *    必须在浏览器中登录 weread.qq.com 触发采集
- * 
- * Cookie 变量名：weread_data (wr_vid@wr_skey 格式)
- * 多账号用 & 分隔
+ * Cookie 变量名：weread_auth (JSON: {vid, skey, basever, channelid, ua})
+ * 多账号用 & 分隔（JSON用|分隔账号）
  * 
  * [rewrite_local]
- * ^https?:\/\/weread\.qq\.com\/ url script-request-header https://raw.githubusercontent.com/7452323/QuantumultX/main/task/weread_auto_claim.js
+ * ^https?:\/\/i\.weread\.qq\.com\/ url script-request-header https://raw.githubusercontent.com/7452323/QuantumultX/main/task/weread_auto_claim.js
  * 
  * [task_local]
  * 30 8 * * * https://raw.githubusercontent.com/7452323/QuantumultX/main/task/weread_auto_claim.js, tag=微信读书(每日领奖励), enabled=true
  * 
  * [MITM]
- * hostname = weread.qq.com
+ * hostname = i.weread.qq.com
  */
 
-const WEB_API = 'https://weread.qq.com';
-const KEY = 'weread_data';
-const SEP = '&';
+const API = 'https://i.weread.qq.com';
+const AUTH_KEY = 'weread_auth';
+const PF = 'weread_wx-2001-iap-2001-iphone';
 
-let $ = typeof $environment !== 'undefined' || typeof $task !== 'undefined' ? new Env('微信读书') : null;
+let $ = new Env('微信读书');
 
 // ======== Cookie 采集 ========
-function handleCookie() {
-  const url = $request.url || '';
-  if (!url.includes('weread.qq.com')) {
-    $.done();
-    return;
+function handleAuth() {
+  const h = $request.headers || {};
+  let vid, skey, basever, channelid, ua;
+  
+  for (let k in h) {
+    const key = k.toLowerCase();
+    if (key === 'vid') vid = h[k];
+    if (key === 'skey') skey = h[k];
+    if (key === 'basever') basever = h[k];
+    if (key === 'channelid') channelid = h[k];
+    if (key === 'user-agent') ua = h[k];
   }
   
-  const cookie = $request.headers['Cookie'] || $request.headers['cookie'] || '';
-  if (!cookie) {
-    $.done();
-    return;
+  if (!vid || !skey) { $.done(); return; }
+  
+  const existing = getAuth();
+  if (existing && existing.vid === vid && existing.skey === skey) {
+    $.done(); return;
   }
   
-  const vidMatch = cookie.match(/wr_vid=(\d+)/);
-  const skeyMatch = cookie.match(/wr_skey=([^;]+)/);
-  
-  if (vidMatch && skeyMatch) {
-    const val = vidMatch[1] + '@' + skeyMatch[1];
-    let list = ($.getdata(KEY) || '').split(SEP).filter(Boolean);
-    const idx = list.findIndex(x => x.startsWith(vidMatch[1] + '@'));
-    if (idx >= 0) list[idx] = val;
-    else list.push(val);
-    $.setdata(list.join(SEP), KEY);
-    $.msg($.name, `✅ Cookie已保存 (${list.length}个账号)`, `wr_vid=${vidMatch[1]}`);
-  }
+  const auth = { vid, skey, basever: basever || '', channelid: channelid || 'AppStore', ua: ua || 'WeRead' };
+  $.setdata(JSON.stringify(auth), AUTH_KEY);
+  $.msg($.name, '✅ 凭证已保存', `vid=${vid}`);
   $.done();
 }
 
+// ======== 主流程 ========
 !(async () => {
   if (typeof $request !== 'undefined') {
-    handleCookie();
+    handleAuth();
     return;
   }
-
-  // --- cron 模式 ---
-  const raw = $.getdata(KEY);
-  if (!raw) {
-    $.msg($.name, '', '⚠️ 未获取到Cookie\n\n请用浏览器打开 weread.qq.com 登录\n登录后浏览任意页面即可自动采集\n\n🎯 失败');
-    $.done();
-    return;
-  }
-
-  const accounts = raw.split(SEP).filter(Boolean);
-  let allBodies = [];
-  let valid = 0, expired = 0;
-
-  for (const acc of accounts) {
-    const [vid, skey] = acc.split('@');
-    if (!vid || !skey) continue;
-
-    const cookie = `wr_vid=${vid}; wr_skey=${skey}`;
-
-    // 先刷新cookie
-    let newSkey = await refreshCookie(cookie, vid);
-    if (newSkey) {
-      skey = newSkey;
-      const val = vid + '@' + skey;
-      let list = ($.getdata(KEY) || '').split(SEP).filter(Boolean);
-      const idx = list.findIndex(x => x.startsWith(vid + '@'));
-      if (idx >= 0) list[idx] = val;
-      $.setdata(list.join(SEP), KEY);
-    }
-
-    const curCookie = `wr_vid=${vid}; wr_skey=${skey}`;
-    
-    // 验证有效性
-    const shelfRes = await httpGet(`${WEB_API}/web/shelf`, curCookie);
-    if (!shelfRes.body || shelfRes.body.includes('登录')) {
-      expired++;
-      allBodies.push(`👤 ${vid}\n${ts()}  ❌ Cookie已过期`);
-      continue;
-    }
-
-    valid++;
-    const res = {};
-
-    // 领取阅读奖励 (体验卡/书币)
-    const rewardRes = await httpPost(`${WEB_API}/web/readingAward/claim`, curCookie, JSON.stringify({awardType: 1}));
-    const rewardData = tryParse(rewardRes.body);
-    if (rewardData?.errcode === 0) {
-      res.奖励 = `+${rewardData?.data?.awardNum || 0} ${rewardData?.data?.awardType === 1 ? '体验卡' : '书币'}`;
-    } else {
-      res.奖励 = rewardData?.errmsg || '无奖励';
-    }
-
-    await rwait(1000, 2000);
-
-    // 签到
-    const signRes = await httpPost(`${WEB_API}/web/signIn`, curCookie, JSON.stringify({}));
-    const signData = tryParse(signRes.body);
-    if (signData?.errcode === 0) {
-      res.签到 = `+${signData?.data?.score || 0}分`;
-    } else {
-      res.签到 = signData?.errmsg || '重复';
-    }
-
-    const lines = Object.entries(res).map(([k, v]) => `${ts()}  ${v.includes('❌') || v.includes('重复') ? 'ℹ️' : '✅'} ${k}: ${v}`);
-    allBodies.push(`👤 ${vid}\n${lines.join('\n')}`);
-  }
-
-  let body;
-  if (valid === 0 && expired > 0) {
-    body = `${allBodies.join('\n\n')}\n\n🎯 凭证全部过期 ${expired}/${accounts.length}`;
-  } else {
-    body = `${allBodies.join('\n\n')}\n\n🎯 完成`;
-  }
-  $.msg($.name, '', body);
+  
+  await runClaim();
   $.done();
 })().catch(e => { $.logErr(e); $.done(); });
 
-// ======== 刷新Cookie ========
-async function refreshCookie(cookie, vid) {
-  const variants = [
-    {rq: "%2Fweb%2Fbook%2Fread", ql: false},
-    {rq: "%2Fweb%2Fbook%2Fread", ql: true},
-    {rq: "%2Fweb%2Fbook%2Fread"}
-  ];
-  
-  for (const data of variants) {
-    try {
-      const res = await httpPost(`${WEB_API}/web/login/renewal`, cookie, JSON.stringify(data));
-      const setCookie = res.headers?.['Set-Cookie'] || res.headers?.['set-cookie'] || '';
-      const skeyMatch = setCookie.match(/wr_skey=([^;]+)/);
-      if (skeyMatch) return skeyMatch[1];
-      // 也检查response body
-      const json = tryParse(res.body);
-      if (json?.errcode === 0) {
-        // 可能cookie已更新在response header
-        const newCookie = res.headers?.['Set-Cookie'] || res.headers?.['set-cookie'] || '';
-        const newSkey = newCookie.match(/wr_skey=([^;]+)/);
-        if (newSkey) return newSkey[1];
-        return null; // 不需要刷新
-      }
-    } catch(e) {}
+async function runClaim() {
+  const auth = getAuth();
+  if (!auth) {
+    $.msg($.name, '', '⚠️ 未获取到凭证\n请打开微信读书APP刷新任意页面\n\n🎯 失败');
+    return;
   }
-  return null;
+  
+  const headers = {
+    'Content-Type': 'application/json',
+    'Accept': '*/*',
+    'User-Agent': auth.ua || 'WeRead',
+    'channelid': auth.channelid || 'AppStore',
+    'basever': auth.basever || '',
+    'v': auth.basever || '',
+    'vid': auth.vid,
+    'skey': auth.skey
+  };
+  
+  // 查询可领取奖励
+  const queryRes = await post(API + '/weekly/exchange', 
+    encode({ awardLevelId: 0, unread: 1, isExchangeAward: 0, pf: PF, awardChoiceType: 0 }), headers);
+  
+  if (queryRes.status !== 200) {
+    $.msg($.name, '请求失败', 'HTTP ' + queryRes.status);
+    return;
+  }
+  
+  const data = decode(queryRes.body);
+  if (!data) {
+    $.msg($.name, '解析失败', (queryRes.body || '').slice(0, 100));
+    return;
+  }
+  
+  const awards = [];
+  if (data.readtimeAwards) data.readtimeAwards.forEach(a => { a._src = '阅读时长'; awards.push(a); });
+  if (data.readdayAwards) data.readdayAwards.forEach(a => { a._src = '阅读天数'; awards.push(a); });
+  
+  let count = 0;
+  const details = [];
+  
+  for (const item of awards) {
+    if (item.awardStatus !== 1) continue;
+    
+    const choices = item.awardChoices || [];
+    const choice = choices.find(x => x.choiceType === 2 && x.canChoice === 1) ||
+                   choices.find(x => x.choiceType === 1 && x.canChoice === 1);
+    if (!choice) continue;
+    
+    const r = await post(API + '/weekly/exchange',
+      encode({ unread: 1, awardChoiceType: choice.choiceType, awardLevelId: item.awardLevelId, isExchangeAward: 1, pf: PF }), headers);
+    
+    if (r.status === 200) {
+      count++;
+      const name = describeChoice(choice, r);
+      details.push(`${item._src}·${name}`);
+    }
+  }
+  
+  if (count > 0) {
+    $.msg($.name, '领取完成', `成功领取 ${count} 个奖励\n${details.join('、')}\n\n🎯 完成`);
+  } else {
+    $.msg($.name, '领取完成', '暂无可领取的奖励\n\n🎯 完成');
+  }
 }
 
 // ======== 工具函数 ========
-async function httpGet(url, cookie) {
-  return new Promise((resolve, reject) => {
-    const opts = { 
-      url, 
-      headers: { 
-        'Cookie': cookie,
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Referer': 'https://weread.qq.com/'
-      } 
-    };
-    const handler = (err, resp, body) => err ? reject(err) : resolve({ status: resp?.status || resp?.statusCode, body, headers: resp?.headers });
-    if (typeof $task !== 'undefined') $task.fetch(opts).then(r => resolve({ status: r.statusCode, body: r.body, headers: r.headers })).catch(reject);
-    else if (typeof $httpClient !== 'undefined') $httpClient.get(opts, handler);
-    else reject(new Error('不支持的平台'));
-  });
+function getAuth() {
+  const d = $.getdata(AUTH_KEY);
+  if (!d) return null;
+  try { return JSON.parse(d); } catch { return null; }
 }
 
-async function httpPost(url, cookie, body) {
-  return new Promise((resolve, reject) => {
-    const opts = { 
-      url, 
-      headers: { 
-        'Cookie': cookie,
-        'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Referer': 'https://weread.qq.com/'
-      },
-      body
-    };
-    const handler = (err, resp, body) => err ? reject(err) : resolve({ status: resp?.status || resp?.statusCode, body, headers: resp?.headers });
-    if (typeof $task !== 'undefined') $task.fetch({ ...opts, method: 'POST' }).then(r => resolve({ status: r.statusCode, body: r.body, headers: r.headers })).catch(reject);
-    else if (typeof $httpClient !== 'undefined') $httpClient.post(opts, handler);
-    else reject(new Error('不支持的平台'));
-  });
+function encode(obj) {
+  const str = JSON.stringify(obj);
+  if (typeof $base64 !== 'undefined') return $base64.encode(str);
+  if (typeof $task !== 'undefined') return $text.base64Encode(str);
+  if (typeof $httpClient !== 'undefined') return $base64 ? $base64.encode(str) : str;
+  return str;
 }
 
-function tryParse(str) { try { return JSON.parse(str); } catch { return null; } }
-function rwait(min, max) { return $.wait(min + Math.floor(Math.random() * (max - min))); }
-function ts() { const d = new Date(); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
+function decode(str) {
+  try {
+    if (typeof $base64 !== 'undefined') return JSON.parse($base64.decode(str));
+    if (typeof $task !== 'undefined') return JSON.parse($text.base64Decode(str));
+    return JSON.parse(str);
+  } catch { return null; }
+}
 
-function Env(name, opts) {
-  class _env {
-    constructor(n) { this.name = n; this.data = null; this.startTime = Date.now(); this.logs = []; }
-    getEnv() {
-      if (typeof $task !== 'undefined') return 'Quantumult X';
-      if (typeof $environment !== 'undefined' && $environment['surge-version']) return 'Surge';
-      if (typeof $environment !== 'undefined' && $environment['stash-version']) return 'Stash';
-      if (typeof $loon !== 'undefined') return 'Loon';
-      if (typeof $rocket !== 'undefined') return 'Shadowrocket';
-      if (typeof module !== 'undefined' && module.exports) return 'Node.js';
-      return 'Unknown';
-    }
-    getdata(k) {
-      switch (this.getEnv()) {
-        case 'Quantumult X': return $prefs.valueForKey(k) || '';
-        case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket': return $persistentStore.read(k) || '';
-        case 'Node.js': return this.data && this.data[k] || process.env[k] || '';
-        default: return '';
-      }
-    }
-    setdata(v, k) {
-      switch (this.getEnv()) {
-        case 'Quantumult X': return $prefs.setValueForKey(v, k);
-        case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket': return $persistentStore.write(v, k);
-        case 'Node.js': this.data = this.data || {}; this.data[k] = v; return true;
-        default: return false;
-      }
-    }
-    log(...t) { t.length && (this.logs = [...this.logs, ...t]); console.log(t.join('\n')); }
-    logErr(t) { this.log('', `❗️${this.name}, 错误!`, t?.message || t); }
-    wait(ms) { return new Promise(r => setTimeout(r, ms)); }
-    msg(s, t, c) {
-      switch (this.getEnv()) {
-        case 'Quantumult X': $notify(s, t||'', c||''); break;
-        case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket': default: $notification.post(s, t||'', c||''); break;
-        case 'Node.js': console.log(`${s}: ${t} - ${c}`); break;
-      }
-    }
-    done() {
-      const elapsed = ((Date.now() - this.startTime) / 1000).toFixed(2);
-      this.log(`结束! ${elapsed}s`);
-      switch (this.getEnv()) {
-        case 'Quantumult X': case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket': default: $done(); break;
-        case 'Node.js': process.exit(0); break;
-      }
+function describeChoice(choice, resp) {
+  if (resp && resp.body) {
+    const ex = decode(resp.body);
+    if (ex) {
+      if (ex.awardName) return ex.awardName;
+      if (ex.exchangeName) return ex.exchangeName;
+      if (ex.choiceName) return ex.choiceName;
     }
   }
-  return new _env(name, opts);
+  if (choice.choiceName) return choice.choiceName;
+  if (choice.choiceType === 2) return '书币';
+  if (choice.choiceType === 1) return '体验卡';
+  return '奖励';
+}
+
+function post(url, body, headers) {
+  return new Promise((resolve, reject) => {
+    const opts = { url, headers, body, timeout: 10000 };
+    if (typeof $task !== 'undefined') {
+      $task.fetch({ ...opts, method: 'POST' }).then(r => resolve({ status: r.statusCode, body: r.body })).catch(reject);
+    } else if (typeof $httpClient !== 'undefined') {
+      $httpClient.post(opts, (err, res, data) => err ? reject(err) : resolve({ status: res.status || res.statusCode, body: data }));
+    } else {
+      reject(new Error('不支持的平台'));
+    }
+  });
+}
+
+function Env(name) {
+  this.name = name;
+  this.logs = [];
+  
+  this.getdata = function(k) {
+    if (typeof $prefs !== 'undefined') return $prefs.valueForKey(k) || '';
+    if (typeof $persistentStore !== 'undefined') return $persistentStore.read(k) || '';
+    if (typeof $task !== 'undefined') return $prefs.valueForKey(k) || '';
+    return '';
+  };
+  
+  this.setdata = function(v, k) {
+    if (typeof $prefs !== 'undefined') return $prefs.setValueForKey(v, k);
+    if (typeof $persistentStore !== 'undefined') return $persistentStore.write(v, k);
+    if (typeof $task !== 'undefined') return $prefs.setValueForKey(v, k);
+    return false;
+  };
+  
+  this.log = function(...t) { this.logs.push(...t); console.log(t.join('\n')); };
+  this.logErr = function(t) { this.log(`❗️${this.name}, 错误!`, t?.message || t); };
+  this.msg = function(t, s, b) {
+    if (typeof $notify !== 'undefined') $notify(t, s || '', b || '');
+    else if (typeof $notification !== 'undefined') $notification.post(t, s || '', b || '');
+  };
+  this.done = function() { $done(); };
 }
