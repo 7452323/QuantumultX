@@ -71,7 +71,7 @@ function saveAuth() {
     if (key === 'user-agent') auth.ua = h[k];
   }
   $.setdata(JSON.stringify(auth), AUTH_KEY);
-  $.msg('WeRead', '凭证已采集', `vid=${vid}\nskey=${skey.substring(0,8)}...`);
+  $.msg('「微信读书」', '凭证已采集', '');
   $.log('[WeRead] auth saved');
 }
 
@@ -79,14 +79,12 @@ function saveAuth() {
 async function runClaim() {
   const auth = getAuth();
   if (!auth) {
-    $.msg('WeRead', '没有认证', '请打开微信读书 APP 随便刷一下');
+    $.msg('「微信读书」', '请重新获取凭证', '');
     return;
   }
 
-  // 先尝试 APP API（vid/skey header）
   let result = await claimWithApp(auth);
   
-  // APP 失败时尝试 web cookie 刷新
   if (!result.success && result.needRefresh) {
     const newSkey = await refreshWebCookie(auth.vid);
     if (newSkey) {
@@ -96,10 +94,19 @@ async function runClaim() {
     }
   }
 
-  if (result.success) {
-    $.msg('WeRead', '领取完成', result.detail);
+  if (!result.success && result.needRefresh) {
+    $.msg('「微信读书」', '请重新获取凭证', '');
+    return;
+  }
+
+  if (result.claimed > 0) {
+    if (CHOICE_TYPE === 2) {
+      $.msg('「微信读书」', '领取书币', `${result.before}+${result.claimed}`);
+    } else {
+      $.msg('「微信读书」', '领取体验卡', `${result.before}+${result.claimed}`);
+    }
   } else {
-    $.msg('WeRead', '领取失败', result.detail + '\n\n请重新打开微信读书 APP');
+    $.msg('「微信读书」', '重复领取', '');
   }
 }
 
@@ -121,24 +128,24 @@ async function claimWithApp(auth) {
   }), headers);
 
   if (queryResp.status === 401) {
-    return { success: false, needRefresh: true, detail: '认证过期' };
+    return { success: false, needRefresh: true, detail: '认证过期', claimed: 0, before: 0 };
   }
   if (queryResp.status !== 200) {
-    return { success: false, needRefresh: false, detail: 'HTTP ' + queryResp.status };
+    return { success: false, needRefresh: false, detail: 'HTTP ' + queryResp.status, claimed: 0, before: 0 };
   }
 
   const data = decode(queryResp.body);
-  if (!data) return { success: false, needRefresh: false, detail: '解析失败' };
+  if (!data) return { success: false, needRefresh: false, detail: '解析失败', claimed: 0, before: 0 };
   if (data.errcode) {
-    return { success: false, needRefresh: true, detail: data.errmsg || '认证失败' };
+    return { success: false, needRefresh: true, detail: data.errmsg || '认证失败', claimed: 0, before: 0 };
   }
 
   const awards = [];
   if (data.readtimeAwards) data.readtimeAwards.forEach(a => { a._src = '阅读时长'; awards.push(a); });
   if (data.readdayAwards) data.readdayAwards.forEach(a => { a._src = '阅读天数'; awards.push(a); });
 
-  let count = 0;
-  const details = [];
+  let claimed = 0;
+  let before = data.currentBalance || data.balance || 0;
 
   for (const item of awards) {
     if (item.awardStatus !== 1) continue;
@@ -152,15 +159,16 @@ async function claimWithApp(auth) {
     }), headers);
 
     if (r.status === 200) {
-      count++;
-      details.push(`${item._src}·${choice.choiceType === 2 ? '书币' : '体验卡'}`);
+      claimed++;
     }
   }
 
   return {
     success: true,
     needRefresh: false,
-    detail: count > 0 ? `+${count}个 (${details.join(', ')})` : '暂无可领取'
+    claimed,
+    before,
+    detail: claimed > 0 ? `+${claimed}个` : '暂无可领取'
   };
 }
 
