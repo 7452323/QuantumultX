@@ -5,9 +5,10 @@
 
 [Script]
 # 采集凭证：打开微信读书APP随便刷一下即可
-http-request ^https?://i\.weread\.qq\.com/ script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/weread_auto_claim.js, tag=微信读书-采集凭证, enable=true
-# 定时领取
-cron "30 8 * * *" script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/weread_auto_claim.js, tag=微信读书-领取奖励, enable=true
+http-request ^https?://i\.weread\.qq\.com/ script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/weread_auto_claim.js, tag=微信读书(采集凭证), enable=true
+
+# 定时领取：每天早上9点
+cron "0 9 * * *" script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/weread_auto_claim.js, tag=微信读书(每日领奖励), enable=true
 
 [MITM]
-hostname = %APPEND% i.weread.qq.com
+hostname = i.weread.qq.com

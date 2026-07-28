@@ -1,202 +1,215 @@
 /*
  * 微信读书 每日领取阅读奖励
  * 
- * Cookie 变量名：weread_auth (JSON: {vid, skey, basever, channelid, ua})
- * 多账号用 & 分隔（JSON用|分隔账号）
+ * 凭证变量名：weread_auth (JSON: {vid, skey, basever, channelid, ua})
+ * 多账号 JSON 用 | 分隔
+ * 
+ * 原理：从 APP 请求头采集 vid/skey（非 Cookie），APP token 有效期长无需 refresh
+ * 备用：web cookie 模式，通过 /web/login/renewal 刷新
  * 
  * [rewrite_local]
  * ^https?:\/\/i\.weread\.qq\.com\/ url script-request-header https://raw.githubusercontent.com/7452323/QuantumultX/main/task/weread_auto_claim.js
  * 
  * [task_local]
- * 30 8 * * * https://raw.githubusercontent.com/7452323/QuantumultX/main/task/weread_auto_claim.js, tag=微信读书(每日领奖励), enabled=true
+ * 0 9 * * * https://raw.githubusercontent.com/7452323/QuantumultX/main/task/weread_auto_claim.js, tag=微信读书(每日领奖励), enabled=true
  * 
  * [MITM]
  * hostname = i.weread.qq.com
  */
 
-const API = 'https://i.weread.qq.com';
+const APP_API = 'https://i.weread.qq.com';
+const WEB_API = 'https://weread.qq.com';
 const AUTH_KEY = 'weread_auth';
 const PF = 'weread_wx-2001-iap-2001-iphone';
 
 let $ = new Env('微信读书');
 
-// ======== Cookie 采集 ========
-function handleAuth() {
-  const h = $request.headers || {};
-  let vid, skey, basever, channelid, ua;
-  
-  for (let k in h) {
-    const key = k.toLowerCase();
-    if (key === 'vid') vid = h[k];
-    if (key === 'skey') skey = h[k];
-    if (key === 'basever') basever = h[k];
-    if (key === 'channelid') channelid = h[k];
-    if (key === 'user-agent') ua = h[k];
-  }
-  
-  if (!vid || !skey) { $.done(); return; }
-  
-  const existing = getAuth();
-  if (existing && existing.vid === vid && existing.skey === skey) {
-    $.done(); return;
-  }
-  
-  const auth = { vid, skey, basever: basever || '', channelid: channelid || 'AppStore', ua: ua || 'WeRead' };
-  $.setdata(JSON.stringify(auth), AUTH_KEY);
-  $.msg($.name, '✅ 凭证已保存', `vid=${vid}`);
-  $.done();
-}
-
-// ======== 主流程 ========
-!(async () => {
-  if (typeof $request !== 'undefined') {
-    handleAuth();
-    return;
-  }
-  
-  await runClaim();
-  $.done();
-})().catch(e => { $.logErr(e); $.done(); });
-
-async function runClaim() {
-  const auth = getAuth();
-  if (!auth) {
-    $.msg($.name, '', '⚠️ 未获取到凭证\n请打开微信读书APP刷新任意页面\n\n🎯 失败');
-    return;
-  }
-  
-  const headers = {
-    'Content-Type': 'application/json',
-    'Accept': '*/*',
-    'User-Agent': auth.ua || 'WeRead',
-    'channelid': auth.channelid || 'AppStore',
-    'basever': auth.basever || '',
-    'v': auth.basever || '',
-    'vid': auth.vid,
-    'skey': auth.skey
-  };
-  
-  // 查询可领取奖励
-  const queryRes = await post(API + '/weekly/exchange', 
-    encode({ awardLevelId: 0, unread: 1, isExchangeAward: 0, pf: PF, awardChoiceType: 0 }), headers);
-  
-  if (queryRes.status !== 200) {
-    $.msg($.name, '请求失败', 'HTTP ' + queryRes.status);
-    return;
-  }
-  
-  const data = decode(queryRes.body);
-  if (!data) {
-    $.msg($.name, '解析失败', (queryRes.body || '').slice(0, 100));
-    return;
-  }
-  
-  const awards = [];
-  if (data.readtimeAwards) data.readtimeAwards.forEach(a => { a._src = '阅读时长'; awards.push(a); });
-  if (data.readdayAwards) data.readdayAwards.forEach(a => { a._src = '阅读天数'; awards.push(a); });
-  
-  let count = 0;
-  const details = [];
-  
-  for (const item of awards) {
-    if (item.awardStatus !== 1) continue;
-    
-    const choices = item.awardChoices || [];
-    const choice = choices.find(x => x.choiceType === 2 && x.canChoice === 1) ||
-                   choices.find(x => x.choiceType === 1 && x.canChoice === 1);
-    if (!choice) continue;
-    
-    const r = await post(API + '/weekly/exchange',
-      encode({ unread: 1, awardChoiceType: choice.choiceType, awardLevelId: item.awardLevelId, isExchangeAward: 1, pf: PF }), headers);
-    
-    if (r.status === 200) {
-      count++;
-      const name = describeChoice(choice, r);
-      details.push(`${item._src}·${name}`);
+(async () => {
+    try {
+        if (typeof $request !== 'undefined') {
+            saveAuth();
+            $done({});
+            return;
+        }
+        await runClaim();
+    } catch (e) {
+        $.msg('WeRead', '执行异常', String(e));
     }
-  }
-  
-  if (count > 0) {
-    $.msg($.name, '领取完成', `成功领取 ${count} 个奖励\n${details.join('、')}\n\n🎯 完成`);
-  } else {
-    $.msg($.name, '领取完成', '暂无可领取的奖励\n\n🎯 完成');
-  }
+    $done({});
+})();
+
+/* ======== 采集 APP 凭证 ======== */
+function saveAuth() {
+    const h = $request.headers || {};
+    let vid, skey;
+    for (let k in h) {
+        const key = k.toLowerCase();
+        if (key === 'vid') vid = h[k];
+        if (key === 'skey') skey = h[k];
+    }
+    if (!vid || !skey) return;
+
+    const existing = getAuth();
+    if (existing && existing.vid === vid && existing.skey === skey) return;
+
+    const auth = { vid, skey };
+    for (let k in h) {
+        const key = k.toLowerCase();
+        if (key === 'basever') auth.basever = h[k];
+        if (key === 'channelid') auth.channelid = h[k];
+        if (key === 'user-agent') auth.ua = h[k];
+    }
+    $.setdata(JSON.stringify(auth), AUTH_KEY);
+    $.log('[WeRead] auth saved');
 }
 
-// ======== 工具函数 ========
+/* ======== 主流程：领取奖励 ======== */
+async function runClaim() {
+    const auth = getAuth();
+    if (!auth) {
+        $.msg('WeRead', '没有认证', '请打开微信读书 APP 随便刷一下');
+        return;
+    }
+
+    // 先尝试 APP API（vid/skey header）
+    let result = await claimWithApp(auth);
+    
+    // APP 失败时尝试 web cookie 刷新
+    if (!result.success && result.needRefresh) {
+        const newSkey = await refreshWebCookie(auth.vid);
+        if (newSkey) {
+            auth.skey = newSkey;
+            $.setdata(JSON.stringify(auth), AUTH_KEY);
+            result = await claimWithApp(auth);
+        }
+    }
+
+    if (result.success) {
+        $.msg('WeRead', '领取完成', result.detail);
+    } else {
+        $.msg('WeRead', '领取失败', result.detail + '\n\n请重新打开微信读书 APP');
+    }
+}
+
+/* ======== APP API 领取 ======== */
+async function claimWithApp(auth) {
+    const headers = {
+        'Content-Type': 'application/json',
+        'Accept': '*/*',
+        'User-Agent': auth.ua || 'WeRead',
+        'channelid': auth.channelid || 'AppStore',
+        'basever': auth.basever || '',
+        'v': auth.basever || '',
+        'vid': auth.vid,
+        'skey': auth.skey
+    };
+
+    const queryResp = await post(APP_API + '/weekly/exchange', encode({
+        awardLevelId: 0, unread: 1, isExchangeAward: 0, pf: PF, awardChoiceType: 0
+    }), headers);
+
+    if (queryResp.status === 401) {
+        return { success: false, needRefresh: true, detail: '认证过期' };
+    }
+    if (queryResp.status !== 200) {
+        return { success: false, needRefresh: false, detail: 'HTTP ' + queryResp.status };
+    }
+
+    const data = decode(queryResp.body);
+    if (!data) return { success: false, needRefresh: false, detail: '解析失败' };
+    if (data.errcode) {
+        // errcode 通常表示 token 过期
+        return { success: false, needRefresh: true, detail: data.errmsg || '认证失败' };
+    }
+
+    const awards = [];
+    if (data.readtimeAwards) data.readtimeAwards.forEach(a => { a._src = '阅读时长'; awards.push(a); });
+    if (data.readdayAwards) data.readdayAwards.forEach(a => { a._src = '阅读天数'; awards.push(a); });
+
+    let count = 0;
+    const details = [];
+
+    for (const item of awards) {
+        if (item.awardStatus !== 1) continue;
+        const choices = item.awardChoices || [];
+        const choice = choices.find(x => x.choiceType === 2 && x.canChoice === 1) ||
+                       choices.find(x => x.choiceType === 1 && x.canChoice === 1);
+        if (!choice) continue;
+
+        const r = await post(APP_API + '/weekly/exchange', encode({
+            unread: 1, awardChoiceType: choice.choiceType,
+            awardLevelId: item.awardLevelId, isExchangeAward: 1, pf: PF
+        }), headers);
+
+        if (r.status === 200) {
+            count++;
+            details.push(`${item._src}·${choice.choiceType === 2 ? '书币' : '体验卡'}`);
+        }
+    }
+
+    return {
+        success: true,
+        needRefresh: false,
+        detail: count > 0 ? `+${count}个 (${details.join(', ')})` : '暂无可领取'
+    };
+}
+
+/* ======== Web Cookie 刷新（备用） ======== */
+async function refreshWebCookie(vid) {
+    const variants = [
+        { rq: '%2Fweb%2Fbook%2Fread', ql: false },
+        { rq: '%2Fweb%2Fbook%2Fread', ql: true },
+        { rq: '%2Fweb%2Fbook%2Fread' }
+    ];
+    for (const body of variants) {
+        try {
+            const res = await post(WEB_API + '/web/login/renewal',
+                JSON.stringify(body), { 'Content-Type': 'application/json' });
+            const setCookie = res.headers?.['Set-Cookie'] || res.headers?.['set-cookie'] || '';
+            const m = setCookie.match(/wr_skey=([^;]+)/);
+            if (m) return m[1].substring(0, 8);
+        } catch (e) {}
+    }
+    return null;
+}
+
+/* ======== 工具函数 ======== */
 function getAuth() {
-  const d = $.getdata(AUTH_KEY);
-  if (!d) return null;
-  try { return JSON.parse(d); } catch { return null; }
+    const d = $.getdata(AUTH_KEY);
+    if (!d) return null;
+    try { return JSON.parse(d); } catch { return null; }
 }
 
 function encode(obj) {
-  const str = JSON.stringify(obj);
-  if (typeof $base64 !== 'undefined') return $base64.encode(str);
-  if (typeof $task !== 'undefined') return $text.base64Encode(str);
-  if (typeof $httpClient !== 'undefined') return $base64 ? $base64.encode(str) : str;
-  return str;
+    const str = JSON.stringify(obj);
+    if (typeof $base64 !== 'undefined') return $base64.encode(str);
+    return str;
 }
 
 function decode(str) {
-  try {
-    if (typeof $base64 !== 'undefined') return JSON.parse($base64.decode(str));
-    if (typeof $task !== 'undefined') return JSON.parse($text.base64Decode(str));
-    return JSON.parse(str);
-  } catch { return null; }
-}
-
-function describeChoice(choice, resp) {
-  if (resp && resp.body) {
-    const ex = decode(resp.body);
-    if (ex) {
-      if (ex.awardName) return ex.awardName;
-      if (ex.exchangeName) return ex.exchangeName;
-      if (ex.choiceName) return ex.choiceName;
-    }
-  }
-  if (choice.choiceName) return choice.choiceName;
-  if (choice.choiceType === 2) return '书币';
-  if (choice.choiceType === 1) return '体验卡';
-  return '奖励';
+    try {
+        if (typeof $base64 !== 'undefined') return JSON.parse($base64.decode(str));
+        return JSON.parse(str);
+    } catch { return null; }
 }
 
 function post(url, body, headers) {
-  return new Promise((resolve, reject) => {
-    const opts = { url, headers, body, timeout: 10000 };
-    if (typeof $task !== 'undefined') {
-      $task.fetch({ ...opts, method: 'POST' }).then(r => resolve({ status: r.statusCode, body: r.body })).catch(reject);
-    } else if (typeof $httpClient !== 'undefined') {
-      $httpClient.post(opts, (err, res, data) => err ? reject(err) : resolve({ status: res.status || res.statusCode, body: data }));
-    } else {
-      reject(new Error('不支持的平台'));
-    }
-  });
+    return new Promise((resolve, reject) => {
+        $httpClient.post({ url, headers, body, timeout: 10000 }, (err, res, data) => {
+            if (err) reject(err);
+            else resolve({ status: res.status, body: data, headers: res.headers });
+        });
+    });
 }
 
+/* ======== Env ======== */
 function Env(name) {
-  this.name = name;
-  this.logs = [];
-  
-  this.getdata = function(k) {
-    if (typeof $prefs !== 'undefined') return $prefs.valueForKey(k) || '';
-    if (typeof $persistentStore !== 'undefined') return $persistentStore.read(k) || '';
-    if (typeof $task !== 'undefined') return $prefs.valueForKey(k) || '';
-    return '';
-  };
-  
-  this.setdata = function(v, k) {
-    if (typeof $prefs !== 'undefined') return $prefs.setValueForKey(v, k);
-    if (typeof $persistentStore !== 'undefined') return $persistentStore.write(v, k);
-    if (typeof $task !== 'undefined') return $prefs.setValueForKey(v, k);
-    return false;
-  };
-  
-  this.log = function(...t) { this.logs.push(...t); console.log(t.join('\n')); };
-  this.logErr = function(t) { this.log(`❗️${this.name}, 错误!`, t?.message || t); };
-  this.msg = function(t, s, b) {
-    if (typeof $notify !== 'undefined') $notify(t, s || '', b || '');
-    else if (typeof $notification !== 'undefined') $notification.post(t, s || '', b || '');
-  };
-  this.done = function() { $done(); };
+    this.name = name;
+    this.getdata = k => (typeof $persistentStore !== 'undefined') ? $persistentStore.read(k) :
+                        (typeof $prefs !== 'undefined') ? $prefs.valueForKey(k) : null;
+    this.setdata = (v, k) => (typeof $persistentStore !== 'undefined') ? $persistentStore.write(v, k) :
+                              (typeof $prefs !== 'undefined') ? $prefs.setValueForKey(v, k) : false;
+    this.msg = (t, s, b) => (typeof $notify !== 'undefined') ? $notify(t, s, b) :
+                             (typeof $notification !== 'undefined') ? $notification.post(t, s, b) : null;
+    this.log = (...args) => console.log(...args);
 }
