@@ -1,21 +1,21 @@
 /*
- * 微信读书 每日领取阅读奖励
- * 
- * 凭证变量名：weread_auth (JSON: {vid, skey, basever, channelid, ua})
- * 多账号 JSON 用 | 分隔
- * 
- * 原理：从 APP 请求头采集 vid/skey（非 Cookie），APP token 有效期长无需 refresh
- * 备用：web cookie 模式，通过 /web/login/renewal 刷新
- * 
- * [rewrite_local]
- * ^https?:\/\/i\.weread\.qq\.com\/ url script-request-header https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading.js
- * 
- * [task_local]
+微信读书 每日领取阅读奖励
+
+凭证变量名：weread_auth (JSON: {vid, skey, basever, channelid, ua})
+多账号 JSON 用 | 分隔
+
+原理：从 APP 请求头采集 vid/skey（非 Cookie），APP token 有效期长无需 refresh
+备用：web cookie 模式，通过 /web/login/renewal 刷新
+
+[rewrite_local]
+^https?:\/\/i\.weread\.qq\.com\/ url script-request-header https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading.js
+
+[task_local]
  * 0 9 * * * https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading.js, tag=微信读书(每日领奖励), enabled=true
- * 
- * [MITM]
- * hostname = i.weread.qq.com
- */
+
+[MITM]
+hostname = i.weread.qq.com
+*/
 
 const APP_API = 'https://i.weread.qq.com';
 const WEB_API = 'https://weread.qq.com';
