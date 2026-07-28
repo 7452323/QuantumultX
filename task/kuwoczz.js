@@ -1,5 +1,5 @@
 /*
-酷我音乐 每日任务 — integralapi.kuwo.cn
+酷我音乐 每日任务
 
 Cookie 变量名：kuwo_data
 多账号用 & 分隔
