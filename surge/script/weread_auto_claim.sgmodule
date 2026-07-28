@@ -1,0 +1,12 @@
+#name=微信读书(每日领奖励)
+#!desc=自动采集登录凭证并领取体验卡/书币
+#!system=ios
+
+[General]
+
+[Script]
+微信读书-自动领取阅读奖励 = type=cron, cronexp="30 8 * * *", timeout=120, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/surge/script/weread_auto_claim.js, wake-system=1
+微信读书-采集登录凭证 = type=http-request, pattern=^https?:\/\/i\.weread\.qq\.com\/login, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/surge/script/weread_auto_claim.js, max-size=0, timeout=10
+
+[MITM]
+hostname = i.weread.qq.com
