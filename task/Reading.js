@@ -1,23 +1,22 @@
 /*
-微信读书 每日领取阅读奖励
+微信读书 每日领取阅读奖励 (Web版)
 
-凭证变量名：weread_auth (JSON: {vid, skey, basever, channelid, ua})
+凭证变量名：weread_auth (JSON: {vid, skey, cookie, nickname})
 多账号 JSON 用 | 分隔
 
 [rewrite_local]
-^https?:\/\/i\.weread\.qq\.com\/ url script-request-header https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading.js
+^https?:\/\/weread\.qq\.com\/ url script-request-header https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading.js
 
 [task_local]
 0 9 * * * https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading.js, tag=微信读书(领取阅读奖励), enabled=true
 
 [MITM]
-hostname = i.weread.qq.com
+hostname = weread.qq.com
 */
 
 const APP_API = 'https://i.weread.qq.com';
 const WEB_API = 'https://weread.qq.com';
 const AUTH_KEY = 'weread_auth';
-const PF = 'weread_wx-2001-iap-2001-iphone';
 
 // 解析 $argument（query-string 格式：key1=val1&key2=val2）
 const ARG = {};
@@ -49,37 +48,32 @@ let $ = new Env('微信读书');
   $done({});
 })();
 
-/* ======== 采集 APP 凭证 ======== */
+/* ======== 采集 Web 凭证 ======== */
 async function saveAuth() {
   const h = $request.headers || {};
-  let vid, skey;
+  let cookie;
   for (let k in h) {
-    const key = k.toLowerCase();
-    if (key === 'vid') vid = h[k];
-    if (key === 'skey') skey = h[k];
+    if (k.toLowerCase() === 'cookie') { cookie = h[k]; break; }
   }
-  if (!vid || !skey) return;
+  if (!cookie) return;
+
+  // 提取 wr_vid 和 wr_skey
+  const vidMatch = cookie.match(/wr_vid=(\d+)/);
+  const skeyMatch = cookie.match(/wr_skey=([^;]+)/);
+  if (!vidMatch || !skeyMatch) return;
+
+  const vid = vidMatch[1];
+  const skey = skeyMatch[1];
 
   const existing = getAuth();
-  // 保留已有的 refreshToken
-  const existingToken = existing?.refreshToken || '';
-
   if (existing && existing.vid === vid && existing.skey === skey) return;
 
-  const auth = { vid, skey };
-  for (let k in h) {
-    const key = k.toLowerCase();
-    if (key === 'basever') auth.basever = h[k];
-    if (key === 'channelid') auth.channelid = h[k];
-    if (key === 'user-agent') auth.ua = h[k];
-  }
-  if (existingToken) auth.refreshToken = existingToken;
-
+  const auth = { vid, skey, cookie };
   const nickname = await fetchNickname(auth);
   if (nickname) auth.nickname = nickname;
   $.setdata(JSON.stringify(auth), AUTH_KEY);
   $.msg(`「${nickname || '微信读书'}」`, '凭证采集成功', '');
-  $.log('[WeRead] auth saved');
+  $.log('[WeRead] web auth saved');
 }
 
 function notify(name, sub, body) {
@@ -90,28 +84,22 @@ function notify(name, sub, body) {
 async function fetchNickname(auth) {
   try {
     const headers = {
-      'vid': auth.vid,
-      'skey': auth.skey,
-      'User-Agent': auth.ua || 'WeRead/7.0.0 WRBrand/huawei Dalvik/2.1.0',
-      'v': '7.4.2.23',
-      'Content-Type': 'application/json'
+      'Cookie': auth.cookie,
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
     };
-    const resp = await post(APP_API + '/friend/ranking?mine=1&synckey=0', '', headers);
+    const resp = await get(WEB_API + '/web/profile', headers);
     const data = JSON.parse(resp.body);
     if (data?.errcode) return null;
-    if (data?.ranking?.length > 0) {
-      const me = data.ranking.find(r => r.user?.userVid == auth.vid);
-      if (me?.user?.name) return me.user.name;
-      if (data.ranking[0]?.user?.name) return data.ranking[0].user.name;
-    }
-    if (data?.data?.user?.name) return data.data.user.name;
+    if (data?.name) return data.name;
     if (data?.user?.name) return data.user.name;
+    if (data?.data?.user?.name) return data.data.user.name;
     return null;
   } catch (e) {
     console.log('fetchNickname error: ' + e.message);
     return null;
   }
 }
+
 /* ======== 主流程：领取奖励 ======== */
 async function runClaim() {
   const auth = getAuth();
@@ -122,19 +110,12 @@ async function runClaim() {
     return;
   }
 
-  let result = await claimWithApp(auth);
-  
+  let result = await claimWithWeb(auth);
+
   if (!result.success && result.needRefresh) {
-    const newAuth = await refreshAppAuth(auth);
-    if (newAuth) {
-      result = await claimWithApp(newAuth);
-    } else {
-      const newSkey = await refreshWebCookie(auth.vid);
-      if (newSkey) {
-        auth.skey = newSkey;
-        $.setdata(JSON.stringify(auth), AUTH_KEY);
-        result = await claimWithApp(auth);
-      }
+    const refreshed = await refreshWebCookie(auth);
+    if (refreshed) {
+      result = await claimWithWeb(refreshed);
     }
   }
 
@@ -154,22 +135,16 @@ async function runClaim() {
   }
 }
 
-/* ======== APP API 领取 ======== */
-async function claimWithApp(auth) {
+/* ======== Web API 领取 ======== */
+async function claimWithWeb(auth) {
   const headers = {
     'Content-Type': 'application/json',
     'Accept': '*/*',
-    'User-Agent': auth.ua || 'WeRead',
-    'channelid': auth.channelid || 'AppStore',
-    'basever': auth.basever || '',
-    'v': auth.basever || '',
-    'vid': auth.vid,
-    'skey': auth.skey
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Cookie': auth.cookie
   };
 
-  const queryResp = await post(APP_API + '/weekly/exchange', encode({
-    awardLevelId: 0, unread: 1, isExchangeAward: 0, pf: PF, awardChoiceType: 0
-  }), headers);
+  const queryResp = await post(APP_API + '/weekly/exchange', '', headers);
 
   if (queryResp.status === 401) {
     return { success: false, needRefresh: true, detail: '认证过期', claimed: 0, before: 0 };
@@ -178,8 +153,14 @@ async function claimWithApp(auth) {
     return { success: false, needRefresh: false, detail: 'HTTP ' + queryResp.status, claimed: 0, before: 0 };
   }
 
-  const data = decode(queryResp.body);
-  if (!data) return { success: false, needRefresh: false, detail: '解析失败', claimed: 0, before: 0 };
+  let data;
+  try { data = JSON.parse(queryResp.body); } catch {
+    // 可能是 Base64
+    try { data = JSON.parse($base64.decode(queryResp.body)); } catch {
+      return { success: false, needRefresh: false, detail: '解析失败', claimed: 0, before: 0 };
+    }
+  }
+
   if (data.errcode) {
     return { success: false, needRefresh: true, detail: data.errmsg || '认证失败', claimed: 0, before: 0 };
   }
@@ -197,13 +178,18 @@ async function claimWithApp(auth) {
     const choice = choices.find(x => x.choiceType === CHOICE_TYPE && x.canChoice === 1);
     if (!choice) continue;
 
-    const r = await post(APP_API + '/weekly/exchange', encode({
+    const body = JSON.stringify({
       unread: 1, awardChoiceType: choice.choiceType,
-      awardLevelId: item.awardLevelId, isExchangeAward: 1, pf: PF
-    }), headers);
+      awardLevelId: item.awardLevelId, isExchangeAward: 1, pf: 'weread_wx-2001-iap-2001-iphone'
+    });
 
+    const r = await post(APP_API + '/weekly/exchange', body, headers);
     if (r.status === 200) {
-      claimed++;
+      let rd;
+      try { rd = JSON.parse(r.body); } catch {
+        try { rd = JSON.parse($base64.decode(r.body)); } catch { rd = null; }
+      }
+      if (rd && !rd.errcode) claimed++;
     }
   }
 
@@ -216,45 +202,12 @@ async function claimWithApp(auth) {
   };
 }
 
-/* ======== APP 凭证刷新（refreshToken） ======== */
-async function refreshAppAuth(auth) {
-  try {
-    const body = JSON.stringify({
-      deviceId: '1',
-      refCgi: '',
-      refreshToken: auth.refreshToken || ''
-    });
-    const res = await post(APP_API + '/login', body, {
-      'User-Agent': auth.ua || 'WeRead/7.0.0 WRBrand/huawei Dalvik/2.1.0',
-      'Content-Type': 'application/json'
-    });
-
-    if (res.status !== 200) return null;
-
-    const data = JSON.parse(res.body);
-    if (data.errcode !== 0 || !data.data) return null;
-
-    const d = data.data;
-    auth.vid = d.vid;
-    auth.skey = d.skey;
-    if (d.refreshToken) auth.refreshToken = d.refreshToken;
-    if (d.user?.name) auth.nickname = d.user.name;
-
-    $.setdata(JSON.stringify(auth), AUTH_KEY);
-    $.log('[WeRead] auth refreshed');
-    return auth;
-  } catch (e) {
-    $.log('[WeRead] refresh error: ' + e.message);
-    return null;
-  }
-}
-
-/* ======== Web Cookie 刷新（备用） ======== */
-async function refreshWebCookie(vid) {
+/* ======== Web Cookie 刷新 ======== */
+async function refreshWebCookie(auth) {
   const variants = [
+    { rq: '%2Fweb%2Fbook%2Fread' },
     { rq: '%2Fweb%2Fbook%2Fread', ql: false },
-    { rq: '%2Fweb%2Fbook%2Fread', ql: true },
-    { rq: '%2Fweb%2Fbook%2Fread' }
+    { rq: '%2Fweb%2Fbook%2Fread', ql: true }
   ];
   for (const body of variants) {
     try {
@@ -262,7 +215,18 @@ async function refreshWebCookie(vid) {
         JSON.stringify(body), { 'Content-Type': 'application/json' });
       const setCookie = res.headers?.['Set-Cookie'] || res.headers?.['set-cookie'] || '';
       const m = setCookie.match(/wr_skey=([^;]+)/);
-      if (m) return m[1].substring(0, 8);
+      if (m) {
+        const newSkey = m[1];
+        const newAuth = { ...auth, skey: newSkey };
+        // 更新 cookie 中的 wr_skey
+        newAuth.cookie = auth.cookie.replace(/wr_skey=[^;]+/, 'wr_skey=' + newSkey);
+        // 尝试获取新昵称
+        const nickname = await fetchNickname(newAuth);
+        if (nickname) newAuth.nickname = nickname;
+        $.setdata(JSON.stringify(newAuth), AUTH_KEY);
+        $.log('[WeRead] web cookie refreshed');
+        return newAuth;
+      }
     } catch (e) {}
   }
   return null;
@@ -273,19 +237,6 @@ function getAuth() {
   const d = $.getdata(AUTH_KEY);
   if (!d) return null;
   try { return JSON.parse(d); } catch { return null; }
-}
-
-function encode(obj) {
-  const str = JSON.stringify(obj);
-  if (typeof $base64 !== 'undefined') return $base64.encode(str);
-  return str;
-}
-
-function decode(str) {
-  try {
-    if (typeof $base64 !== 'undefined') return JSON.parse($base64.decode(str));
-    return JSON.parse(str);
-  } catch { return null; }
 }
 
 function get(url, headers) {
