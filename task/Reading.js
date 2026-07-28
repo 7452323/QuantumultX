@@ -87,20 +87,19 @@ async function fetchNickname(auth) {
     const headers = {
       'vid': auth.vid,
       'skey': auth.skey,
-      'User-Agent': auth.ua || 'WeRead',
+      'User-Agent': auth.ua || 'WeRead/7.0.0 WRBrand/huawei Dalvik/2.1.0',
       'Content-Type': 'application/json'
     };
-    const res = await post(APP_API + '/user/profile', '{}', headers);
-    if (res.status === 200) {
-      const data = decode(res.body);
-      if (data?.nickname) return data.nickname;
-      if (data?.nickName) return data.nickName;
-      if (data?.name) return data.name;
-    }
-  } catch (e) {}
-  return null;
+    const resp = await get('https://i.weread.qq.com/user/profile', headers);
+    const data = JSON.parse(resp.body);
+    if (data?.data?.user?.name) return data.data.user.name;
+    if (data?.user?.name) return data.user.name;
+    return null;
+  } catch (e) {
+    console.log('fetchNickname error: ' + e.message);
+    return null;
+  }
 }
-
 /* ======== 主流程：领取奖励 ======== */
 async function runClaim() {
   const auth = getAuth();
@@ -237,6 +236,15 @@ function decode(str) {
     if (typeof $base64 !== 'undefined') return JSON.parse($base64.decode(str));
     return JSON.parse(str);
   } catch { return null; }
+}
+
+function get(url, headers) {
+  return new Promise((resolve, reject) => {
+    $httpClient.get({ url, headers, timeout: 10000 }, (err, res, data) => {
+      if (err) reject(err);
+      else resolve({ status: res.status, body: data, headers: res.headers });
+    });
+  });
 }
 
 function post(url, body, headers) {
