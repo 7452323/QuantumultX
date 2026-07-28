@@ -59,8 +59,7 @@ async function saveAuth() {
   const existing = getAuth();
   const existingToken = existing?.refreshToken || '';
 
-  if (existing && existing.vid === vid && existing.skey === skey) return;
-
+  // 无论是否相同，只要有 vid/skey 就更新 refreshToken
   const auth = { vid, skey };
   for (let k in h) {
     const key = k.toLowerCase();
@@ -70,10 +69,14 @@ async function saveAuth() {
   }
   if (existingToken) auth.refreshToken = existingToken;
 
-  const nickname = await fetchNickname(auth);
-  if (nickname) auth.nickname = nickname;
+  // 先保存，昵称异步获取，避免阻塞通知
   $.setdata(JSON.stringify(auth), AUTH_KEY);
-  $.msg(`「${nickname || '微信读书'}」`, '凭证采集成功', '');
+  $.msg(`「${auth.nickname || '微信读书'}」`, '凭证采集成功', '');
+  const nickname = await fetchNickname(auth);
+  if (nickname) {
+    auth.nickname = nickname;
+    $.setdata(JSON.stringify(auth), AUTH_KEY);
+  }
   $.log('[WeRead] auth saved');
 }
 
