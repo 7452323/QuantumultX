@@ -71,7 +71,7 @@ function saveAuth() {
     if (key === 'user-agent') auth.ua = h[k];
   }
   $.setdata(JSON.stringify(auth), AUTH_KEY);
-  $.msg('「微信读书」', '凭证已采集', '');
+  $.msg('「微信读书」', '凭证采集成功', '');
   $.log('[WeRead] auth saved');
 }
 
