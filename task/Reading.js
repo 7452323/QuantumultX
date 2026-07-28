@@ -96,8 +96,14 @@ async function fetchNickname(auth) {
       'v': '7.4.2.23',
       'Content-Type': 'application/json'
     };
-    const resp = await get('https://i.weread.qq.com/user/profile', headers);
+    const resp = await post(APP_API + '/friend/ranking?mine=1&synckey=0', '', headers);
     const data = JSON.parse(resp.body);
+    if (data?.errcode) return null;
+    if (data?.ranking?.length > 0) {
+      const me = data.ranking.find(r => r.user?.userVid == auth.vid);
+      if (me?.user?.name) return me.user.name;
+      if (data.ranking[0]?.user?.name) return data.ranking[0].user.name;
+    }
     if (data?.data?.user?.name) return data.data.user.name;
     if (data?.user?.name) return data.user.name;
     return null;
