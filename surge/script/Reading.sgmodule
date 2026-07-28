@@ -1,5 +1,5 @@
 #!name=微信读书(领取阅读奖励)
-#!desc=打开微信读书APP自动采集凭证，定时领取体验卡/书币
+#!desc=打开微信读书Web自动采集凭证，定时领取体验卡/书币
 #!author=7452323
 #!category=签到羊毛
 #!arguments=choiceType:1,cron:"10 23 * * 7",Cookie:1
@@ -7,7 +7,7 @@
 
 [Script]
 微信读书 = type=cron, cronexp="{{{cron}}}", wake-system=1, timeout=60, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading.js, argument="choiceType={{{choiceType}}}&Cookie={{{Cookie}}}"
-微信读书_cookie = type=http-request, pattern=^https?://i\.weread\.qq\.com/, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading.js, requires-body=1
+微信读书_cookie = type=http-request, pattern=^https?://weread\.qq\.com/, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading.js, requires-body=1
 
 [MITM]
-hostname = %APPEND% i.weread.qq.com
+hostname = %APPEND% weread.qq.com
