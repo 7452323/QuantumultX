@@ -3,7 +3,9 @@ name: scripting-home-screen-ui
 description: 为脚本提供 home_screen_default_ui.tsx，使其能被渲染到首页第一个 Tab 中
 metadata:
   display_name: "脚本 UI 万能适配"
-  intent_patterns: "首页Tab,首页配置,home_screen_default_ui,首页默认UI,首页第一个Tab,添加首页,shared.tsx,共享代码提取,避免副作用,导入副作用"
+  intent_patterns: "首页Tab,首页配置,home_screen_default_ui,首页默认UI,首页第一个Tab,添加首页,shared.tsx,共享代码提取,避免副作用,导入副作用,万能适配"
+  assistant_tools:
+    - load: true
 ---
 
 # Purpose
