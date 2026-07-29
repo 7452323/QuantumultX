@@ -29,31 +29,42 @@ script-dir/
 ├── index.tsx                    → 类型2（可能同时有widget/intent）
 ├── widget.tsx                   → 类型3
 ├── intent.tsx                   → 类型4
-└── script.json                  → 能力声明
+├── app_intents.tsx              → 类型5
+├── live_activity.tsx            → 类型6
+└── script.json                  → 元信息
 ```
 
 ## 检查清单
 
-1. **搜索 `TabView`** — 有则标记"需改顶部布局"
-2. **搜索 `home_screen_default_ui.tsx`** — 有则标记"需加 NavigationStack"
+1. **搜索 `<TabView`** — 有则标记"需改顶部布局"
+2. **搜索 `home_screen_default_ui.tsx`** — 检查是否被 NavigationStack 包裹
 3. **搜索 `AVPlayer` / `AVPlayerView`** — 有则标记"需补播放器功能"
 4. **搜索 `widget.tsx`** — 检查 Widget 模板
 5. **搜索 `intent.tsx`** — 检查 Intent 模板
-6. **搜索旧文字** — "setup_token"、"Token 来自浏览器"、"手动填写 Token"
-7. **检查 import** — 全局 API 不得从 scripting import
-8. **检查 script.json** — capability 是否匹配入口文件
+6. **搜索 `app_intents.tsx`** — 检查交互意图
+7. **搜索 `live_activity.tsx`** — 检查 Live Activity
+8. **搜索旧文字** — "setup_token"、"Token 来自浏览器"、"手动填写 Token"
+9. **检查 import** — 全局 API 不得从 scripting import
+10. **检查主页框架** — 是否用 `Navigation.present` 或 `Navigation.present({ element: ... })`
 
 # 第二步：类型1 — home_screen_default_ui.tsx 适配
 
 ## 必须检查
 
-默认导出的最外层组件必须被 `<NavigationStack>` 包裹：
+默认导出的最外层组件**必须**被 `<NavigationStack>` 包裹：
 
 ```tsx
 // ❌ 错误（App 不再自动包裹）
 export default function HomeScreenView() {
   return (
     <ScrollView>...</ScrollView>
+  )
+}
+
+// ❌ 错误（ZStack 也不是 NavigationStack）
+export default function HomeScreenDefaultUi() {
+  return (
+    <ZStack>...</ZStack>
   )
 }
 
@@ -71,41 +82,99 @@ export default function HomeScreenView() {
 
 - 如果已有 NavigationStack，但它是 App 旧版本自动加的 `HomeScreenView` 父级组件，检查是否在 `<TabView>` / `<VStack>` 外部
 - 确保没有重复嵌套 2 层 NavigationStack
+- 注意直接使用 `<ZStack>` / `<VStack>` / `<ScrollView>` 作为根组件的情况
 
 # 第三步：类型2 — index.tsx TabView → 顶部 HStack 按钮
 
 ## 扫描现有代码
 
 找出所有底部 TabView：
-- 搜索 `<TabView` 及其子 `<Tab`
+- 搜索 `<TabView` 及其子 `<Tab` / `<TabItem`
 - 记录 Tab 数量和每个 Tab 的内容（name, icon, 页面组件）
-- 记录是否有 `iOS 18 兼容` 的两套代码
+- 检查是否有两套代码（iOS 18 兼容 `Device.systemVersion >= 18`）
+- 检查是否有自定义 `useTabs()` hook
+- 检查 `selection` 是用 `useObservable` 还是 `useState`
+
+## 全部 TabView 变体模式（覆盖所有已知脚本）
+
+### 模式A: 标准 `<Tab>` 组件（ComicReader, TMP.link, Scripting Music）
+```tsx
+<TabView selection={selection}>
+  <Tab title="首页" systemImage="house.fill" value={0}>
+    <NavigationStack><HomeView /></NavigationStack>
+  </Tab>
+</TabView>
+```
+
+### 模式B: `Tab as TabItem` 别名（IPA-Tool）
+```tsx
+import { TabView, Tab as TabItem } from "scripting";
+<TabView selection={selection} tabBarMinimizeBehavior="automatic">
+  <TabItem title="" systemImage="magnifyingglass" value={Tab.Search} role="search" badge={count}>
+    <SearchView />
+  </TabItem>
+</TabView>
+```
+
+### 模式C: 旧版 `tabItem={<Label />}`（糖心2旧iOS、Video Downloader2）
+```tsx
+<TabView tint="systemPink">
+  <NavigationStack tabItem={<Label title="首页" systemImage="house.fill" />}>
+    <HomeView />
+  </NavigationStack>
+</TabView>
+```
+
+### 模式D: 两套 iOS 版本分支代码（糖心2）
+```tsx
+const isNew = parseFloat(Device.systemVersion) >= 18;
+if (isNew) {
+  return <TabView tint="systemPink"><Tab title="首页" ...>...</Tab></TabView>
+}
+return <TabView tint="systemPink"><NavigationStack tabItem={<Label .../>}>...</NavigationStack></TabView>
+```
+
+## TabView 属性提取检查清单
+
+转换前，逐项检查以下 TabView 属性：
+
+| 属性 | 位置 | 转换处理 |
+|------|------|---------|
+| `selection={selection}` | `<TabView>` | 确认是 `useObservable` 还是 `useState`；`useObservable`→`useState` |
+| `tint="systemPink"` | `<TabView>` | 记录颜色，用于顶部按钮选中态（默认 systemBlue，有 tint 则用 tint 色） |
+| `tabBarMinimizeBehavior` | `<TabView>` | **必须删除**，顶部 HStack 不需要 |
+| `tabViewStyle` | `<TabView>` | **必须删除** |
+| `tabViewBottomAccessory` | `<TabView>` | 提取内容，改为条件渲染放在内容页下方 |
+| `sheet={{ isPresented, content }}` | `<TabView>` | 提取为独立 `.sheet()` 调用 |
+| `value={0}` 或 `value="home"` | `<Tab>` | 记录所有 value，改为字符串 name |
+| `badge={count}` | `<Tab>` / `<TabItem>` | 在顶部按钮上显示角标：`{badge > 0 ? <Text font="caption2" foregroundStyle="red">{badge}</Text> : null}` |
+| `role="search"` | `<Tab>` / `<TabItem>` | 无特殊处理，同普通按钮 |
+| `title=""` (空字符串) | `<Tab>` / `<TabItem>` | 记录空标题，转换时用 `title=""` |
+| `systemImage="..."` | `<Tab>` / `<TabItem>` | 照搬到 Button 的 systemImage |
 
 ## 改造方法
 
 ```tsx
-// ❌ 旧（底部 TabView）
+// ❌ 旧（底部 TabView）— 任意变体模式
 import { TabView, Tab, Label } from "scripting"
-<TabView selection={tabIndex} onTabIndexChanged={function(v){setTabIndex(v)}}>
-  <Tab tabItem={<Label text="首页" systemImage="house" />}>
-    <NavigationStack>
-      <HomeView />
-    </NavigationStack>
+<TabView selection={tabIndex} tint="systemPink">
+  <Tab title="首页" systemImage="house" value={0}>
+    <NavigationStack><HomeView /></NavigationStack>
   </Tab>
-  <Tab tabItem={<Label text="设置" systemImage="gear" />}>
-    <NavigationStack>
-      <SettingsView />
-    </NavigationStack>
+  <Tab title="设置" systemImage="gear" value={1}>
+    <NavigationStack><SettingsView /></NavigationStack>
   </Tab>
 </TabView>
 
 // ✅ 新（顶部 HStack + 条件渲染）
-// import 移除: TabView, Tab, Label（如果不再被其他地方使用）
+// import 移除: TabView, Tab, Label, TabItem（如果不再被其他地方使用）
+// import 添加: useState, ScrollView, HStack, Divider, Button（如没import）
 const tabs = [
   { name: "首页", icon: "house" },
   { name: "设置", icon: "gear" },
 ] as const
 const [selectedTab, setSelectedTab] = useState<string>("首页")
+const accentColor = "systemPink" // 从原 tint 属性继承
 
 return (
   <NavigationStack>
@@ -122,7 +191,7 @@ return (
                 title={tab.name}
                 systemImage={tab.icon}
                 action={function() { setSelectedTab(tab.name) }}
-                background={active ? "systemBlue" : "clear"}
+                background={active ? accentColor : "clear"}
                 foregroundStyle={active ? "white" : "label"}
                 frame={{ maxWidth: "infinity" }}
                 padding={{ leading: 14, trailing: 14, top: 8, bottom: 8 }}
@@ -145,11 +214,14 @@ return (
 
 1. **Tab 数量过多**（≥5 个）→ 用 `ScrollView axes="horizontal"` 包 HStack，防止溢出
 2. **Tab 有图标** → 用 `systemImage` 参数配 Button
-3. **iOS 18 兼容代码** → 如果同时有 iOS 18 和旧版两套 <TabView>，直接完全替换
+3. **iOS 18 兼容代码** → 如果同时有 iOS 18 和旧版两套 `<TabView>`，直接完全替换，删除 `Device.systemVersion` 分支
 4. **`selection` 用 `useObservable`** → 改成 `useState`
-5. **`tabIndex` + `onTabIndexChanged`** → 改成 `selectedTab` + `setSelectedTab`
-6. **子 Tab 原有的 `NavigationStack`** → 外层 NavigationStack 已经包裹了，子页面可以去掉内部的 NavigationStack 或被条件渲染保留两个 NavigationStack 层级（不影响功能）
-7. **移除未使用的 import** — `TabView`, `Tab`, `Label` 如果不再用就删掉
+5. **自定义 `useTabs()` hook** → 删除 hook 文件引用，改为 `useState` + 内联 tabs 数组
+6. **子 Tab 原有的 `NavigationStack`** → 外层 NavigationStack 已经包裹了，子 NavigationStack 可以保留（不影响功能）
+7. **移除未使用的 import** — `TabView`, `Tab`, `Label`, `TabItem`, `useObservable`（如果不再用）等
+8. **`tabItem={<Label />}` 旧模式** → 用 title + systemImage 提取信息
+9. **`tabViewBottomAccessory`** → 提取为独立的底部视图或 `.sheet()`
+10. **`badge` 角标** → 保持在按钮上显示为红色角标文字
 
 # 第四步：类型2 — 播放页功能补齐
 
@@ -233,6 +305,7 @@ async function unlikeVideo(id: string): Promise<boolean> { ... }
 | `useEffect` | **必须 from "scripting"** | — | `import { useEffect } from "scripting"` |
 | `useObservable` | **必须 from "scripting"** | — | `import { useObservable } from "scripting"` |
 | `AVPlayer` | **全局** | — | 不 import，直接 `new AVPlayer()` |
+| `Device` | **全局** | — | 不 import，直接 `Device.systemVersion` |
 
 > 运行时错误 `undefined is not an object (evaluating 'scripting_1.Storage.set')` = 全局 API 被错误 import。
 
@@ -262,6 +335,15 @@ async function unlikeVideo(id: string): Promise<boolean> { ... }
 |---------|---------|
 | `background="transparent"` | `background="clear"` |
 
+### TabView（额外约束）
+| 属性 | 状态 |
+|------|------|
+| `tint` | 仅旧版 TabView 需要；转换顶部后用作选中色 |
+| `tabBarMinimizeBehavior` | 转换后必须删除 |
+| `tabViewStyle` | 转换后必须删除 |
+| `tabViewBottomAccessory` | 转换后提取为独立组件 |
+| `sheet` on TabView | 转换后改为独立 `.sheet()` |
+
 ## 5.3 异步操作安全
 
 所有 `fetch`、`await` 调用必须有 try-catch：
@@ -284,12 +366,10 @@ try {
 }
 ```
 
-## 5.4 脚本退出
+## 5.4 脚本退出 — 多种模式
 
-所有入口必须确保 Script.exit() 被调用：
-
+### 模式A: `Navigation.present()` + `.finally(Script.exit)`（推荐）
 ```tsx
-// ✅ 正确（finally 确保退出）
 async function run() {
   await Navigation.present({ element: <App /> })
 }
@@ -298,11 +378,39 @@ run().finally(Script.exit)
 run().catch(console.error).finally(Script.exit)
 ```
 
-错误写法：
+### 模式B: 直接 `Script.exit()` 在 async 末尾
 ```tsx
-// ❌ run() 后没有 .finally(Script.exit)
-// ❌ intent.tsx 中 return 后没调 Script.exit()
+async function run() {
+  await Navigation.present({ element: <App /> })
+  Script.exit()
+}
+run()
 ```
+⚠️ 这种模式没有 `.finally()`，如果 run() 内抛出异常不会退出。
+
+### 模式C: `.then(() => Script.exit())`
+```tsx
+run().then(() => Script.exit())
+```
+
+### 模式D: `.finally(() => Script.exit())`
+```tsx
+run().finally(() => Script.exit());
+```
+
+### 模式E: Intent 中 IIFE
+```tsx
+(async function() {
+  if (!fileURLs) { Script.exit(); return }
+  // ...逻辑...
+  await Navigation.present({ element: <ResultView ... /> })
+})().catch(function(e) {
+  console.error(e)
+  console.present()
+}).finally(Script.exit)
+```
+
+**统一原则**：所有入口必须有 `.finally(Script.exit)` 或等效保证。优先使用模式A。
 
 # 第六步：类型3 — Widget 模板检查
 
@@ -343,7 +451,7 @@ main()
 
 ## Widget 检查项
 
-1. ✅ 每个尺寸都有对应的视图
+1. ✅ 每个尺寸都有对应的视图（或者单尺寸 widget）
 2. ✅ 数据加载带 try-catch
 3. ✅ 数据为 null 时有 fallback 视图
 4. ✅ 没有使用 `useState`（Widget 内不支持）
@@ -356,8 +464,23 @@ main()
 ```tsx
 // 定时刷新
 Widget.present(<View />, { policy: "after", date: new Date(Date.now() + 15 * 60 * 1000) })
-// 或使用 TimelineProvider（推荐）
+// TimelineProvider 方式（推荐用于经常变化的数据）
 ```
+
+## 单尺寸 Widget 处理
+
+有些 Widget 只提供一个尺寸（如 `Docker Compose Manager`）：
+```tsx
+async function main() {
+  try {
+    const output = await loadData()
+    Widget.present(<SystemSmallView data={output} />)
+  } catch(e) {
+    Widget.present(<Text>{String(e)}</Text>)
+  }
+}
+```
+检查时：单尺寸也要有错误 fallback。
 
 # 第七步：类型4 — Intent 模板检查
 
@@ -390,39 +513,104 @@ run().catch(function(e) {
 5. ✅ `.catch()` 中有错误处理（console.present 或 dialog）
 6. ✅ 未使用的 import（如 `Path`）已移除
 
-# 第八步：类型5/6 — app_intents.tsx / Live Activity 适配
-
-## app_intents.tsx 标准
+# 第八步：类型5 — app_intents.tsx 交互意图检查
 
 ```tsx
-import { Widget, Script } from "scripting"
+import { Widget, Script, Intent } from "scripting"
 
 // 提供 toggle/button action 给交互小组件
 async function toggleAction() { ... }
+
+// 检查项
+// 1. ✅ 从 "scripting" import Widget, Script
+// 2. ✅ 导出的 async 函数有错误处理
+// 3. ✅ 无参数时 Script.exit()
+// 4. ✅ 类型声明正确
 ```
 
-## Live Activity 标准
+# 第九步：类型6 — Live Activity 适配 ⚠️
+
+## ⚠️ 重要：正确的 Live Activity API
 
 ```tsx
+// ❌ 错误（早期文档写法，不存在 ActivityKit）
 import { ActivityKit } from "scripting"
-
-// 启动 / 更新 / 结束 Live Activity
 const activity = await ActivityKit.start(...)
+
+// ✅ 正确（实际 API）
+import {
+  LiveActivity,
+  LiveActivityUI,
+  LiveActivityUIBuilder,
+  LiveActivityUIExpandedCenter,
+  LiveActivityUIExpandedLeading,
+  LiveActivityUIExpandedTrailing,
+  LiveActivityUIExpandedBottom,
+  HStack, VStack, Text, Image, Spacer, ProgressView, Gauge,
+} from "scripting"
+
+// 定义状态类型
+export type ActivityState = {
+  progress: number
+  total: number
+  status: "idle" | "active" | "done" | "error"
+  currentLabel: string
+}
+
+// 构建 Live Activity UI builder
+const builder: LiveActivityUIBuilder<ActivityState> = (state) => {
+  return (
+    <LiveActivityUI
+      content={<LockScreenView {...state} />}              // 锁屏展开视图
+      compactLeading={<CompactLeadingView {...state} />}    // 灵动岛紧凑左
+      compactTrailing={<CompactTrailingView {...state} />}  // 灵动岛紧凑右
+      minimal={<MinimalView {...state} />}                  // 灵动岛最小化
+    >
+      <LiveActivityUIExpandedCenter>
+        <ExpandedCenterView {...state} />
+      </LiveActivityUIExpandedCenter>
+      <LiveActivityUIExpandedLeading>
+        <ExpandedLeadingView {...state} />
+      </LiveActivityUIExpandedLeading>
+      <LiveActivityUIExpandedTrailing>
+        <ExpandedTrailingView {...state} />
+      </LiveActivityUIExpandedTrailing>
+      <LiveActivityUIExpandedBottom>
+        <ExpandedBottomView {...state} />
+      </LiveActivityUIExpandedBottom>
+    </LiveActivityUI>
+  )
+}
+
+// 注册 Live Activity
+export const MyLiveActivity = LiveActivity.register("MyActivity", builder)
+
+// 启动（在其他文件中）
+// const activity = await MyLiveActivity.start({ progress: 0, total: 20, status: "active", ... })
+// 更新
+// await activity.update({ progress: 10 })
+// 结束
+// await activity.end()
 ```
 
-## 检查项
+## Live Activity 检查项
 
-1. ✅ 引用了正确的 Scripting API（ActivityKit, Widget, Intent）
-2. ✅ 类型声明匹配
-3. ✅ 错误处理完善
-4. ✅ `.finally(Script.exit)` 确保退出
+1. ✅ 使用正确的 `LiveActivityUI` + `LiveActivityUIBuilder` 模式
+2. ✅ 提供了 `content`（锁屏）、`compactLeading`、`compactTrailing`、`minimal` 四个必需区域
+3. ✅ 可选区域 `LiveActivityUIExpandedCenter/Leading/Trailing/Bottom` 齐备
+4. ✅ 类型定义（状态接口）清晰
+5. ✅ 通过 `LiveActivity.register("Name", builder)` 注册
+6. ✅ 导出了注册后的 activity 对象（供其他文件 start/update/end）
+7. ✅ 有合理的状态类型（progress, total, status）
 
-# 第九步：收尾验证
+# 第十步：收尾验证
 
 ## 自动检查清单
 
 - [ ] `home_screen_default_ui.tsx` 被 NavigationStack 包裹（如果有）
-- [ ] 所有底部 TabView 已改为顶部 HStack
+- [ ] 所有底部 TabView 已改为顶部 HStack（包括别名 TabItem、useTabs hook、两套代码等变体）
+- [ ] TabView 的 tint/tabBarMinimizeBehavior/tabViewStyle/bottomAccessory/sheet 等属性已正确处理
+- [ ] Tab badge 角标已迁移到顶部按钮
 - [ ] 播放器有完整的点赞/下载/画质切换
 - [ ] 所有 import 正确（全局API不从scripting import）
 - [ ] TextField/SecureField 没有 placeholder/keyboardType/autocapitalization
@@ -430,9 +618,10 @@ const activity = await ActivityKit.start(...)
 - [ ] Text 没有 alignment 属性
 - [ ] Button 有 title（即使配了 systemImage）
 - [ ] 所有 fetch/async 有 try-catch
-- [ ] 所有入口有 .finally(Script.exit)
+- [ ] 所有入口有 .finally(Script.exit)（或等效保障）
 - [ ] Widget 有 null 数据 fallback + try-catch + 多尺寸
 - [ ] Intent 有无参数时正常退出
+- [ ] **Live Activity 使用了正确的 LiveActivity.register() API（不是 ActivityKit）**
 - [ ] 过时文字已更新（setup_token, Token 来自浏览器）
 - [ ] 未使用的 import 已移除
 - [ ] TypeScript 诊断零错误
@@ -447,3 +636,6 @@ get_typescript_diagnostics(script_name="<脚本名>")
 
 只需说：
 > **"万能适配这个脚本"**
+
+或指定脚本名称：
+> **"万能适配 ComicReader"**
