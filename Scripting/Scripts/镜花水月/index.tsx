@@ -32,6 +32,7 @@ interface SavedUser { id: string; nickname: string; avatar: string; savedAt: num
 
 const MOBILE_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1"
 const ANDROID_UA = "Mozilla/5.0 (Android; Mobile; rv:54.0) Gecko/54.0 Firefox/54.0"
+const POST_PAGE_SIZE = 30
 
 // ─── 工具函数 ───
 function sleep(ms: number): Promise<void> { return new Promise((r) => setTimeout(r, ms)) }
@@ -50,12 +51,6 @@ function isGifUrl(url: string): boolean {
   }
 }
 
-/** 检测是否是 WebP 动图 URL */
-function isAnimatedWebpUrl(url: string): boolean {
-  if (!url) return false
-  const path = url.split("?")[0].toLowerCase()
-  return path.endsWith(".webp")
-}
 
 /**
  * 检测 Data 是否为 GIF 动图（通过 magic bytes）。
@@ -80,6 +75,43 @@ function pickBestUrl(urls?: string[]): string {
 }
 function formatDuration(ms: number): string { const s = Math.floor(ms / 1000); const m = Math.floor(s / 60); return `${m}:${String(s % 60).padStart(2, "0")}` }
 function formatCount(n: number): string { if (n >= 10000) return (n / 10000).toFixed(1) + "w"; if (n >= 1000) return (n / 1000).toFixed(1) + "k"; return String(n) }
+function getGridCardWidth(): number {
+  const screenWidth = (typeof screen !== 'undefined' && typeof screen?.width === 'number') ? screen.width : 390
+  // List/Section 会吃掉一部分可用宽度；这里用保守值，避免 hit area 压到相邻 cell。
+  const horizontalPadding = 64
+  const columnSpacing = 14 * 2
+  return Math.floor((screenWidth - horizontalPadding - columnSpacing) / 3)
+}
+
+async function writeDataFile(path: string, data: Data): Promise<void> {
+  if (await FileManager.exists(path)) {
+    await FileManager.remove(path)
+  }
+  try {
+    // @ts-ignore
+    await FileManager.writeAsData(path, data)
+  } catch (writeErr: any) {
+    throw new Error(`写入文件失败: ${writeErr?.message || String(writeErr)}`)
+  }
+}
+
+async function createLivePhotoPairFromVideoPath(videoPath: string, baseName: string) {
+  const basePath = FileManager.documentsDirectory + baseName
+  const imagePath = `${basePath}.jpg`
+  const liveVideoPath = `${basePath}.mov`
+  if (await FileManager.exists(imagePath)) await FileManager.remove(imagePath)
+  if (await FileManager.exists(liveVideoPath)) await FileManager.remove(liveVideoPath)
+  return await LivePhoto.createFromVideo({
+    videoPath,
+    imageOutputPath: imagePath,
+    videoOutputPath: liveVideoPath,
+    stillTime: 0,
+    maxDuration: 10,
+    imageFormat: "jpeg",
+    quality: 0.9,
+    includeAudio: false,
+  })
+}
 
 /** 从 aweme_id 构造抖音分享链接 */
 function getShareUrl(video: VideoInfo): string {
@@ -207,7 +239,8 @@ function extractAwemeFromRouterData(routerData: any): any {
  */
 async function extractNoWatermarkUrl(
   video: VideoInfo,
-  isImage?: boolean
+  isImage?: boolean,
+  imageIndex: number = 0
 ): Promise<{ url: string; imageUrls: string[] }> {
   const shareUrl = getShareUrl(video)
   const webView = new WebViewController({ ephemeral: true })
@@ -264,7 +297,7 @@ async function extractNoWatermarkUrl(
         
         // 如果是图文作品或明确要求图片，返回图片 URL
         if ((isImage || (hasImages && !hasVideo)) && imageUrls.length > 0) {
-          return { url: imageUrls[0], imageUrls }
+          return { url: imageUrls[imageIndex] || imageUrls[0], imageUrls }
         }
         
         // 提取视频 URL
@@ -312,24 +345,30 @@ async function downloadWithProgress(
 ): Promise<Data> {
   const CHUNK_SIZE = 1024 * 512 // 512KB 每块
   
-  // 1. 先发起普通请求获取 Content-Length
-  const resp = await fetch(url, { headers })
-  if (!resp.ok) {
-    throw new Error(`下载 HTTP ${resp.status}`)
-  }
-  
-  // 尝试从 headers 获取 Content-Length
-  const contentLengthStr = resp.headers?.get?.("Content-Length") || resp.headers?.get?.("content-length")
-  const totalSize = contentLengthStr ? parseInt(contentLengthStr) : 0
-  
-  // 如果无法获取文件大小或服务器不支持 Range，回退普通下载
-  if (!totalSize) {
+  const downloadDirect = async (): Promise<Data> => {
     onProgress(0, 0)
+    const resp = await fetch(url, { headers })
+    if (!resp.ok) throw new Error(`下载 HTTP ${resp.status}`)
     const arrayBuf = await resp.arrayBuffer()
     const data = Data.fromArrayBuffer(arrayBuf)
     if (!data) throw new Error("下载数据转换失败")
     onProgress(data.size, data.size)
     return data
+  }
+
+  // 1. 优先用 HEAD 探测大小，避免正式下载前多拉一次完整文件
+  let totalSize = 0
+  try {
+    const headResp = await fetch(url, { method: "HEAD", headers })
+    if (headResp.ok) {
+      const contentLengthStr = headResp.headers?.get?.("Content-Length") || headResp.headers?.get?.("content-length")
+      totalSize = contentLengthStr ? parseInt(contentLengthStr) : 0
+    }
+  } catch {}
+  
+  // 如果无法获取文件大小，回退普通下载
+  if (!totalSize) {
+    return await downloadDirect()
   }
   
   // 2. 分块下载
@@ -341,18 +380,14 @@ async function downloadWithProgress(
     const rangeHeader = { ...headers, Range: `bytes=${downloaded}-${end}` }
     
     const chunkResp = await fetch(url, { headers: rangeHeader })
-    if (!chunkResp.ok && chunkResp.status !== 206) {
-      // 服务器不支持 Range，回退普通下载
-      const arrayBuf = await resp.arrayBuffer()
-      const data = Data.fromArrayBuffer(arrayBuf)
-      if (!data) throw new Error("下载数据转换失败")
-      onProgress(data.size, data.size)
-      return data
+    if (chunkResp.status !== 206) {
+      // 服务器忽略 Range 或返回异常状态，回退普通下载
+      return await downloadDirect()
     }
     
     const chunkArrayBuf = await chunkResp.arrayBuffer()
     const chunkData = Data.fromArrayBuffer(chunkArrayBuf)
-    if (!chunkData) throw new Error("分块数据转换失败")
+    if (!chunkData || chunkData.size === 0) throw new Error("分块下载返回空数据")
     
     chunks.push(chunkData)
     downloaded += chunkData.size
@@ -367,48 +402,24 @@ async function downloadWithProgress(
   }
   
   // 3. 合并所有块
-  // 使用 ObjC 桥接合并 Data 数组
-  // 方案：将所有 chunk 转为 Uint8Array，然后合并
   let totalBytes = 0
-  for (const c of chunks) {
-    totalBytes += c.size
+  const byteChunks: Uint8Array[] = []
+  for (const chunk of chunks) {
+    const bytes = chunk.toUint8Array()
+    if (!bytes) throw new Error("分块数据转换失败")
+    byteChunks.push(bytes)
+    totalBytes += bytes.length
   }
-  
-  // 使用 writeToFile 然后 read 的方式
-  const tempPath = FileManager.documentsDirectory + `.download_tmp_${Date.now()}`
-  
-  // 逐块写入文件
-  for (let i = 0; i < chunks.length; i++) {
-    const chunk = chunks[i]
-    if (i === 0) {
-      // 第一块：创建新文件
-      // @ts-ignore
-      await FileManager.writeAsBytes(tempPath, chunk.toUint8Array())
-    } else {
-      // 后续块：追加到文件
-      const existing = await FileManager.readAsBytes(tempPath)
-      if (!existing) throw new Error("读取临时文件失败")
-      const chunkBytes = chunk.toUint8Array()
-      if (!chunkBytes) throw new Error("分块数据转换失败")
-      const newArray = new Uint8Array(existing.length + chunkBytes.length)
-      newArray.set(existing, 0)
-      newArray.set(chunkBytes, existing.length)
-      // @ts-ignore
-      await FileManager.writeAsBytes(tempPath, newArray)
-    }
+
+  const mergedBytes = new Uint8Array(totalBytes)
+  let offset = 0
+  for (const bytes of byteChunks) {
+    mergedBytes.set(bytes, offset)
+    offset += bytes.length
   }
-  
-  // 读取合并后的文件
-  const mergedBytes = await FileManager.readAsBytes(tempPath)
-  // @ts-ignore - Uint8Array.buffer 在某些情况下被标记为 nullable，但实际有值
+
   const mergedData = Data.fromArrayBuffer(mergedBytes.buffer)
-  if (!mergedData) {
-    throw new Error("合并下载数据失败")
-  }
-  
-  // 清理临时文件
-  try { await FileManager.remove(tempPath) } catch {}
-  
+  if (!mergedData) throw new Error("合并下载数据失败")
   return mergedData
 }
 
@@ -426,47 +437,75 @@ async function shareVideo(video: VideoInfo, isImage: boolean, animIdx?: number) 
       isImage={isImage}
       originalUrl={isImage ? (imgInfo?.url || "") : video.play_url}
       imageVideoUrl={isImage ? (imgInfo?.videoUrl || "") : ""}
+      imageIndex={animIdx ?? 0}
     />
   )
 }
 
+const EXPORT_STEPS = ["解析", "下载", "保存"]
+
+function ExportStepIndicator({ currentStep }: { currentStep: number }) {
+  return (
+    <HStack frame={{ maxWidth: "infinity" }} spacing={8} padding={{ horizontal: 4 }}>
+      {EXPORT_STEPS.map((label, idx) => {
+        const order = idx + 1
+        const done = currentStep > order
+        const active = currentStep === order
+        return (
+          <HStack key={label} spacing={6} frame={{ maxWidth: "infinity" }}>
+            <VStack frame={{ width: 22, height: 22 }} alignment="center" background={done ? "systemGreen" : (active ? "systemBlue" : "systemGray5")} clipShape={{ type: "rect", cornerRadius: 11 }}>
+              <Text font="caption2" foregroundStyle={done || active ? "white" : "secondaryLabel"}>{done ? "✓" : String(order)}</Text>
+            </VStack>
+            <Text font="caption" foregroundStyle={active ? "label" : "secondaryLabel"}>{label}</Text>
+          </HStack>
+        )
+      })}
+    </HStack>
+  )
+}
+
 // ─── 分享进度视图 ───
-function ShareProgressView({ video, shareUrl, isImage, originalUrl, imageVideoUrl }: {
+function ShareProgressView({ video, shareUrl, isImage, originalUrl, imageVideoUrl, imageIndex }: {
   video: VideoInfo
   shareUrl: string
   isImage: boolean
   originalUrl: string
   imageVideoUrl: string
+  imageIndex: number
 }) {
   const dismiss = Navigation.useDismiss()
   const [step, setStep] = useState(0)         // 0=准备, 1=去水印, 2=下载, 3=保存, 4=完成, -1=失败
-  const [progressText, setProgressText] = useState("准备中...")
+  const [progressText, setProgressText] = useState("准备导出...")
+  const [statusTitle, setStatusTitle] = useState("准备导出")
   const [errorMsg, setErrorMsg] = useState("")
-  const [apiStatus, setApiStatus] = useState<string[]>([])
+  const [detailLines, setDetailLines] = useState<string[]>([])
+  const [showDetails, setShowDetails] = useState(false)
+  const [progressRatio, setProgressRatio] = useState(0)
+  const addDetail = (line: string) => setDetailLines(prev => [...prev.slice(-7), line])
 
   useEffect(() => {
     ;(async () => {
       try {
         // 步骤1：通过 WebView 解析抖音页面获取无水印资源
         setStep(1)
-        setProgressText("正在解析抖音页面...")
-        
-        setApiStatus(prev => [...prev, `🔗 视频链接: ${shareUrl}`])
-        setApiStatus(prev => [...prev, `⏳ 正在加载页面并解析资源地址...`])
+        setProgressRatio(0.08)
+        setStatusTitle("正在解析资源")
+        setProgressText("正在获取无水印地址")
+        addDetail(`分享页: ${shareUrl}`)
         
         // 使用 WebView 解析抖音页面内嵌数据（不依赖第三方 API）
-        const result = await extractNoWatermarkUrl(video, isImage)
+        const result = await extractNoWatermarkUrl(video, isImage, imageIndex)
         
-        setApiStatus(prev => [...prev, `📋 解析完成，URL 长度: ${result.url.length} 字符`] )
+        addDetail(`页面解析完成，资源地址长度 ${result.url.length}`)
         
         let targetUrl = result.url || ""
         
         // 如果解析失败，回退到原始地址
         if (!targetUrl) {
-          setApiStatus(prev => [...prev, `⚠️ 页面解析未获取到无水印地址，回退原始地址`])
+          addDetail("未解析到无水印地址，使用原始地址")
           targetUrl = originalUrl
         } else {
-          setApiStatus(prev => [...prev, `✅ 获取到无水印地址${result.imageUrls.length > 0 ? "（图文作品，共 " + result.imageUrls.length + " 张）" : ""}`])
+          addDetail(`已获取无水印地址${result.imageUrls.length > 0 ? "，图文共 " + result.imageUrls.length + " 张" : ""}`)
         }
         
         if (!targetUrl) {
@@ -474,28 +513,27 @@ function ShareProgressView({ video, shareUrl, isImage, originalUrl, imageVideoUr
         }
         // 锁定 targetUrl 为不可变常量，方便后续窄化
         const finalTargetUrl = targetUrl
-        setApiStatus(prev => [...prev, `📥 下载地址已获取，长度: ${finalTargetUrl.length} 字符`])
+        addDetail(`下载地址已确认，长度 ${finalTargetUrl.length}`)
         
-        // 动图处理：如果图片有伴随的视频 URL，直接下载视频保存为 mp4
+        // 动图处理：如果图片有伴随的视频 URL，下载视频后转换为 Live Photo
         const isAnimatedImage = isImage && imageVideoUrl.length > 0
         const downloadUrl = isAnimatedImage ? imageVideoUrl : finalTargetUrl
         if (isAnimatedImage) {
-          setApiStatus(prev => [...prev, `🎬 检测到动图视频源，将保存为 MP4 视频`])
+          addDetail("检测到动态图视频源，将保存为 Live Photo")
         }
         
         // 步骤2：下载文件（带百分比进度）
         setStep(2)
-        setProgressText("正在下载文件...")
+        setProgressRatio(0.18)
+        setStatusTitle("正在下载")
+        setProgressText("正在下载媒体文件")
         
         // 检测是否是 GIF 动图
         const isGif = !isAnimatedImage && isGifUrl(downloadUrl)
         const ext = isAnimatedImage ? "mp4" : (isImage ? (isGif ? "gif" : "jpg") : "mp4")
-        const fileName = `${video.aweme_id}${isAnimatedImage ? "_video" : (isGif ? "_" + (video.images[0]?.url || "").split("/").pop()?.split("?")[0].replace(/[^a-zA-Z0-9]/g, "").substring(0, 10) : "")}.${ext}`
+        const fileName = `${video.aweme_id}${isAnimatedImage ? "_video" : (isGif ? "_" + (originalUrl || "").split("/").pop()?.split("?")[0].replace(/[^a-zA-Z0-9]/g, "").substring(0, 10) : "")}.${ext}`
         
-        setApiStatus(prev => [...prev, `📦 文件名: ${fileName}${isGif ? " (检测到 GIF 动图)" : ""}`])
-        
-        // 步骤2：带实时进度的分块下载
-        setApiStatus(prev => [...prev, `📥 开始下载（分块获取实时进度）...`])
+        addDetail(`文件名: ${fileName}${isGif ? "，GIF" : ""}`)
         
         // 使用分块下载获取实时进度（512KB/块）
         const data = await downloadWithProgress(
@@ -504,15 +542,9 @@ function ShareProgressView({ video, shareUrl, isImage, originalUrl, imageVideoUr
           (downloaded, total) => {
             if (total > 0) {
               // 有总大小时显示 "36.5/50.0 M" 格式
-              setProgressText(`${formatBytes(downloaded)}/${formatBytes(total)}`)
-              setApiStatus(prev => {
-                // 只更新最后一条状态，避免日志过多
-                const last = prev[prev.length - 1]
-                if (last?.startsWith("📊")) {
-                  return [...prev.slice(0, -1), `📊 ${formatBytes(downloaded)}/${formatBytes(total)} (${(downloaded / total * 100).toFixed(0)}%)`]
-                }
-                return [...prev, `📊 ${formatBytes(downloaded)}/${formatBytes(total)} (${(downloaded / total * 100).toFixed(0)}%)`]
-              })
+              const ratio = downloaded / total
+              setProgressRatio(0.18 + ratio * 0.62)
+              setProgressText(`${formatBytes(downloaded)} / ${formatBytes(total)} (${(ratio * 100).toFixed(0)}%)`)
             } else {
               // 无总大小时显示已下载量
               setProgressText(`已下载 ${formatBytes(downloaded)}`)
@@ -524,7 +556,8 @@ function ShareProgressView({ video, shareUrl, isImage, originalUrl, imageVideoUr
           throw new Error("下载数据为空")
         }
         
-        setApiStatus(prev => [...prev, `📥 下载完成，共 ${formatBytes(data.size)}`])
+        setProgressRatio(0.82)
+        addDetail(`下载完成，共 ${formatBytes(data.size)}`)
         
         // 如果下载后发现是 GIF（magic bytes 检测），修正扩展名
         const actuallyGif = isGif || isGifData(data)
@@ -534,205 +567,211 @@ function ShareProgressView({ video, shareUrl, isImage, originalUrl, imageVideoUr
         const finalFileName = `${baseFileName}.${finalExt}`
         
         if (actuallyGif && ext !== finalExt) {
-          setApiStatus(prev => [...prev, `🔍 下载后检测到 GIF 动图 magic bytes，修正格式为 .gif`])
+          addDetail("下载后检测到 GIF，已修正文件格式")
         }
         
         // 步骤3：写入 Documents + 保存到相册
         setStep(3)
-        setProgressText("正在保存到相册...")
+        setProgressRatio(0.88)
+        setStatusTitle("正在保存")
+        setProgressText("正在写入相册")
         
         const docPath = FileManager.documentsDirectory + finalFileName
-        if (await FileManager.exists(docPath)) {
-          await FileManager.remove(docPath)
-        }
-        try {
-          // @ts-ignore
-          await FileManager.writeAsData(docPath, data)
-        } catch (writeErr: any) {
-          throw new Error(`写入文件失败: ${writeErr?.message || String(writeErr)}`)
-        }
-        setApiStatus(prev => [...prev, `💾 已写入: ${docPath} (${data.size} 字节)`])
+        await writeDataFile(docPath, data)
+        addDetail(`已写入临时文件，${data.size} 字节`)
         
         // 保存到相册：
-        // 1. 动图（带视频URL的）→ 保存为 MP4 视频
+        // 1. 动图（带视频URL的）→ 转换并保存为 Live Photo，失败时回退 MP4
         // 2. GIF 动图 → Data 模式保存保留动画
         // 3. 普通图片 → 路径模式保存
         // 4. 视频 → 路径模式保存
         let savedOk = false
         if (isAnimatedImage) {
-          // 动图：下载的是视频，用 saveVideo 保存为 MP4
-          savedOk = await Photos.saveVideo(docPath, { fileName: finalFileName, shouldMoveFile: true })
-          setApiStatus(prev => [...prev, `📤 动图已保存为 MP4 视频${savedOk ? "" : "（失败）"}`])
+          try {
+            setProgressText("正在生成 Live Photo")
+            addDetail("正在生成 Live Photo 资源")
+            const pair = await createLivePhotoPairFromVideoPath(docPath, `${video.aweme_id}_livephoto_${Date.now()}`)
+            await Photos.saveLivePhoto({ imagePath: pair.imagePath, videoPath: pair.videoPath, shouldMoveFile: true })
+            savedOk = true
+            addDetail(`Live Photo 已保存，${pair.duration.toFixed(1)}s${pair.reencoded ? "，已重编码" : ""}`)
+            try { await FileManager.remove(docPath) } catch {}
+          } catch (liveErr: any) {
+            addDetail(`Live Photo 保存失败，回退 MP4: ${liveErr?.message || String(liveErr)}`)
+            savedOk = await Photos.saveVideo(docPath, { fileName: finalFileName, shouldMoveFile: true })
+            addDetail(`动态图已回退保存为 MP4${savedOk ? "" : "，失败"}`)
+          }
         } else if (actuallyGif) {
           // GIF 动图：用 Data 直接保存，保留动画
           savedOk = await Photos.savePhoto(data, { fileName: finalFileName })
-          setApiStatus(prev => [...prev, `📤 GIF 动图已用 Data 模式保存${savedOk ? "" : "（失败）"}`])
+          if (savedOk) {
+            try { await FileManager.remove(docPath) } catch {}
+          }
+          addDetail(`GIF 动图已保存${savedOk ? "" : "，失败"}`)
         } else if (isImage) {
           savedOk = await Photos.savePhoto(docPath, { fileName: finalFileName, shouldMoveFile: true })
-          setApiStatus(prev => [...prev, `📤 图片已保存${savedOk ? "" : "（失败）"}`])
+          addDetail(`图片已保存${savedOk ? "" : "，失败"}`)
         } else {
           savedOk = await Photos.saveVideo(docPath, { fileName: finalFileName, shouldMoveFile: true })
-          setApiStatus(prev => [...prev, `📤 视频已保存${savedOk ? "" : "（失败）"}`])
+          addDetail(`视频已保存${savedOk ? "" : "，失败"}`)
         }
-        setApiStatus(prev => [...prev, `📤 保存${savedOk ? "成功" : "失败"}`])
+        addDetail(`保存${savedOk ? "成功" : "失败"}`)
         
+        let sharedOk = false
         if (!savedOk) {
-          // 回退：ShareSheet
-          setApiStatus(prev => [...prev, `⚠️ Photos 保存失败，尝试 ShareSheet 回退`])
-          await ShareSheet.present([docPath])
+          addDetail("Photos 保存失败，打开系统分享")
+          sharedOk = await ShareSheet.present([docPath])
+          if (!sharedOk) throw new Error("相册保存失败，且未完成系统分享")
         }
         
         setStep(4)
-        setProgressText("完成 ✓")
+        setProgressRatio(1)
+        setStatusTitle(savedOk ? "已保存到相册" : "已通过系统分享")
+        setProgressText(isAnimatedImage && savedOk ? "动态照片已保存" : (savedOk ? "导出完成" : "分享已完成"))
         
       } catch (e: any) {
         setStep(-1)
         const msg = (e?.message || String(e) || JSON.stringify(e) || "未知错误").substring(0, 200)
+        setProgressRatio(0)
+        setStatusTitle("导出失败")
         setErrorMsg(msg)
-        setApiStatus(prev => [...prev, `❌ ${msg}`])
+        addDetail(`失败: ${msg}`)
       }
     })()
   }, [])
 
+  const isBusy = step > 0 && step < 4
+  const iconName = step === 4 ? "checkmark.circle.fill" : (step === -1 ? "xmark.circle.fill" : "arrow.down.circle")
+  const iconColor = step === 4 ? "systemGreen" : (step === -1 ? "systemRed" : "systemBlue")
+  const progressWidth = Math.max(8, Math.min(260, 260 * progressRatio))
+
   return (
-    <VStack frame={{ maxWidth: "infinity", maxHeight: "infinity" }} background="systemBackground"
-      padding={24} spacing={16} alignment="center"
-    >
-      <Text font="title2" bold>保存/分享</Text>
-      
-      {step !== -1 && step < 4 ? (
-        <ProgressView foregroundStyle="systemBlue" />
-      ) : null}
-      
-      {step !== -1 && step < 4 ? (
-        <Text font="body" foregroundStyle="secondaryLabel">{progressText}</Text>
-      ) : null}
-      
-      {step === 4 ? (
-        <Image systemName="checkmark.circle.fill" font="largeTitle" foregroundStyle="systemGreen" />
-      ) : null}
-      
-      {step === -1 ? (
-        <VStack spacing={8} alignment="center" padding={{ top: 4 }}>
-          <Image systemName="xmark.circle.fill" font="largeTitle" foregroundStyle="systemRed" />
-          <Text font="body" foregroundStyle="systemRed">{errorMsg}</Text>
+    <VStack frame={{ maxWidth: "infinity", maxHeight: "infinity" }} background="systemBackground" padding={24} spacing={18} alignment="center">
+      <Spacer />
+      <VStack frame={{ width: 72, height: 72 }} alignment="center" background="secondarySystemBackground" clipShape={{ type: "rect", cornerRadius: 36 }}>
+        {isBusy ? <ProgressView foregroundStyle="systemBlue" /> : <Image systemName={iconName} font="largeTitle" foregroundStyle={iconColor} />}
+      </VStack>
+      <Text font="title3" bold>{statusTitle}</Text>
+      <Text font="subheadline" foregroundStyle={step === -1 ? "systemRed" : "secondaryLabel"} multilineTextAlignment="center" lineLimit={3}>
+        {step === -1 ? errorMsg : progressText}
+      </Text>
+      {step > 0 && step !== -1 ? <ExportStepIndicator currentStep={step} /> : null}
+      {isBusy ? (
+        <VStack frame={{ width: 260, height: 6, alignment: "leading" }} background="systemGray5" clipShape={{ type: "rect", cornerRadius: 3 }}>
+          <VStack frame={{ width: progressWidth, height: 6 }} background="systemBlue" clipShape={{ type: "rect", cornerRadius: 3 }} />
         </VStack>
       ) : null}
-      
-      {/* 详细诊断日志 */}
-      {apiStatus.length > 0 ? (
-        <ScrollView frame={{ maxWidth: "infinity", maxHeight: 280 }}>
-          <VStack spacing={2} frame={{ maxWidth: "infinity" }}>
-            {apiStatus.map((s, i) => (
-              <Text key={i} font="caption2" foregroundStyle="tertiaryLabel" lineLimit={3}>{s}</Text>
-            ))}
-          </VStack>
-        </ScrollView>
+      {detailLines.length > 0 ? (
+        <VStack frame={{ maxWidth: "infinity" }} spacing={8} padding={{ top: 6 }}>
+          <Button action={() => setShowDetails(!showDetails)}>
+            <HStack spacing={6}>
+              <Image systemName={showDetails ? "chevron.up" : "chevron.down"} font="caption" foregroundStyle="secondaryLabel" />
+              <Text font="caption" foregroundStyle="secondaryLabel">诊断信息</Text>
+            </HStack>
+          </Button>
+          {showDetails ? (
+            <ScrollView frame={{ maxWidth: "infinity", maxHeight: 140 }}>
+              <VStack spacing={4} frame={{ maxWidth: "infinity" }} alignment="leading">
+                {detailLines.map((s, i) => <Text key={i} font="caption2" foregroundStyle="tertiaryLabel" lineLimit={3}>{s}</Text>)}
+              </VStack>
+            </ScrollView>
+          ) : null}
+        </VStack>
       ) : null}
-      
-      {step >= 4 || step === -1 ? (
-        <Button title="关闭" action={() => dismiss()} />
-      ) : null}
+      <Spacer />
+      {step >= 4 || step === -1 ? <Button title="关闭" action={() => dismiss()} /> : null}
     </VStack>
   )}
 
 // ─── 动图/图片单页组件 ──—
-/**
- * 单张图片/动图页面：
- * - 如果有 videoUrl（API 提供的动图视频），用 AVPlayer 循环播放
- * - 如果是 GIF 动图 URL，用 WebView 原生渲染动画
- * - 否则显示静态 Image
- */
-function AnimatedImagePage({ imgInfo, pageWidth, pageHeight }: { imgInfo: ImageInfo; pageWidth: number; pageHeight: number }) {
-  const [player, setPlayer] = useState<AVPlayer | null>(null)
-  const [playerError, setPlayerError] = useState(false)
+function FloatingIconButton({ systemName, onTap, opacity = 0.58 }: { systemName: string; onTap: () => void; opacity?: number }) {
+  return (
+    <Button action={onTap}>
+      <VStack frame={{ width: 38, height: 38 }} alignment="center" background="black" opacity={opacity} clipShape={{ type: "rect", cornerRadius: 19 }}>
+        <Image systemName={systemName} font="body" foregroundStyle="white" />
+      </VStack>
+    </Button>
+  )
+}
 
-  // 有视频 URL 时自动创建播放器并循环播放
+function ImagePageOverlay({ badgeText, pageWidth, pageHeight, onExport, loading }: {
+  badgeText: string
+  pageWidth: number
+  pageHeight: number
+  onExport: () => void
+  loading: boolean
+}) {
+  return (
+    <VStack frame={{ width: pageWidth, height: pageHeight }} alignment="center" padding={{ horizontal: 16, bottom: 14 }}>
+      {loading ? (
+        <VStack frame={{ maxWidth: "infinity", maxHeight: "infinity" }} alignment="center">
+          <ProgressView foregroundStyle="white" />
+        </VStack>
+      ) : <Spacer />}
+      <HStack frame={{ maxWidth: "infinity" }} spacing={12}>
+        <HStack padding={{ horizontal: 8, vertical: 4 }} background="black" opacity={0.58} clipShape={{ type: "rect", cornerRadius: 6 }}>
+          <Text font="caption2" foregroundStyle="white">{badgeText}</Text>
+        </HStack>
+        <Spacer />
+        <FloatingIconButton systemName="square.and.arrow.down" onTap={onExport} />
+      </HStack>
+    </VStack>
+  )
+}
+
+function AnimatedImagePage({ imgInfo, pageWidth, pageHeight, index, total, onExport }: {
+  imgInfo: ImageInfo
+  pageWidth: number
+  pageHeight: number
+  index: number
+  total: number
+  onExport: () => void
+}) {
+  const [player, setPlayer] = useState<AVPlayer | null>(null)
+  const [videoError, setVideoError] = useState(false)
+  const isAnimatedVideo = !!imgInfo.videoUrl
+
   useEffect(() => {
     if (!imgInfo.videoUrl) return
     const p = new AVPlayer()
-    p.setSource(imgInfo.videoUrl, {
-      headers: { "User-Agent": MOBILE_UA, Referer: "https://www.douyin.com/" }
-    })
-    // 静音播放（动图通常无声音）
     p.volume = 0
-    // 无限循环
     p.numberOfLoops = -1
-    SharedAudioSession.setCategory('playback', [])
-    SharedAudioSession.setActive(true)
     p.onReadyToPlay = () => {
       setPlayer(p)
       p.play()
     }
-    p.onError = () => {
-      setPlayerError(true)
-    }
+    p.onError = () => setVideoError(true)
+    const sourceSet = p.setSource(imgInfo.videoUrl, {
+      headers: { "User-Agent": MOBILE_UA, Referer: "https://www.douyin.com/" }
+    })
+    if (!sourceSet) setVideoError(true)
+    SharedAudioSession.setCategory('playback', [])
+    SharedAudioSession.setActive(true)
     return () => {
       try { p.stop(); p.dispose() } catch {}
     }
   }, [])
 
-  // 情况1：有视频 URL 且播放器就绪 → 播放视频
-  if (imgInfo.videoUrl && player) {
+  const badgeText = isAnimatedVideo ? "动图" : `${index + 1}/${total}`
+  const overlay = <ImagePageOverlay badgeText={badgeText} pageWidth={pageWidth} pageHeight={pageHeight} onExport={onExport} loading={isAnimatedVideo && !player && !videoError} />
+
+  if (isAnimatedVideo && player && !videoError) {
     return (
-      <VStack frame={{ width: pageWidth, height: pageHeight }} background="black" alignment="center">
-        <VideoPlayer
-          player={player}
-          overlay={
-            <VStack frame={{ maxWidth: "infinity", maxHeight: "infinity", alignment: "bottomTrailing" }} padding={8}>
-              {/* 动图标识 */}
-              <HStack padding={{ horizontal: 6, vertical: 2 }} background="black" opacity={0.5} clipShape={{ type: "rect", cornerRadius: 4 }}>
-                <Text font="caption2" foregroundStyle="white">GIF</Text>
-              </HStack>
-            </VStack>
-          }
-        />
+      <VStack frame={{ width: pageWidth, height: pageHeight }} background="black" alignment="center" clipped>
+        <VideoPlayer player={player} frame={{ width: pageWidth, height: pageHeight }} overlay={overlay} />
       </VStack>
     )
   }
 
-  // 情况2：有视频 URL 但出错或未就绪 → 显示静态图 + loading
-  if (imgInfo.videoUrl && !player) {
-    return (
-      <VStack frame={{ width: pageWidth, height: pageHeight }} background="black" alignment="center">
-        <Image
-          imageUrl={imgInfo.url}
-          resizable
-          aspectRatio={{ value: null, contentMode: 'fit' }}
-          frame={{ maxWidth: "infinity", maxHeight: "infinity" }}
-          opacity={playerError ? 1 : 0.5}
-        />
-        {!playerError ? (
-          <VStack frame={{ maxWidth: "infinity", maxHeight: "infinity" }} alignment="center">
-            <ProgressView foregroundStyle="white" />
-          </VStack>
-        ) : null}
-      </VStack>
-    )
-  }
-
-  // 情况3：GIF 动图 URL → 用 WebView 原生渲染动画
-  if (isGifUrl(imgInfo.url)) {
-    return (
-      <VStack frame={{ width: pageWidth, height: pageHeight }} background="black" alignment="center">
-        <Image
-          imageUrl={imgInfo.url}
-          resizable
-          aspectRatio={{ value: null, contentMode: 'fit' }}
-          frame={{ maxWidth: "infinity", maxHeight: "infinity" }}
-        />
-      </VStack>
-    )
-  }
-
-  // 情况4：普通静态图
   return (
-    <VStack frame={{ width: pageWidth, maxHeight: "infinity" }} background="black" alignment="center">
+    <VStack frame={{ width: pageWidth, height: pageHeight }} background="black" alignment="center" clipped>
       <Image
         imageUrl={imgInfo.url}
         resizable
         aspectRatio={{ value: null, contentMode: 'fit' }}
-        frame={{ maxWidth: "infinity", maxHeight: "infinity" }}
+        frame={{ width: pageWidth, height: pageHeight }}
+        clipped
+        opacity={isAnimatedVideo && !videoError ? 0.45 : 1}
+        overlay={{ alignment: "center", content: overlay }}
       />
     </VStack>
   )
@@ -744,25 +783,22 @@ function VideoPreviewView({ video }: { video: VideoInfo }) {
   const [player, setPlayer] = useState<AVPlayer | null>(null)
   const [error, setError] = useState("")
   const isImagePost = video.images.length > 0
-  // 获取屏幕宽度用于分页，兜底 400
-  const pageWidth = ((typeof screen !== 'undefined' && typeof screen?.width === 'number')
-    ? screen.width
-    : 400)
 
   useEffect(() => {
     if (isImagePost) return
-    const p = new AVPlayer()
     if (!video.play_url) { setError("无可播放地址"); return }
-    p.setSource(video.play_url, {
-      headers: { "User-Agent": MOBILE_UA, Referer: "https://www.douyin.com/" }
-    })
-    SharedAudioSession.setCategory('playback', [])
-    SharedAudioSession.setActive(true)
-    p.onReadyToPlay = () => { 
+    const p = new AVPlayer()
+    p.onReadyToPlay = () => {
       setPlayer(p)
       p.play()
     }
     p.onError = () => { setError("播放失败") }
+    const sourceSet = p.setSource(video.play_url, {
+      headers: { "User-Agent": MOBILE_UA, Referer: "https://www.douyin.com/" }
+    })
+    if (!sourceSet) setError("播放地址加载失败")
+    SharedAudioSession.setCategory('playback', [])
+    SharedAudioSession.setActive(true)
     return () => {
       try { p.stop(); p.dispose() } catch {}
     }
@@ -772,37 +808,43 @@ function VideoPreviewView({ video }: { video: VideoInfo }) {
     <GeometryReader>{({ size: { width, height } }) => (
       <VStack frame={{ width, height }} background="black">
         {isImagePost ? (
-          <VStack frame={{ maxWidth: "infinity", maxHeight: "infinity" }} spacing={0}>
+          <VStack frame={{ width, height }} spacing={0}>
             <ScrollView axes="horizontal" scrollTargetBehavior="paging" frame={{ width, height: height - 56 }}>
-              <HStack spacing={0}>
+              <HStack spacing={0} frame={{ height: height - 56 }}>
                 {video.images.map((imgInfo, i) => (
-                  <AnimatedImagePage key={i} imgInfo={imgInfo} pageWidth={width} pageHeight={height - 56} />
+                  <AnimatedImagePage
+                    key={i}
+                    imgInfo={imgInfo}
+                    pageWidth={width}
+                    pageHeight={height - 56}
+                    index={i}
+                    total={video.images.length}
+                    onExport={() => shareVideo(video, true, i)}
+                  />
                 ))}
               </HStack>
             </ScrollView>
-            <HStack frame={{ maxWidth: "infinity" }} padding={{ horizontal: 16, vertical: 8 }} spacing={16}>
-              <Button action={() => shareVideo(video, true)}>
-                <Image systemName="square.and.arrow.up" font="title3" foregroundStyle="white" opacity={0.85} />
-              </Button>
+            <HStack frame={{ width, height: 56 }} padding={{ horizontal: 16, vertical: 8 }} spacing={16}>
               <Spacer />
               <Button action={dismiss}>
-                <Image systemName="xmark.circle.fill" font="title" foregroundStyle="white" opacity={0.8} />
+                <Image systemName="xmark.circle.fill" font="title" foregroundStyle="white" opacity={0.86} />
               </Button>
             </HStack>
           </VStack>
         ) : player ? (
           <VideoPlayer
             player={player}
+            frame={{ width, height }}
             overlay={
-              <VStack frame={{ maxWidth: "infinity", maxHeight: "infinity", alignment: "bottom" }} padding={{ horizontal: 16, bottom: 16 }}>
-                <HStack frame={{ maxWidth: "infinity" }} spacing={16}>
-                  <Button action={() => shareVideo(video, false)}>
-                    <Image systemName="square.and.arrow.up" font="title3" foregroundStyle="white" opacity={0.85} />
-                  </Button>
+              <VStack frame={{ width, height }} padding={{ horizontal: 16, top: 16, bottom: 14 }} alignment="center">
+                <HStack frame={{ maxWidth: "infinity" }}>
                   <Spacer />
-                  <Button action={() => { try { player.stop(); player.dispose() } catch (_) {} dismiss() }}>
-                    <Image systemName="xmark.circle.fill" font="title" foregroundStyle="white" opacity={0.8} />
-                  </Button>
+                  <FloatingIconButton systemName="xmark" opacity={0.62} onTap={() => { try { player.stop(); player.dispose() } catch (_) {} dismiss() }} />
+                </HStack>
+                <Spacer />
+                <HStack frame={{ maxWidth: "infinity" }}>
+                  <Spacer />
+                  <FloatingIconButton systemName="square.and.arrow.down" onTap={() => shareVideo(video, false)} />
                 </HStack>
               </VStack>
             }
@@ -868,7 +910,7 @@ function saveUser(user: SavedUser) {
 // ─── 抖音号解析 ───
 function extractUrl(text: string): string {
   const m = text.match(/https?:\/\/[^\s]+/)
-  return m ? m[0].replace(/[:：][^\s]*$/, "") : text
+  return m ? m[0].replace(/[),.;!?，。；！？）】]+$/, "") : text.trim()
 }
 
 // ─── iesdouyin API + Cookie 直调 ───
@@ -1064,7 +1106,6 @@ function parseAwemeResponse(rawJson: string): { videos: VideoInfo[]; maxCursor: 
     const found = findAwemeList(data)
     if (found) awemeList = found
   }
-  if (awemeList.length === 0) throw new Error("未找到作品数据")
   const videos: VideoInfo[] = awemeList.map((item: any) => ({
     aweme_id: item.aweme_id || "", desc: item.desc || "", create_time: item.create_time || 0,
     cover: pickBestUrl(item.video?.origin_cover?.url_list) || pickBestUrl(item.video?.cover?.url_list),
@@ -1084,7 +1125,7 @@ function parseAwemeResponse(rawJson: string): { videos: VideoInfo[]; maxCursor: 
 }
 
 async function fetchViaWebView(secUid: string, cursor: number = 0): Promise<string> {
-  const apiUrl = `https://www.douyin.com/aweme/v1/web/aweme/post/?device_platform=web&aid=6383&sec_user_id=${encodeURIComponent(secUid)}&count=21&max_cursor=${cursor}&cookie_enabled=true&platform=web&downlink=10`
+  const apiUrl = `https://www.douyin.com/aweme/v1/web/aweme/post/?device_platform=web&aid=6383&sec_user_id=${encodeURIComponent(secUid)}&count=${POST_PAGE_SIZE}&max_cursor=${cursor}&cookie_enabled=true&platform=web&downlink=10`
   const webView = new WebViewController({ ephemeral: false })
   try {
     webView.setCustomUserAgent(MOBILE_UA)
@@ -1144,7 +1185,7 @@ async function fetchViaWebView(secUid: string, cursor: number = 0): Promise<stri
 async function fetchViaCookie(secUid: string, cursor: number = 0): Promise<string> {
   const cookie = (Storage.get<string>(KEY_COOKIE) || "").trim()
   if (!cookie || cookie.length < 50) throw new Error("未配置 Cookie 或长度不足")
-  const apiUrl = `https://www.douyin.com/aweme/v1/web/aweme/post/?device_platform=web&aid=6383&sec_user_id=${encodeURIComponent(secUid)}&count=21&max_cursor=${cursor}&cookie_enabled=true&platform=web&downlink=10`
+  const apiUrl = `https://www.douyin.com/aweme/v1/web/aweme/post/?device_platform=web&aid=6383&sec_user_id=${encodeURIComponent(secUid)}&count=${POST_PAGE_SIZE}&max_cursor=${cursor}&cookie_enabled=true&platform=web&downlink=10`
   const resp = await fetch(apiUrl, {
     headers: { "User-Agent": MOBILE_UA, "Referer": `https://www.douyin.com/user/${encodeURIComponent(secUid)}`, "Cookie": cookie, "Accept": "application/json" },
   })
@@ -1331,250 +1372,90 @@ function SwitchUserView({ onSwitch, currentUid }: { onSwitch: (uid: string) => v
 
 // ─── Cookie 工具函数 ───
 
-/** 将 Cookie 数组序列化为 HTTP Cookie 字符串 */
-function cookiesToString(cookies: { name: string; value: string; domain: string }[]): string {
-  // 只保留 douyin.com 域名的 cookie
-  const relevant = cookies.filter((c) => c.domain.includes("douyin.com") || c.domain.includes("iesdouyin.com"))
-  // 去重（后出现的覆盖前面的同名 cookie）
-  const seen = new Map<string, string>()
-  for (const c of relevant) {
-    seen.set(c.name, c.value)
-  }
-  return Array.from(seen.entries())
-    .map(([name, value]) => `${name}=${value}`)
-    .join("; ")
+function hasDouyinAuthCookie(cookie: string): boolean {
+  return /(?:^|;\s*)(sessionid|sessionid_ss|sid_guard|sid_tt|uid_tt)=([^;]{6,})/.test(cookie)
 }
 
-/** 从 WebView 提取所有 douyin.com Cookie 并保存到 Storage */
-async function extractAndSaveCookies(webView: any): Promise<string> {
-  const allCookies: any[] = await webView.getAllCookies()
-  const cookieStr = cookiesToString(allCookies)
-  if (cookieStr && cookieStr.length > 50) {
-    Storage.set(KEY_COOKIE, cookieStr)
-  }
-  return cookieStr
-}
-
-/** 检查已保存的 Cookie 是否仍然有效（调用抖音简单 API） */
-async function checkCookieValidity(): Promise<{ valid: boolean; detail: string }> {
-  const cookie = (Storage.get<string>(KEY_COOKIE) || "").trim()
-  if (!cookie || cookie.length < 50) {
-    return { valid: false, detail: "未登录或 Cookie 无效" }
+async function validateCookieString(cookie: string): Promise<{ valid: boolean; detail: string }> {
+  const trimmed = cookie.trim()
+  if (!trimmed || trimmed.length < 50 || !hasDouyinAuthCookie(trimmed)) {
+    return { valid: false, detail: "未检测到登录 Cookie" }
   }
   try {
-    // 用 Cookie 调一个简单的资料 API 看返回
     const resp = await fetch(
       "https://www.douyin.com/aweme/v1/web/im/user/info/",
       {
         method: "GET",
         headers: {
           "User-Agent": MOBILE_UA,
-          "Cookie": cookie,
+          "Cookie": trimmed,
           "Referer": "https://www.douyin.com/",
           "Accept": "application/json",
         },
       }
     )
     const text = await resp.text()
+    if (!resp.ok) return { valid: false, detail: `检查失败: HTTP ${resp.status}` }
+    if (!text || text.trim().startsWith("<") || /login|passport/i.test(text)) {
+      return { valid: false, detail: "Cookie 未通过登录校验" }
+    }
     let json: any
-    try { json = JSON.parse(text) } catch { json = {} }
-    if (json.status_code === 0 || json.status_code === undefined) {
-      return { valid: true, detail: "Cookie 有效" }
-    }
-    if (json.status_code === 3 || json.status_code === -99 || String(text).includes("login")) {
-      return { valid: false, detail: "Cookie 已过期，请重新登录" }
-    }
-    return { valid: true, detail: `状态码: ${json.status_code}` }
+    try { json = JSON.parse(text) } catch { return { valid: false, detail: "Cookie 校验返回异常" } }
+    if (json.status_code === 0) return { valid: true, detail: "Cookie 有效" }
+    if (json.status_code === 3 || json.status_code === -99) return { valid: false, detail: "Cookie 已过期，请重新登录" }
+    return { valid: false, detail: `Cookie 校验失败: ${json.status_code ?? "未知状态"}` }
   } catch (e: any) {
     return { valid: false, detail: `检查失败: ${e.message || e}` }
   }
 }
 
-/**
- * 静默刷新 Cookie：打开一个不可见的 WebView，导航到抖音
- * 利用已有的 cookie（非 ephemeral WebView 共享 cookie store）
- * 看能否自动续期 __ac_signature
- */
-async function silentRefreshCookie(): Promise<{ ok: boolean; message: string }> {
-  const currentCookie = (Storage.get<string>(KEY_COOKIE) || "").trim()
-  if (!currentCookie || currentCookie.length < 50) {
-    return { ok: false, message: "尚未登录，无法刷新" }
-  }
-  
-  let webView: any = null
-  try {
-    webView = new WebViewController()
-    webView.setCustomUserAgent(MOBILE_UA)
-    
-    // 先预置现有 Cookie
-    const cookiePairs = currentCookie.split(";").map(s => s.trim())
-    for (const pair of cookiePairs) {
-      const eq = pair.indexOf("=")
-      if (eq <= 0) continue
-      const name = pair.substring(0, eq)
-      const value = pair.substring(eq + 1)
-      await webView.setCookie({
-        name,
-        value,
-        domain: ".douyin.com",
-        path: "/",
-        isSecure: false,
-        isHTTPOnly: false,
-        isSessionOnly: false,
-      })
-    }
-    
-    // 加载抖音首页（cookie 会被自动携带）
-    await webView.loadURL("https://www.douyin.com/")
-    await webView.waitForLoad()
-    await sleep(3000)
-    
-    // 获取更新后的 cookie
-    const allCookies: any[] = await webView.getAllCookies()
-    const newCookieStr = cookiesToString(allCookies)
-    
-    if (newCookieStr && newCookieStr.length >= 50) {
-      // 检查 __ac_signature 是否更新
-      const oldSig = currentCookie.match(/__ac_signature=([^;]+)/)?.[1] || ""
-      const newSig = newCookieStr.match(/__ac_signature=([^;]+)/)?.[1] || ""
-      
-      if (newSig && newSig !== oldSig) {
-        // __ac_signature 已更新 — 保存新 cookie
-        Storage.set(KEY_COOKIE, newCookieStr)
-        return { ok: true, message: "Cookie 已自动刷新" }
-      } else if (newSig) {
-        return { ok: true, message: "Cookie 仍有效，无需刷新" }
-      }
-    }
-    
-    return { ok: false, message: "无法自动刷新，请重新登录" }
-  } catch (e: any) {
-    return { ok: false, message: `刷新失败: ${e.message || e}` }
-  } finally {
-    if (webView) webView.dispose()
-  }
+function VideoGridCard({ video, cardWidth, onOpen }: { video: VideoInfo; cardWidth: number; onOpen: () => void }) {
+  const coverWidth = cardWidth - 8
+  return (
+    <VStack key={video.aweme_id} spacing={5} padding={{ horizontal: 4, vertical: 3 }} frame={{ width: cardWidth }} background="systemBackground">
+      <VStack frame={{ width: coverWidth, height: 200 }} background="systemGray5" clipShape={{ type: "rect", cornerRadius: 8 }} clipped overlay={{ alignment: "center", content: (
+        <VStack frame={{ width: coverWidth, height: 200 }} background="black" opacity={0.001} onTapGesture={onOpen} />
+      )}}>
+        {video.cover ? <Image imageUrl={video.cover} resizable scaleToFill frame={{ width: coverWidth, height: 200 }} clipped allowsHitTesting={false} overlay={{ alignment: "bottom", content: (
+          <VStack padding={3} spacing={3}>
+            <HStack>
+              {video.duration > 0 ? (
+                <HStack padding={{ horizontal: 6, vertical: 2 }} background="black" opacity={0.6} clipShape={{ type: "rect", cornerRadius: 4 }} spacing={3}>
+                  <Image systemName="play.fill" font="caption2" foregroundStyle="white" />
+                  <Text font="caption2" foregroundStyle="white">{formatDuration(video.duration)}</Text>
+                </HStack>
+              ) : null}
+              {video.images.length > 0 ? (
+                <HStack padding={{ horizontal: 6, vertical: 2 }} background="black" opacity={0.6} clipShape={{ type: "rect", cornerRadius: 4 }} spacing={3}>
+                  <Image systemName="photo.on.rectangle" font="caption2" foregroundStyle="white" />
+                  <Text font="caption2" foregroundStyle="white">{video.images.length}</Text>
+                </HStack>
+              ) : null}
+            </HStack>
+            <HStack>
+              <HStack spacing={2}>
+                <Image systemName="heart.fill" font="caption2" foregroundStyle="systemPink" />
+                <Text font="caption2" foregroundStyle="white">{formatCount(video.digg_count)}</Text>
+              </HStack>
+            </HStack>
+          </VStack>
+        )}} />
+        : <VStack frame={{ width: coverWidth, height: 200 }} alignment="center" allowsHitTesting={false}><Image systemName="play.rectangle" font="largeTitle" foregroundStyle="tertiaryLabel" /></VStack>}
+      </VStack>
+      <Text font="caption2" lineLimit={2} padding={{ horizontal: 2 }}>{video.desc}</Text>
+    </VStack>
+  )
 }
 
-// ─── 抖音 WebView 登录视图 ───
-/**
- * 在 App 内嵌 WebView 展示抖音官网，用户自然完成登录（扫码/手机号/邮箱）
- * 登录成功后自动提取 Cookie 并保存
- */
-function DouyinLoginView({ onLoginComplete }: { onLoginComplete: () => void }) {
-  const dismiss = Navigation.useDismiss()
-  const [status, setStatus] = useState<string>("加载中...")
-  const [progress, setProgress] = useState(true)
-  const [error, setError] = useState("")
-  
-  useEffect(() => {
-    ;(async () => {
-      let webView: any = null
-      try {
-        webView = new WebViewController()
-        webView.setCustomUserAgent(MOBILE_UA)
-        
-        // 监控请求：检测登录成功后的页面跳转
-        let loginDetected = false
-        
-        webView.shouldAllowRequest = async (request: any) => {
-          const url = request.url || ""
-          
-          // 检测登录成功信号：
-          // - passport 登录回调完成进入首页
-          // - 或用户个人主页
-          if (!loginDetected && (
-            url === "https://www.douyin.com/" ||
-            url === "https://www.douyin.com/follow" ||
-            url === "https://www.douyin.com/recommend" ||
-            /douyin\.com\/(user|profile)/.test(url) ||
-            // sso 登录回调成功
-            (url.includes("passport/sso/login/callback") && url.includes("ticket=")) 
-          )) {
-            if (url.includes("ticket=") || !loginDetected) {
-              // 延迟一点等 cookie 设置好
-              loginDetected = true
-              setTimeout(async () => {
-                try {
-                  setStatus("正在获取登录信息...")
-                  await sleep(2000)
-                  
-                  const cookieStr = await extractAndSaveCookies(webView)
-                  if (cookieStr && cookieStr.length >= 50) {
-                    setStatus("登录成功 ✓")
-                    setProgress(false)
-                    await sleep(800)
-                    onLoginComplete()
-                    dismiss()
-                  } else {
-                    // 再等一会再试一次
-                    await sleep(3000)
-                    const retryStr = await extractAndSaveCookies(webView)
-                    if (retryStr && retryStr.length >= 50) {
-                      setStatus("登录成功 ✓")
-                      setProgress(false)
-                      await sleep(800)
-                      onLoginComplete()
-                      dismiss()
-                    } else {
-                      setError("无法获取 Cookie，请确保已登录成功")
-                      setProgress(false)
-                    }
-                  }
-                } catch (e: any) {
-                  setError(`获取 Cookie 失败: ${e.message || e}`)
-                  setProgress(false)
-                }
-              }, 1000)
-            }
-          }
-          return true
-        }
-        
-        // 启动一个轮询，监控 cookie 中的 __ac_signature
-        ;(async function pollLogin() {
-          for (let i = 0; i < 60; i++) { // 最多等 5 分钟（每5秒轮询一次）
-            await sleep(5000)
-            if (loginDetected) return // 已被 shouldAllowRequest 处理
-            try {
-              const cookies: any[] = await webView.getAllCookies()
-              const sig = cookies.find((c: any) => c.name === "__ac_signature" && c.value.length > 5)
-              const sessionid = cookies.find((c: any) => c.name === "sessionid" && c.value.length > 5)
-              if (sig || sessionid) {
-                loginDetected = true
-                setStatus("检测到登录，正在保存...")
-                await sleep(1500) // 等 cookie 稳定
-                const cookieStr = await extractAndSaveCookies(webView)
-                if (cookieStr && cookieStr.length >= 50) {
-                  setStatus("登录成功 ✓")
-                  setProgress(false)
-                  await sleep(800)
-                  onLoginComplete()
-                  dismiss()
-                }
-                return
-              }
-            } catch {}
-          }
-        })()
-        
-        // 导航到抖音首页
-        setStatus("正在打开抖音...")
-        await webView.loadURL("https://www.douyin.com/")
-        await webView.present({ fullscreen: true })
-        setStatus("请在抖音页面登录（扫码/手机号/邮箱）")
-        
-      } catch (e: any) {
-        setError(`启动失败: ${e.message || e}`)
-        setProgress(false)
-      }
-    })()
-  }, [])
-  
-  return null // WebView 已通过 present 展示，不需要 UI 组件
+function chunkItems<T>(items: T[], size: number): T[][] {
+  const rows: T[][] = []
+  for (let i = 0; i < items.length; i += size) rows.push(items.slice(i, i + size))
+  return rows
 }
 
 // ─── 主页 ───
-function HomeView({ dismissApp }: { dismissApp: () => void }) {
+function HomeView({ dismissApp, isActive }: { dismissApp: () => void; isActive: boolean }) {
+  const gridCardWidth = getGridCardWidth()
   const [secUid, setSecUid] = useState(() => loadSecUid())
   const [videos, setVideos] = useState<VideoInfo[]>([])
   const [loading, setLoading] = useState(false)
@@ -1593,7 +1474,10 @@ function HomeView({ dismissApp }: { dismissApp: () => void }) {
     try {
       const result = await fetchUserPosts(targetUid, c)
       if (reset) setVideos(result.videos)
-      else setVideos((prev) => [...prev, ...result.videos])
+      else setVideos((prev) => {
+        const existingIds = new Set(prev.map((v) => v.aweme_id))
+        return [...prev, ...result.videos.filter((v) => !existingIds.has(v.aweme_id))]
+      })
       setCursor(result.maxCursor)
       setHasMore(result.hasMore)
       if (result.videos.length > 0) {
@@ -1618,7 +1502,12 @@ function HomeView({ dismissApp }: { dismissApp: () => void }) {
     else setLoadingMore(false)
   }
 
-  useEffect(() => { doLoadVideos(true) }, [])
+  useEffect(() => {
+    if (!isActive) return
+    const activeUid = loadSecUid()
+    if (activeUid !== secUid) setSecUid(activeUid)
+    doLoadVideos(true, activeUid)
+  }, [isActive])
 
   function handleSwitchUser(uid: string) {
     setSecUid(uid)
@@ -1692,45 +1581,18 @@ function HomeView({ dismissApp }: { dismissApp: () => void }) {
           </Section>
         ) : (
           <Section>
-            <VStack padding={{ horizontal: 8 }}>
-              <LazyVGrid columns={[
-                { size: { type: "flexible", min: 100, max: 200 }, spacing: 6 },
-                { size: { type: "flexible", min: 100, max: 200 }, spacing: 6 },
-                { size: { type: "flexible", min: 100, max: 200 }, spacing: 6 },
-              ]} spacing={6}>
-                {videos.map((v, idx) => (
-                    <VStack key={v.aweme_id} spacing={3} onTapGesture={() => openVideo(v, idx)}>
-                      <VStack frame={{ maxWidth: "infinity", height: 200 }} background="systemGray5" clipShape={{ type: "rect", cornerRadius: 8 }}>
-                        {v.cover ? <Image imageUrl={v.cover} resizable aspectRatio={{ value: 9/16, contentMode: 'fit' }} frame={{ maxWidth: "infinity", height: 200 }} overlay={{ alignment: "bottom", content: (
-                          <VStack padding={3} spacing={3}>
-                            <HStack>
-                              {v.duration > 0 ? (
-                                <HStack padding={{ horizontal: 6, vertical: 2 }} background="black" opacity={0.6} clipShape={{ type: "rect", cornerRadius: 4 }} spacing={3}>
-                                  <Image systemName="play.fill" font="caption2" foregroundStyle="white" />
-                                  <Text font="caption2" foregroundStyle="white">{formatDuration(v.duration)}</Text>
-                                </HStack>
-                              ) : null}
-                              {v.images.length > 0 ? (
-                                <HStack padding={{ horizontal: 6, vertical: 2 }} background="black" opacity={0.6} clipShape={{ type: "rect", cornerRadius: 4 }} spacing={3}>
-                                  <Image systemName="photo.on.rectangle" font="caption2" foregroundStyle="white" />
-                                  <Text font="caption2" foregroundStyle="white">{v.images.length}</Text>
-                                </HStack>
-                              ) : null}
-                            </HStack>
-                            <HStack>
-                              <HStack spacing={2}>
-                                <Image systemName="heart.fill" font="caption2" foregroundStyle="systemPink" />
-                                <Text font="caption2" foregroundStyle="white">{formatCount(v.digg_count)}</Text>
-                              </HStack>
-                            </HStack>
-                          </VStack>
-                        )}} />
-                      : <VStack frame={{ maxWidth: "infinity", height: 200 }} alignment="center"><Image systemName="play.rectangle" font="largeTitle" foregroundStyle="tertiaryLabel" /></VStack>}
-                      </VStack>
-                    <Text font="caption2" lineLimit={2} padding={{ horizontal: 2 }}>{v.desc}</Text>
-                  </VStack>
-                ))}
-              </LazyVGrid>
+            <VStack padding={{ horizontal: 12 }} spacing={16}>
+              {chunkItems(videos, 3).map((row, rowIndex) => (
+                <HStack key={rowIndex} spacing={14} frame={{ maxWidth: "infinity" }}>
+                  {row.map((v, colIndex) => {
+                    const itemIndex = rowIndex * 3 + colIndex
+                    return <VideoGridCard key={v.aweme_id} video={v} cardWidth={gridCardWidth} onOpen={() => openVideo(v, itemIndex)} />
+                  })}
+                  {row.length < 3 ? Array.from({ length: 3 - row.length }).map((_, emptyIndex) => (
+                    <VStack key={`empty-${rowIndex}-${emptyIndex}`} frame={{ width: gridCardWidth }} />
+                  )) : null}
+                </HStack>
+              ))}
               {hasMore ? (
                 <VStack padding={{ vertical: 16 }} frame={{ maxWidth: "infinity" }} alignment="center">
                   {loadingMore ? (
@@ -1757,20 +1619,32 @@ function HomeView({ dismissApp }: { dismissApp: () => void }) {
   )
 }
 
-function HistoryItemCard({ item, idx, history, setHistory }: { item: HistoryItem; idx: number; history: HistoryItem[]; setHistory: (h: HistoryItem[]) => void }) {
+function HistoryItemCard({ item, idx, history, setHistory, cardWidth }: { item: HistoryItem; idx: number; history: HistoryItem[]; setHistory: (h: HistoryItem[]) => void; cardWidth: number }) {
+  const coverWidth = cardWidth - 8
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const onPlay = () => openVideo(item, idx)
-  const onDelete = () => { const u = history.filter((h) => h.aweme_id !== item.aweme_id); saveHistory(u); setHistory(u) }
+  const onDelete = () => { const u = history.filter((h) => h.aweme_id !== item.aweme_id); saveHistory(u); setHistory(u); setConfirmDelete(false) }
   return (
-    <VStack spacing={3}>
-      <VStack frame={{ maxWidth: "infinity", height: 200 }} background="systemGray5" clipShape={{ type: "rect", cornerRadius: 8 }}>
+    <VStack spacing={5} padding={{ horizontal: 4, vertical: 3 }} frame={{ width: cardWidth }} background="systemBackground" onLongPressGesture={{ minDuration: 600, perform: () => setConfirmDelete(true) }} confirmationDialog={{
+      title: "删除这条历史？",
+      isPresented: confirmDelete,
+      onChanged: setConfirmDelete,
+      message: <Text>删除后不会影响作品本身。</Text>,
+      actions: <VStack>
+        <Button title="删除" role="destructive" action={onDelete} />
+        <Button title="取消" role="cancel" action={() => setConfirmDelete(false)} />
+      </VStack>,
+    }}>
+      <VStack frame={{ width: coverWidth, height: 200 }} background="systemGray5" clipShape={{ type: "rect", cornerRadius: 8 }} clipped overlay={{ alignment: "center", content: (
+        <VStack frame={{ width: coverWidth, height: 200 }}>
+          <VStack frame={{ width: coverWidth, height: 200 }} background="black" opacity={0.001} onTapGesture={onPlay} />
+
+        </VStack>
+      )}}>
         {item.cover ? (
-          <Image imageUrl={item.cover} resizable aspectRatio={{ value: 9/16, contentMode: 'fit' }} frame={{ maxWidth: "infinity", height: 200 }} overlay={{ alignment: "bottomTrailing", content: (
-            <VStack onTapGesture={onDelete} padding={4}>
-              <Image systemName="xmark.circle.fill" font="title3" foregroundStyle="white" />
-            </VStack>
-          )}} onTapGesture={onPlay} />
+          <Image imageUrl={item.cover} resizable scaleToFill frame={{ width: coverWidth, height: 200 }} clipped allowsHitTesting={false} />
         ) : (
-          <VStack frame={{ maxWidth: "infinity", height: 200 }} alignment="center" onTapGesture={onPlay}><Image systemName="play.rectangle" font="largeTitle" foregroundStyle="tertiaryLabel" /></VStack>
+          <VStack frame={{ width: coverWidth, height: 200 }} alignment="center" allowsHitTesting={false}><Image systemName="play.rectangle" font="largeTitle" foregroundStyle="tertiaryLabel" /></VStack>
         )}
       </VStack>
       <Text font="caption2" lineLimit={2} padding={{ horizontal: 2 }}>{item.desc}</Text>
@@ -1780,12 +1654,14 @@ function HistoryItemCard({ item, idx, history, setHistory }: { item: HistoryItem
 }
 
 // ─── 历史 ───
-function HistoryView({ dismissApp }: { dismissApp: () => void }) {
+function HistoryView({ dismissApp, isActive }: { dismissApp: () => void; isActive: boolean }) {
+  const gridCardWidth = getGridCardWidth()
   const [history, setHistory] = useState<HistoryItem[]>(() => loadHistory())
   useEffect(() => {
+    if (!isActive) return
     const h = loadHistory()
-    if (JSON.stringify(h) !== JSON.stringify(history)) setHistory(h)
-  }, [])
+    setHistory(h)
+  }, [isActive])
 
   return (
     <NavigationStack>
@@ -1808,14 +1684,14 @@ function HistoryView({ dismissApp }: { dismissApp: () => void }) {
           </Section>
         ) : (
           <Section>
-            <VStack padding={{ horizontal: 8 }}>
+            <VStack padding={{ horizontal: 12 }}>
               <LazyVGrid columns={[
-                { size: { type: "flexible", min: 100, max: 200 }, spacing: 6 },
-                { size: { type: "flexible", min: 100, max: 200 }, spacing: 6 },
-                { size: { type: "flexible", min: 100, max: 200 }, spacing: 6 },
-              ]} spacing={6}>
+                { size: gridCardWidth, spacing: 14 },
+                { size: gridCardWidth, spacing: 14 },
+                { size: gridCardWidth, spacing: 14 },
+              ]} spacing={16}>
                 {history.map((item, idx) => (
-                  <HistoryItemCard item={item} idx={idx} history={history} setHistory={setHistory} />
+                  <HistoryItemCard key={item.aweme_id} item={item} idx={idx} history={history} setHistory={setHistory} cardWidth={gridCardWidth} />
                 ))}
               </LazyVGrid>
             </VStack>
@@ -1827,21 +1703,13 @@ function HistoryView({ dismissApp }: { dismissApp: () => void }) {
 }
 
 // ─── 设置 ───
-function SettingsView() {
+function SettingsView({ isActive }: { isActive: boolean }) {
   const [inputValue, setInputValue] = useState("")
-  const [cookieValue, setCookieValue] = useState(() => {
-    const saved = Storage.get<string>(KEY_COOKIE) || ""
-    return saved.length >= 50 ? "" : saved
-  })
-  const [isCookieSaved, setIsCookieSaved] = useState(() => {
-    const saved = (Storage.get<string>(KEY_COOKIE) || "").trim()
-    return saved.length >= 50
-  })
+  const [cookieValue, setCookieValue] = useState("")
   const [saving, setSaving] = useState(false)
   const [status, setStatus] = useState<{ type: string; text: string }>({ type: "", text: "" })
   const [cookieStatus, setCookieStatus] = useState<{ checking: boolean; valid: boolean; detail: string }>({ checking: true, valid: false, detail: "检查中..." })
-  const [refreshing, setRefreshing] = useState(false)
-  const [showManualCookie, setShowManualCookie] = useState(false)
+  const [savingCookie, setSavingCookie] = useState(false)
   const [savedInfo, setSavedInfo] = useState<SavedUser | null>(null)
   const [savedUsers, setSavedUsers] = useState<SavedUser[]>(() => loadSavedUsers())
   const [currentUid, setCurrentUid] = useState(() => loadSecUid())
@@ -1876,7 +1744,7 @@ function SettingsView() {
           const newUsers = loadSavedUsers()
               setSavedUsers(newUsers)
               const updated = newUsers.find((u) => u.id === uid)
-              if (updated) setSavedInfo(updated)
+              if (updated && loadSecUid() === uid) setSavedInfo(updated)
             }
           }).catch(() => {})
         }
@@ -1885,44 +1753,42 @@ function SettingsView() {
     } else { setSavedInfo(null) }
   }
 
-  useEffect(() => { refreshSavedUsers() }, [])
+  useEffect(() => {
+    if (isActive) refreshSavedUsers()
+  }, [isActive])
 
   // 检查 Cookie 状态
   useEffect(() => {
+    const checkedCookie = Storage.get<string>(KEY_COOKIE) || ""
     ;(async () => {
-      const result = await checkCookieValidity()
-      setCookieStatus({ checking: false, valid: result.valid, detail: result.detail })
+      const result = await validateCookieString(checkedCookie)
+      if ((Storage.get<string>(KEY_COOKIE) || "") === checkedCookie) {
+        setCookieStatus({ checking: false, valid: result.valid, detail: result.detail })
+      }
     })()
   }, [])
 
-  async function handleLogin() {
-    await Navigation.present(
-      <DouyinLoginView onLoginComplete={() => {
-        // 登录成功后刷新状态
-        setCookieStatus({ checking: true, valid: false, detail: "检查中..." })
-        setTimeout(async () => {
-          const result = await checkCookieValidity()
-          setCookieStatus({ checking: false, valid: result.valid, detail: result.detail })
-          setIsCookieSaved(result.valid)
-          refreshSavedUsers()
-        }, 500)
-      }} />
-    )
+  async function handleCookieSave() {
+    const candidate = cookieValue.trim()
+    if (!candidate) {
+      setCookieStatus({ checking: false, valid: false, detail: "请输入 Cookie" })
+      return
+    }
+    setSavingCookie(true)
+    setCookieStatus({ checking: true, valid: false, detail: "正在校验..." })
+    const result = await validateCookieString(candidate)
+    if (result.valid) {
+      Storage.set(KEY_COOKIE, candidate)
+      setCookieValue("")
+    }
+    setCookieStatus({ checking: false, valid: result.valid, detail: result.detail })
+    setSavingCookie(false)
   }
 
-  async function handleRefresh() {
-    setRefreshing(true)
-    const result = await silentRefreshCookie()
-    setRefreshing(false)
-    if (result.ok) {
-      setTimeout(async () => {
-        const check = await checkCookieValidity()
-        setCookieStatus({ checking: false, valid: check.valid, detail: check.detail })
-        setIsCookieSaved(check.valid)
-      }, 500)
-    } else {
-      setCookieStatus({ checking: false, valid: false, detail: result.message })
-    }
+  function handleCookieClear() {
+    Storage.remove(KEY_COOKIE)
+    setCookieValue("")
+    setCookieStatus({ checking: false, valid: false, detail: "Cookie 已清除" })
   }
 
   async function handleSave() {
@@ -1962,7 +1828,7 @@ function SettingsView() {
           Storage.set(KEY_SAVED_USERS, JSON.stringify(all))
           setSavedUsers(loadSavedUsers())
           const updated = loadSavedUsers().find((x) => x.id === r.secUid)
-          if (updated) setSavedInfo(updated)
+          if (updated && loadSecUid() === r.secUid) setSavedInfo(updated)
         }
       }).catch(() => {})
       saveUser(fullUser)
@@ -2068,87 +1934,42 @@ function SettingsView() {
           ) : null}
         </Section>
 
-        <Section title="抖音登录">
+        <Section title="Cookie 配置">
           <VStack padding={12} spacing={12} frame={{ maxWidth: "infinity" }}>
-            {/* Cookie 状态指示器 */}
             <HStack spacing={8} frame={{ maxWidth: "infinity" }}>
               {cookieStatus.checking ? (
                 <ProgressView foregroundStyle="systemBlue" />
               ) : (
-                <Image 
-                  systemName={cookieStatus.valid ? "checkmark.seal.fill" : "exclamationmark.triangle.fill"} 
-                  foregroundStyle={cookieStatus.valid ? "systemGreen" : "systemOrange"} 
-                  font="body" 
+                <Image
+                  systemName={cookieStatus.valid ? "checkmark.seal.fill" : "exclamationmark.triangle.fill"}
+                  foregroundStyle={cookieStatus.valid ? "systemGreen" : "systemOrange"}
+                  font="body"
                 />
               )}
-              <VStack spacing={0}>
-                <Text font="body" bold>{cookieStatus.checking ? "正在检查..." : (cookieStatus.valid ? "已登录" : "未登录")}</Text>
+              <VStack spacing={0} alignment="leading">
+                <Text font="body" bold>{cookieStatus.checking ? "正在校验..." : (cookieStatus.valid ? "Cookie 有效" : "Cookie 无效")}</Text>
                 <Text font="caption" foregroundStyle="secondaryLabel">{cookieStatus.checking ? "" : cookieStatus.detail}</Text>
               </VStack>
               <Spacer />
             </HStack>
-            
-            {/* 操作按钮 */}
-            <HStack spacing={8} frame={{ maxWidth: "infinity" }}>
-              <Button 
-                title={cookieStatus.valid ? "重新登录" : "登录抖音"}
-                action={handleLogin}
-                frame={{ maxWidth: "infinity" }}
-              />
-              {cookieStatus.valid && (
-                <Button 
-                  title={refreshing ? "刷新中..." : "刷新 Cookie"}
-                  action={handleRefresh}
-                  disabled={refreshing}
-                  frame={{ maxWidth: "infinity" }}
-                />
-              )}
-            </HStack>
-            
-            {/* 手动 Cookie 编辑（高级） */}
-            <HStack spacing={4}>
-              <Text font="caption" foregroundStyle="tertiaryLabel" onTapGesture={() => setShowManualCookie(!showManualCookie)}>
-                {showManualCookie ? "收起手动输入" : "手动配置 Cookie（高级）"}
-              </Text>
-            </HStack>
-            
-            {showManualCookie && (
+
+            {cookieStatus.valid ? (
+              <HStack frame={{ maxWidth: "infinity" }}>
+                <Spacer />
+                <Button title="清除 Cookie" role="destructive" action={handleCookieClear} />
+              </HStack>
+            ) : (
               <VStack spacing={8} frame={{ maxWidth: "infinity" }}>
-                {isCookieSaved ? (
-                  <HStack spacing={8} padding={{ vertical: 8 }}>
-                    <Image systemName="checkmark.circle.fill" foregroundStyle="systemGreen" font="body" />
-                    <Text font="body" foregroundStyle="systemGreen">Cookie 已保存 ✓</Text>
-                    <Spacer />
-                    <Button title="清除 Cookie" action={() => {
-                      Storage.set(KEY_COOKIE, "")
-                      setIsCookieSaved(false)
-                      setCookieValue("")
-                      setCookieStatus({ checking: false, valid: false, detail: "已清除" })
-                    }} />
-                  </HStack>
-                ) : (
-                  <>
-                    <TextField
-                      title="Cookie"
-                      prompt="粘贴 douyin.com Cookie"
-                      value={cookieValue}
-                      onChanged={(val: string) => setCookieValue(val)}
-                    />
-                    <HStack spacing={8} padding={{ top: 4 }}>
-                      <Spacer />
-                      <Button title="保存 Cookie" action={() => {
-                        Storage.set(KEY_COOKIE, cookieValue.trim())
-                        setCookieValue("")
-                        setIsCookieSaved(true)
-                        setCookieStatus({ checking: true, valid: false, detail: "检查中..." })
-                        setTimeout(async () => {
-                          const result = await checkCookieValidity()
-                          setCookieStatus({ checking: false, valid: result.valid, detail: result.detail })
-                        }, 1000)
-                      }} disabled={!cookieValue.trim()} />
-                    </HStack>
-                  </>
-                )}
+                <TextField
+                  title="Cookie"
+                  prompt="粘贴抖音 Cookie"
+                  value={cookieValue}
+                  onChanged={(val: string) => setCookieValue(val)}
+                />
+                <HStack frame={{ maxWidth: "infinity" }}>
+                  <Spacer />
+                  <Button title={savingCookie ? "校验中..." : "校验并保存"} action={handleCookieSave} disabled={savingCookie || !cookieValue.trim()} />
+                </HStack>
               </VStack>
             )}
           </VStack>
@@ -2159,23 +1980,41 @@ function SettingsView() {
             <Text font="caption" foregroundStyle="secondaryLabel">暂无已保存的用户</Text>
           ) : (
             savedUsers.map((u) => (
-              <HStack key={u.id} spacing={12} padding={{ vertical: 8, leading: 0, trailing: 0 }}>
+              <HStack
+                key={u.id}
+                spacing={12}
+                padding={{ vertical: 8, leading: 0, trailing: 0 }}
+                trailingSwipeActions={{
+                  allowsFullSwipe: false,
+                  actions: [
+                    <Button tint="systemRed" action={() => {
+                      const users = loadSavedUsers().filter((x) => x.id !== u.id)
+                      Storage.set(KEY_SAVED_USERS, JSON.stringify(users))
+                      if (u.id === loadSecUid()) {
+                        if (users.length > 0) saveSecUid(users[0].id)
+                        else Storage.remove(KEY_SEC_UID)
+                      }
+                      refreshSavedUsers()
+                    }}>
+                      <VStack spacing={2}>
+                        <Image systemName="trash" font="body" />
+                        <Text font="caption" foregroundStyle="tertiaryLabel">删除</Text>
+                      </VStack>
+                    </Button>,
+                  ],
+                }}
+              >
                 <HStack spacing={12} frame={{ maxWidth: "infinity" }} onTapGesture={() => {
                   if (u.id !== currentUid) { saveSecUid(u.id); refreshSavedUsers() }
                 }}>
                   {u.avatar ? <Image imageUrl={u.avatar} resizable scaleToFill frame={{ width: 36, height: 36 }} clipShape={{ type: "rect", cornerRadius: 18 }} /> : <VStack frame={{ width: 36, height: 36 }} background="systemGray4" clipShape={{ type: "rect", cornerRadius: 18 }} alignment="center"><Image systemName="person.fill" font="caption" foregroundStyle="tertiaryLabel" /></VStack>}
-                  <VStack spacing={0} frame={{ maxWidth: "infinity" }}>
-                    <Text font="subheadline">{u.nickname || "未命名"}</Text>
+                  <VStack spacing={0} frame={{ maxWidth: "infinity" }} alignment="leading">
+                    <Text font="subheadline" frame={{ maxWidth: "infinity", alignment: "leading" }}>{u.nickname || "未命名"}</Text>
                   </VStack>
                   {u.id === currentUid ? (
                     <Text font="caption" foregroundStyle="systemBlue">当前</Text>
                   ) : null}
                 </HStack>
-                <Text font="caption" foregroundStyle="systemRed" padding={{ leading: 8, trailing: 4 }} onTapGesture={() => {
-                  const users = loadSavedUsers().filter((x) => x.id !== u.id)
-                  Storage.set(KEY_SAVED_USERS, JSON.stringify(users))
-                  refreshSavedUsers()
-                }}>删除</Text>
               </HStack>
             ))
           )}
@@ -2188,28 +2027,32 @@ function SettingsView() {
 // ─── 主入口 ───
 function App() {
   const dismiss = Navigation.useDismiss()
+  const [tabIndex, setTabIndex] = useState(0)
 
   return (
-    <TabView>
+    <TabView tabIndex={tabIndex} onTabIndexChanged={setTabIndex}>
       <Tab title="作品" systemImage="rectangle.grid.2x2">
-        <HomeView dismissApp={() => dismiss()} />
+        <HomeView dismissApp={() => dismiss()} isActive={tabIndex === 0} />
       </Tab>
       <Tab title="历史" systemImage="clock">
-        <HistoryView dismissApp={() => dismiss()} />
+        <HistoryView dismissApp={() => dismiss()} isActive={tabIndex === 1} />
       </Tab>
       <Tab title="设置" systemImage="gear">
-        <SettingsView />
+        <SettingsView isActive={tabIndex === 2} />
       </Tab>
     </TabView>
   )
 }
 
 async function run() {
-  await Navigation.present({
-    element: <App />,
-    modalPresentationStyle: 'overFullScreen',
-  })
-  Script.exit()
+  try {
+    await Navigation.present({
+      element: <App />,
+      modalPresentationStyle: 'overFullScreen',
+    })
+  } finally {
+    Script.exit()
+  }
 }
 
 run()
