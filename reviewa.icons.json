@@ -3,44 +3,16 @@
   "description": "收集一些自己脚本用到的图标",
   "icons": [
     {
-      "name": "Iscreen.png",
-      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Iscreen.png"
-    },
-    {
-      "name": "酷狗概念版.png",
-      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/酷狗概念版.png"
-    },
-    {
-      "name": "Cloudflare.png",
-      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Cloudflare.png"
-    },
-    {
-      "name": "GitHub.png",
-      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/GitHub.png"
+      "name": "ChatGPT.png",
+      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/ChatGPT.png"
     },
     {
       "name": "飞蚂蚁旧衣回收.png",
       "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/飞蚂蚁旧衣回收.png"
     },
     {
-      "name": "Wx.png",
-      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Wx.png"
-    },
-    {
-      "name": "ChatGPT.png",
-      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/ChatGPT.png"
-    },
-    {
       "name": "Caipu.png",
       "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Caipu.png"
-    },
-    {
-      "name": "Xsb.png",
-      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Xsb.png"
-    },
-    {
-      "name": "Javday.png",
-      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Javday.png"
     },
     {
       "name": "Loon.png",
@@ -51,40 +23,32 @@
       "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Github.png"
     },
     {
-      "name": "Tweetie.png",
-      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Tweetie.png"
+      "name": "Xsb.png",
+      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Xsb.png"
     },
     {
-      "name": "中国联通.png",
-      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/中国联通.png"
+      "name": "Javday.png",
+      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Javday.png"
     },
     {
-      "name": "Dx.png",
-      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Dx.png"
+      "name": "仙女棒.png",
+      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/仙女棒.png"
     },
     {
-      "name": "banner.png",
-      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png"
+      "name": "Scripting_wyy.png",
+      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Scripting_wyy.png"
     },
     {
-      "name": "WESTDATA.png",
-      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/WESTDATA.png"
+      "name": "Qinglong.png",
+      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Qinglong.png"
     },
     {
-      "name": "WYYX.png",
-      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/WYYX.png"
+      "name": "Bilibili.png",
+      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Bilibili.png"
     },
     {
-      "name": "角色扮演.png",
-      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/角色扮演.png"
-    },
-    {
-      "name": "Telegram Scripting.png",
-      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Telegram Scripting.png"
-    },
-    {
-      "name": "酷我音乐.png",
-      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/酷我音乐.png"
+      "name": "Zgrb.png",
+      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Zgrb.png"
     },
     {
       "name": "Budingsaomiao.png",
@@ -95,76 +59,116 @@
       "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Qq.png"
     },
     {
-      "name": "Intolive.png",
-      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Intolive.png"
-    },
-    {
-      "name": "小仙女棒.png",
-      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/小仙女棒.png"
-    },
-    {
-      "name": "Zgrb.png",
-      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Zgrb.png"
-    },
-    {
-      "name": "Bilibili.png",
-      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Bilibili.png"
-    },
-    {
-      "name": "PingMe.png",
-      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/PingMe.png"
-    },
-    {
-      "name": "Yiyan.png",
-      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Yiyan.png"
-    },
-    {
-      "name": "xuanfushizhong.png",
-      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/xuanfushizhong.png"
+      "name": "one2.png",
+      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/one2.png"
     },
     {
       "name": "Scripting角色扮演.png",
       "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Scripting角色扮演.png"
     },
     {
-      "name": "Foodie.png",
-      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Foodie.png"
+      "name": "Aliyun.png",
+      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Aliyun.png"
     },
     {
-      "name": "仙女棒.png",
-      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/仙女棒.png"
+      "name": "Dx.png",
+      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Dx.png"
     },
     {
-      "name": "one2.png",
-      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/one2.png"
+      "name": "WYYX.png",
+      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/WYYX.png"
     },
     {
-      "name": "Qinglong.png",
-      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Qinglong.png"
-    },
-    {
-      "name": "Surge.png",
-      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Surge.png"
-    },
-    {
-      "name": "One.png",
-      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/One.png"
-    },
-    {
-      "name": "Kggnb.png",
-      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Kggnb.png"
+      "name": "酷我音乐.png",
+      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/酷我音乐.png"
     },
     {
       "name": "QuantumultX.png",
       "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/QuantumultX.png"
     },
     {
-      "name": "Aliyun.png",
-      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Aliyun.png"
+      "name": "角色扮演.png",
+      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/角色扮演.png"
+    },
+    {
+      "name": "Kggnb.png",
+      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Kggnb.png"
+    },
+    {
+      "name": "Tweetie.png",
+      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Tweetie.png"
+    },
+    {
+      "name": "Iscreen.png",
+      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Iscreen.png"
+    },
+    {
+      "name": "Telegram Scripting.png",
+      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Telegram Scripting.png"
+    },
+    {
+      "name": "banner.png",
+      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png"
+    },
+    {
+      "name": "GitHub.png",
+      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/GitHub.png"
+    },
+    {
+      "name": "Cloudflare.png",
+      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Cloudflare.png"
+    },
+    {
+      "name": "Foodie.png",
+      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Foodie.png"
+    },
+    {
+      "name": "中国联通.png",
+      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/中国联通.png"
+    },
+    {
+      "name": "Surge.png",
+      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Surge.png"
+    },
+    {
+      "name": "酷狗概念版.png",
+      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/酷狗概念版.png"
+    },
+    {
+      "name": "Intolive.png",
+      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Intolive.png"
+    },
+    {
+      "name": "One.png",
+      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/One.png"
+    },
+    {
+      "name": "WESTDATA.png",
+      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/WESTDATA.png"
+    },
+    {
+      "name": "xuanfushizhong.png",
+      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/xuanfushizhong.png"
+    },
+    {
+      "name": "小仙女棒.png",
+      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/小仙女棒.png"
+    },
+    {
+      "name": "Yiyan.png",
+      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Yiyan.png"
+    },
+    {
+      "name": "Wx.png",
+      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Wx.png"
     },
     {
       "name": "itunes.png",
       "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/itunes.png"
+    },
+    {
+      "name": "PingMe.png",
+      "url": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/PingMe.png"
     }
   ]
 }
