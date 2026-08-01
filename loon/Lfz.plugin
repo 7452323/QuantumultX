@@ -1,8 +1,9 @@
 #!name=录风者 Viidure VIP
-#!desc=只修改 VIP code 测试
+#!desc=模拟IAP订单验证解锁VIP
 #!author=7452323
 
 [Script]
+http-response ^https?://app-api\.lufengzhe\.com:9091/store/api/v1/store/order/check$ script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Lfz.js, requires-body=true, timeout=60, tag=录风者订单
 http-response ^https?://app-api\.lufengzhe\.com:9091/store/api/v1/vip/infos$ script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Lfz.js, requires-body=true, timeout=60, tag=录风者VIP
 
 [MITM]
