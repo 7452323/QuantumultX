@@ -3,19 +3,21 @@
 VIP破解 + 去广告 + AI配额破解
 作者: 7452323
 日期: 2026-08-02
+更新: 2026-08-02 (基于 HAR 抓包修正响应格式)
 
 [rewrite_local]
 ^https?://app-api\.lufengzhe\.com:9091/store/api/v1/vip/infos$ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Lfz.js
-^https?://app-api\.lufengzhe\.com:9091/store/api/v1/vip/func/activate$ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Lfz.js
-^https?://app-api\.lufengzhe\.com:9091/store/api/v1/vip/func/find$ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Lfz.js
 ^https?://app-api\.lufengzhe\.com:9091/store/api/v1/store/order/check$ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Lfz.js
+^https?://app-api\.lufengzhe\.com:9091/store/api/v1/store/sale/packet$ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Lfz.js
 ^https?://app-api\.lufengzhe\.com:9091/ai/api/v1/usage/quota$ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Lfz.js
 ^https?://app-api\.lufengzhe\.com:9091/ai/api/v1/task/checkAmount$ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Lfz.js
+^https?://app-api\.lufengzhe\.com:9091/ai/api/v1/task/list$ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Lfz.js
+^https?://app-api\.lufengzhe\.com:9091/ai/api/v1/template/group$ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Lfz.js
 ^https?://app-api\.lufengzhe\.com:9091/res/api/v1/appres/banner$ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Lfz.js
 ^https?://app-api\.lufengzhe\.com:9091/res/api/v1/appres/splash$ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Lfz.js
 ^https?://app-api\.lufengzhe\.com:9091/res/api/v1/appres/commdata$ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Lfz.js
-^https?://app-api\.lufengzhe\.com:9091/store/api/v1/store/sale/packet$ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Lfz.js
 ^https?://app-api\.lufengzhe\.com:9091/iot/api/v1/version/check$ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Lfz.js
+^https?://app-api\.lufengzhe\.com:9091/account/api/v1/user/userinfo/ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Lfz.js
 
 [mitm]
 hostname = app-api.lufengzhe.com:9091
@@ -29,6 +31,7 @@ try {
     var url = $request.url;
 
     // VIP 信息 - 终身会员
+    // 实际格式: {"result": {}, "code": 200001, "des": "vip info notfound", "data": {...}}
     if (url.includes("/store/api/v1/vip/infos")) {
         json.data = {
             is_vip: true,
@@ -51,84 +54,110 @@ try {
                 { id: 10, name: "视频防抖", enabled: true }
             ]
         };
+        json.code = 0;
+        json.des = "success";
     }
 
-    // VIP 功能激活
-    else if (url.includes("/store/api/v1/vip/func/activate")) {
-        json.data = {
-            success: true,
-            vip_func_id: 1,
-            activated_at: Math.floor(Date.now() / 1000),
-            expire_at: 9999999999
-        };
-    }
-
-    // VIP 功能查询 - 全部已激活
-    else if (url.includes("/store/api/v1/vip/func/find")) {
-        json.data = {
-            list: Array.from({length: 20}, (_, i) => ({
-                id: i + 1,
-                activated: true,
-                expire_at: 9999999999
-            }))
-        };
-    }
-
-    // 订单检查 - 已购买
+    // 订单检查 - 已支付
+    // 实际格式: {"result": {"orderid": "...", "status": 0, ...}, "code": 0, "des": "success"}
     else if (url.includes("/store/api/v1/store/order/check")) {
-        json.data = {
-            order_status: "completed",
-            purchased: true,
-            product_id: "vip_lifetime",
-            purchase_time: Math.floor(Date.now() / 1000),
-            expire_time: 9999999999
-        };
+        if (json.result) {
+            json.result.status = 1;
+            json.result.userPayment.status = 1;
+            json.result.paid = true;
+            json.result.order_status = "completed";
+        }
+        json.code = 0;
+        json.des = "success";
+    }
+
+    // 销售包 - 全部已购买，价格清零
+    // 实际格式: {"result": {"data": [...]}, "code": 0, "des": "success"}
+    else if (url.includes("/store/api/v1/store/sale/packet")) {
+        if (json.result && json.result.data) {
+            json.result.data.forEach(function(item) {
+                item.purchased = true;
+                item.price = 0;
+                item.cost = 0;
+                item.status = 2;
+            });
+        }
+        json.code = 0;
+        json.des = "success";
     }
 
     // AI 使用配额 - 无限
     else if (url.includes("/ai/api/v1/usage/quota")) {
-        json.data = {
-            total: 999999,
-            used: 0,
-            remaining: 999999,
-            unlimited: true
-        };
+        if (json.data) {
+            json.data.total = 999999;
+            json.data.used = 0;
+            json.data.remaining = 999999;
+            json.data.unlimited = true;
+        }
+        json.code = 0;
+        json.des = "success";
     }
 
     // AI 任务额度 - 无限
     else if (url.includes("/ai/api/v1/task/checkAmount")) {
-        json.data = {
-            available: 999999,
-            unlimited: true
-        };
+        if (json.data) {
+            json.data.available = 999999;
+            json.data.unlimited = true;
+        }
+        json.code = 0;
+        json.des = "success";
+    }
+
+    // AI 任务列表 - 清除限制
+    else if (url.includes("/ai/api/v1/task/list")) {
+        if (json.result && json.result.data) {
+            json.result.data.forEach(function(task) {
+                if (task.tpl) {
+                    task.tpl.limitUse = false;
+                }
+            });
+        }
+    }
+
+    // AI 模板组 - 移除使用限制
+    else if (url.includes("/ai/api/v1/template/group")) {
+        if (json.result && json.result.data) {
+            json.result.data.forEach(function(group) {
+                if (group.childList) {
+                    group.childList.forEach(function(child) {
+                        if (child.tpl) {
+                            child.tpl.limitUse = false;
+                        }
+                    });
+                }
+            });
+        }
     }
 
     // Banner 广告 - 清空
     else if (url.includes("/res/api/v1/appres/banner")) {
-        json.data = { list: [] };
+        if (json.result) {
+            json.result.data = { list: [] };
+        }
+        json.code = 0;
+        json.des = "success";
     }
 
     // 启动页广告 - 清空
     else if (url.includes("/res/api/v1/appres/splash")) {
-        json.data = { splash: null };
+        if (json.result) {
+            json.result.data = { splash: null };
+        }
+        json.code = 0;
+        json.des = "success";
     }
 
     // 通用数据 - 清除广告
     else if (url.includes("/res/api/v1/appres/commdata")) {
-        if (json.data) {
-            delete json.data.ads;
-            delete json.data.banners;
-            delete json.data.ad_config;
-        }
-    }
-
-    // 销售包 - 全部已购买
-    else if (url.includes("/store/api/v1/store/sale/packet")) {
-        if (json.data && json.data.list) {
-            json.data.list.forEach(function(item) {
-                item.purchased = true;
-                item.price = 0;
-            });
+        if (json.result && json.result.data) {
+            delete json.result.data.ads;
+            delete json.result.data.banners;
+            delete json.result.data.ad_config;
         }
     }
 
@@ -139,6 +168,16 @@ try {
             latest_version: "3.6.1",
             force_update: false
         };
+        json.error_code = -1;
+    }
+
+    // 用户信息 - 添加 VIP 标识
+    else if (url.includes("/account/api/v1/user/userinfo/")) {
+        if (json.result) {
+            json.result.is_vip = true;
+            json.result.vip_level = 3;
+            json.result.vip_expire = 9999999999;
+        }
     }
 
     body = JSON.stringify(json);

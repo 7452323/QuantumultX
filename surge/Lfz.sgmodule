@@ -2,15 +2,17 @@
 #!desc=行车记录仪APP 会员解锁 + 去广告 + AI破解
 #!author=7452323
 #!icon=https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Lfz.png
+#!category=会员解锁
+#!system=ios
 
 [Script]
 录风者VIP = type=http-response, pattern=^https?://app-api\.lufengzhe\.com:9091/store/api/v1/vip/infos$, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Lfz.js, requires-body=true, max-size=-1, timeout=60
-录风者VIP激活 = type=http-response, pattern=^https?://app-api\.lufengzhe\.com:9091/store/api/v1/vip/func/(activate|find)$, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Lfz.js, requires-body=true, max-size=-1, timeout=60
 录风者订单 = type=http-response, pattern=^https?://app-api\.lufengzhe\.com:9091/store/api/v1/store/order/check$, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Lfz.js, requires-body=true, max-size=-1, timeout=60
-录风者AI = type=http-response, pattern=^https?://app-api\.lufengzhe\.com:9091/ai/api/v1/(usage/quota|task/checkAmount)$, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Lfz.js, requires-body=true, max-size=-1, timeout=60
+录风者销售 = type=http-response, pattern=^https?://app-api\.lufengzhe\.com:9091/store/api/v1/store/sale/packet$, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Lfz.js, requires-body=true, max-size=-1, timeout=60
+录风者AI = type=http-response, pattern=^https?://app-api\.lufengzhe\.com:9091/ai/api/v1/(usage/quota|task/checkAmount|task/list|template/group)$, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Lfz.js, requires-body=true, max-size=-1, timeout=60
 录风者广告 = type=http-response, pattern=^https?://app-api\.lufengzhe\.com:9091/res/api/v1/appres/(banner|splash|commdata)$, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Lfz.js, requires-body=true, max-size=-1, timeout=60
-录风者销售包 = type=http-response, pattern=^https?://app-api\.lufengzhe\.com:9091/store/api/v1/store/sale/packet$, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Lfz.js, requires-body=true, max-size=-1, timeout=60
 录风者版本 = type=http-response, pattern=^https?://app-api\.lufengzhe\.com:9091/iot/api/v1/version/check$, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Lfz.js, requires-body=true, max-size=-1, timeout=60
+录风者用户 = type=http-response, pattern=^https?://app-api\.lufengzhe\.com:9091/account/api/v1/user/userinfo/, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Lfz.js, requires-body=true, max-size=-1, timeout=60
 
 [MITM]
 hostname = %APPEND% app-api.lufengzhe.com:9091
