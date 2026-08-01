@@ -1,13 +1,29 @@
 /*
-录风者 Viidure - 空脚本测试版
-不做任何修改，仅测试 MITM 本身是否导致闪退
+录风者 Viidure v3.6.1 会员解锁
+基于第一版（不闪退）只修改 VIP code
+作者: 7452323
 
 [rewrite_local]
-^https?://app-api\.lufengzhe\.com:9091/ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Lfz.js
+^https?://app-api\.lufengzhe\.com:9091/store/api/v1/vip/infos$ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Lfz.js
 
 [mitm]
 hostname = app-api.lufengzhe.com:9091
 */
 
-// 不做任何修改，直接返回原始响应
-$done({});
+var body = $response.body;
+if (!body) { $done({}); }
+
+try {
+    var json = JSON.parse(body);
+    var url = $request.url;
+
+    // VIP 信息 - 只修改 code 让应用认为 VIP 有效
+    if (url.includes("/store/api/v1/vip/infos")) {
+        json.code = 0;
+        json.des = "success";
+    }
+
+    body = JSON.stringify(json);
+} catch(e) {}
+
+$done({body: body});
