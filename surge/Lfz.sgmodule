@@ -1,11 +1,9 @@
-#!name=录风者 Viidure VIP
-#!desc=行车记录仪APP 会员解锁 + 去广告
+#!name=录风者 Viidure (空脚本测试)
+#!desc=测试 MITM 本身是否导致闪退
 #!author=7452323
-#!icon=https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Lfz.png
 
 [Script]
-录风者VIP = type=http-response, pattern=^https?://app-api\.lufengzhe\.com:9091/store/api/v1/vip/infos$, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Lfz.js, requires-body=true, max-size=-1, timeout=60
-录风者广告 = type=http-response, pattern=^https?://app-api\.lufengzhe\.com:9091/res/api/v1/appres/(banner|splash)$, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Lfz.js, requires-body=true, max-size=-1, timeout=60
+录风者测试 = type=http-response, pattern=^https?://app-api\.lufengzhe\.com:9091/, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Lfz.js, requires-body=true, timeout=60
 
 [MITM]
 hostname = %APPEND% app-api.lufengzhe.com:9091
