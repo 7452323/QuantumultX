@@ -1,11 +1,8 @@
 #!name=Fotoz会员解锁
-#!desc=图片一键下载 Pro 会员
-#!author=7452323
-#!icon=https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/itunes.png
-#!homepage=https://github.com/7452323/QuantumultX
+#!desc=图片一键下载 Pro 永久会员（v2026080403）
 
 [Script]
-http-response ^https?:\/\/buy\.itunes\.apple\.com\/verifyReceipt script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Fotoz.js, requires-body=true, timeout=60, tag=Fotoz
+http-response ^https?:\/\/buy\.itunes\.apple\.com\/verifyReceipt$ script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Fotoz.js?v=2026080403, requires-body=true, timeout=60, tag=Fotoz
 
-[MITM]
+[Mitm]
 hostname = buy.itunes.apple.com
