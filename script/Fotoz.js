@@ -3,9 +3,7 @@ Fotoz - 图片一键下载，批量下载网页图片
 https://apps.apple.com/app/id1090640183
 
 [rewrite_local]
-^https?:\/\/buy\.itunes\.apple\.com\/verifyReceipt$ url script-response-body https://cdn.jsdelivr.net/gh/7452323/QuantumultX@main/script/Fotoz.js
-# 备用（raw 被墙时用）:
-# ^https?:\/\/buy\.itunes\.apple\.com\/verifyReceipt$ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Fotoz.js
+^https?:\/\/buy\.itunes\.apple\.com\/verifyReceipt$ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Fotoz.js
 
 [mitm]
 hostname = buy.itunes.apple.com

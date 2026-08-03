@@ -2,7 +2,7 @@
 #!desc=图片一键下载 Pro 会员
 
 [Script]
-Fotoz = type=http-response, pattern=^https?:\/\/buy\.itunes\.apple\.com\/verifyReceipt, script-path=https://cdn.jsdelivr.net/gh/7452323/QuantumultX@main/script/Fotoz.js, requires-body=true, max-size=-1, timeout=60
+Fotoz = type=http-response, pattern=^https?:\/\/buy\.itunes\.apple\.com\/verifyReceipt, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Fotoz.js, requires-body=true, max-size=-1, timeout=60
 
 [MITM]
 hostname = %APPEND% buy.itunes.apple.com
