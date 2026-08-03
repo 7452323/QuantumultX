@@ -1,7 +1,7 @@
 /*
 
 Fotoz：https://apps.apple.com/app/id1090640183
-
+作者 ：Gpt
 [rewrite_local]
 ^https?:\/\/buy\.itunes\.apple\.com\/verifyReceipt$ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Fotoz.js
 
