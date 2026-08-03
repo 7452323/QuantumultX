@@ -3,7 +3,7 @@ Fotoz - 图片一键下载，批量下载网页图片
 https://apps.apple.com/app/id1090640183
 
 [rewrite_local]
-^https?:\/\/buy\.itunes\.apple\.com\/verifyReceipt$ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Fotoz.js?v=2026080403
+^https?:\/\/buy\.itunes\.apple\.com\/verifyReceipt$ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Fotoz.js
 
 [mitm]
 hostname = buy.itunes.apple.com
@@ -55,16 +55,8 @@ if (body) {
     body.status = 0;
     body.environment = body.environment || "Production";
 
-    body.pending_renewal_info = [{
-      "expiration_intent": "1",
-      "product_id": PRODUCT_ID,
-      "is_in_billing_retry_period": "0",
-      "auto_renew_product_id": PRODUCT_ID,
-      "original_transaction_id": "666666666666666",
-      "auto_renew_status": "0"
-    }];
-
-    // Guding88 脚本没有伪造 latest_receipt，保持响应结构一致。
+    // 严格保持 Guding88 脚本的实际最终输出：不添加续期数据，也不伪造 latest_receipt。
+    delete body.pending_renewal_info;
     delete body.latest_receipt;
 
     $done({ body: JSON.stringify(body) });
