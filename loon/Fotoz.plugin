@@ -5,7 +5,7 @@
 #!homepage=https://github.com/7452323/QuantumultX
 
 [Script]
-http-response ^https?:\/\/buy\.itunes\.apple\.com\/verifyReceipt script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Fotoz.js, requires-body=true, timeout=60, tag=Fotoz
+http-response ^https?:\/\/buy\.itunes\.apple\.com\/verifyReceipt script-path=https://cdn.jsdelivr.net/gh/7452323/QuantumultX@main/script/Fotoz.js, requires-body=true, timeout=60, tag=Fotoz
 
 [MITM]
 hostname = buy.itunes.apple.com
