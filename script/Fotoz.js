@@ -9,8 +9,8 @@ Fotoz：https://apps.apple.com/app/id1090640183
 hostname = buy.itunes.apple.com
 
 */
-var guding = {};
-var guding6 = JSON.parse(typeof $response != "undefined" && $response.body || null);
+var result = {};
+var response = JSON.parse(typeof $response != "undefined" && $response.body || null);
 var headers = {};
 for (var key in $request.headers) {
   const reg = /^[a-z]+$/;
@@ -34,7 +34,7 @@ var receipt = {
   "is_trial_period": "false",
   "original_transaction_id": "666666666666666",
   "purchase_date": "2023-06-06 06:06:06 Etc\/GMT",
-  "product_id": "https://t.me/Guding88",
+  "product_id": "com.kiddy.fotoz.ipa.pro",
   "original_purchase_date_pst": "2023-06-06 06:06:06 America\/Los_Angeles",
   "in_app_ownership_type": "PURCHASED",
   "subscription_group_identifier": "20877951",
@@ -46,9 +46,9 @@ var receipt = {
 }
 var renewal = {
   "expiration_intent": "1",
-  "product_id": "https://t.me/Guding88",
+  "product_id": "com.kiddy.fotoz.ipa.pro",
   "is_in_billing_retry_period": "0",
-  "auto_renew_product_id": "https://t.me/Guding88",
+  "auto_renew_product_id": "com.kiddy.fotoz.ipa.pro",
   "original_transaction_id": "666666666666666",
   "auto_renew_status": "0"
 }
@@ -59,11 +59,11 @@ for (var uaKey in uaProductMapping) {
     receipt.product_id = product_id;
     renewal.product_id = product_id;
     renewal.auto_renew_product_id = product_id;
-    guding6.receipt.in_app = [receipt];
-    guding6.latest_receipt_info = [receipt];
-    guding.pending_renewal_info = [renewal];
+    response.receipt.in_app = [receipt];
+    response.latest_receipt_info = [receipt];
+    result.pending_renewal_info = [renewal];
     break;
   }
 }
-guding = guding6;
-$done({ body: JSON.stringify(guding) });
+result = response;
+$done({ body: JSON.stringify(result) });
