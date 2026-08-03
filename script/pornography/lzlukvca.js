@@ -1,10 +1,10 @@
 /*
- * lzlukvca.cc（黄豆短剧）协议只读诊断脚本 —— 合规版
+ * lzlukvca.cc（黄豆短剧）
  *
  * 功能：
  *   1. 解密 /api/drama/detail 与 /api/drama/play 的加密请求/响应体（AES-256-CBC + gzip/zlib）
- *   2. 将解密后的 JSON 输出到控制台，用于协议诊断与流量观察
- *   3. 流量原样放行（$done({})），不做任何内容修改
+ *   2. 将解密后的 JSON 输出到控制台，
+ *   3. 流量原样放行（$done({})）
  *
  * 支持平台：Quantumult X / Surge / Loon
  *   - QX：body 为 base64 字符串（脚本自动解码）
