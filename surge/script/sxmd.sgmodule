@@ -1,0 +1,13 @@
+#!name=书香门第(签到)
+#!desc=书香门第论坛每日签到，随机金币
+#!author=7452323
+#!category=签到
+#!arguments=cron:30 0 * * *,hostname:www.txtnovel.vip
+#!arguments-desc=签到模块参数设置\n├ cron: 定时运行时间\n└ hostname: MITM域名
+
+[Script]
+sxmd = type=cron,cronexp="{{{cron}}}",wake-system=1,timeout=30,script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/sxmd.js
+sxmd_cookie = type=http-request,pattern=^http:\/\/www\.txtnovel\.vip\/,script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/sxmd.js,requires-body=1
+
+[MITM]
+hostname = %APPEND% {{{hostname}}}
