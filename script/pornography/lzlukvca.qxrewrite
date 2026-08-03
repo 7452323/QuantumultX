@@ -1,4 +1,4 @@
-# 黄豆短剧 lzlukvca 协议诊断（只读）—— Quantumult X 配置
+# 黄豆短剧 lzlukvca 
 # 脚本远程地址（更新源，.js 文件）:
 #   https://raw.githubusercontent.com/7452323/QuantumultX/main/script/pornography/lzlukvca.js
 # 使用方法：
@@ -6,8 +6,8 @@
 #   2. 把下面 [rewrite_local] 与 [mitm] 两段合并进自己的 Quantumult X 配置
 #   3. 开启「MitM」并安装/信任证书
 # 说明：
-#   - 仅解密 /api/drama/detail 与 /api/drama/play 的请求/响应并在控制台输出日志
-#   - 流量原样放行，不做任何内容修改
+#   - 仅解密 /api/drama/detail 与 /api/drama/play 的请求/响应
+#   - 
 #   - 二进制 body 在 QX 中为 base64 字符串，脚本会自动解码
 
 [rewrite_local]
