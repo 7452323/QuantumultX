@@ -1,5 +1,5 @@
 #!name=黄豆短剧 lzlukvca 协议诊断（只读）
-#!desc=解密 lzlukvca.cc 的 /api/drama/detail 与 /api/drama/play 加密请求/响应并在控制台输出诊断日志。流量原样放行，不做任何内容修改。需开启 MITM 并信任证书。
+#!desc=解密 lzlukvca.cc 的 /api/drama/detail 与 /api/drama/play 加密请求/响应并在控制台输出诊断日志。
 #!system=ios
 #!author=7452323
 #!homepage=https://github.com/7452323/QuantumultX
