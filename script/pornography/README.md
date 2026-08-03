@@ -29,14 +29,16 @@
   - `detail`：`data.episodes[]`（`seq/type/price/is_buy/methods`）、`coin_episodes[]`、`episode_price`、`free_episodes`、`is_buy_whole` 等。
   - `play`：成功返回 `data.m3u8`/`data.lines[]`；收费剧集返回 `{"status":"n","error":"本集需金币解锁","errorCode":813005}`。
 
-## 文件清单
+## 文件清单（raw 链接）
 
 | 文件 | 说明 |
 |---|---|
-| `lzlukvca.js` | 三平台统一脚本（QX / Surge / Loon），纯 JS 自包含，零外部依赖 |
-| `lzlukvca.sgmodule` | Surge 模块 |
-| `lzlukvca.plugin` | Loon 插件 |
-| `lzlukvca.qxrewrite` | Quantumult X 配置片段 |
+| [`lzlukvca.js`](https://raw.githubusercontent.com/7452323/QuantumultX/main/script/pornography/lzlukvca.js) | 三平台统一脚本（QX / Surge / Loon），纯 JS 自包含，零外部依赖 |
+| [`lzlukvca.sgmodule`](https://raw.githubusercontent.com/7452323/QuantumultX/main/script/pornography/lzlukvca.sgmodule) | Surge 模块 |
+| [`lzlukvca.plugin`](https://raw.githubusercontent.com/7452323/QuantumultX/main/script/pornography/lzlukvca.plugin) | Loon 插件 |
+| [`lzlukvca.qxrewrite`](https://raw.githubusercontent.com/7452323/QuantumultX/main/script/pornography/lzlukvca.qxrewrite) | Quantumult X 配置片段 |
+
+目录：https://github.com/7452323/QuantumultX/tree/main/script/pornography
 
 ## 安装
 

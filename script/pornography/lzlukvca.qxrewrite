@@ -1,6 +1,8 @@
 # 黄豆短剧 lzlukvca 协议诊断（只读）—— Quantumult X 配置
+# 脚本远程地址（更新源，.js 文件）:
+#   https://raw.githubusercontent.com/7452323/QuantumultX/main/script/pornography/lzlukvca.js
 # 使用方法：
-#   1. 将 lzlukvca.js 下载到 Quantumult X 的 Scripts 目录（iCloud Drive/Quantumult X/Scripts/）
+#   1. 把上面的 lzlukvca.js 下载到 Quantumult X 的 Scripts 目录（iCloud Drive/Quantumult X/Scripts/），文件名保持 lzlukvca.js
 #   2. 把下面 [rewrite_local] 与 [mitm] 两段合并进自己的 Quantumult X 配置
 #   3. 开启「MitM」并安装/信任证书
 # 说明：

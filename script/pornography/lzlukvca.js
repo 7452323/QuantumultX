@@ -12,6 +12,11 @@
  *
  * 自包含实现：SHA-256 / HMAC-SHA256 / AES-256-CBC / Base64 / Hex / Utf8 / inflate(gzip+zlib)
  * 零网络依赖、零外部库，所有算法均已对照 Node 标准库与真实抓包样本验证。
+ *
+ * 脚本远程地址（更新源）:
+ *   https://raw.githubusercontent.com/7452323/QuantumultX/main/script/pornography/lzlukvca.js
+ * 仓库目录:
+ *   https://github.com/7452323/QuantumultX/tree/main/script/pornography
  */
 (function () {
   'use strict';
