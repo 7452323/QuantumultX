@@ -644,7 +644,7 @@
     });
   }
 
-  /* ================= 主流程（解锁：detail 全免费 + play 813005 伪造真实密钥） ================= */
+  /* ================= 主流程（解锁：detail 全免费 + play 813004/813005/813006 伪造真实密钥） ================= */
   var isResponse = typeof $response !== 'undefined';
   var url = ($request && $request.url) || '';
   var target = isResponse ? $response : $request;
@@ -664,6 +664,9 @@
   function passThrough() { $done({}); }
 
   // ---- detail 响应：全剧集免费（UI 不显示锁） ----
+  // 注意：App 端 anP() 只把 pay_type==='coin'/'points' 当可解锁项，其余（含 free/vip）
+  // 一律弹“VIP 会员专享”窗且不发 play 请求。因此必须把每集 pay_type 写成 'coin'
+  // 并 is_buy=true + can_vip_watch=false，让 ans() 直接判定已解锁、可发起 play。
   if (isResponse && isDetail && body != null) {
     var djson = decryptBody(body, requestId, deviceType);
     if (djson && djson.data) {
@@ -671,8 +674,11 @@
       if (d.episodes) {
         for (var i = 0; i < d.episodes.length; i++) {
           d.episodes[i].type = 'free';
+          d.episodes[i].pay_type = 'coin';   // 关键：绕过 App 端 VIP 会员弹窗（anP 判定）
           d.episodes[i].is_buy = true;
+          d.episodes[i].can_vip_watch = false; // ans() 直接判已解锁 → 可自动连播
           d.episodes[i].price = 0;
+          d.episodes[i].money = 0;
           d.episodes[i].methods = [];
         }
       }
@@ -681,19 +687,24 @@
       if (d.vip_episodes) d.vip_episodes = [];
       d.is_buy_whole = true;
       d.episode_price = 0;
+      d.points_price = 0;
+      d.money = 0;
+      d.pay_type = 'free';      // 剧集级：避免“该短剧为 VIP 会员专享”弹窗
+      d.can_vip_watch = true;   // 会员可看标记
       if (d.episodes) d.free_episodes = d.episodes.length;
       var denc = encryptBody(djson, requestId, deviceType);
-      log('detail unlocked episodes=' + (d.episodes ? d.episodes.length : 0));
+      log('detail unlocked episodes=' + (d.episodes ? d.episodes.length : 0) + ' pay_type=free/can_vip_watch=true');
       $done({ body: outputBytes(denc) });
     } else {
       log('detail decrypt fail');
       passThrough();
     }
   }
-  // ---- play 响应：813005 → 伪造成功（含真实 hls_key） ----
+  // ---- play 响应：813004(积分)/813005(金币)/813006(会员) → 伪造成功（含真实 hls_key） ----
   else if (isResponse && isPlay && body != null) {
     var pjson = decryptBody(body, requestId, deviceType);
-    if (pjson && pjson.errorCode === 813005) {
+    var payErr = pjson && (pjson.errorCode === 813004 || pjson.errorCode === 813005 || pjson.errorCode === 813006);
+    if (payErr) {
       // 从请求体取 drama_id + seq
       var reqBytes = bodyToBytes($request.body);
       var rjson = reqBytes ? decryptBody(reqBytes, requestId, deviceType) : null;
@@ -701,7 +712,7 @@
       var seq = rjson && rjson.data ? rjson.data.seq : null;
       if (dramaId && seq != null) {
         var m3u8Url = 'https://lzlukvca.cc/api/drama/hls/' + dramaId + '/' + seq + '/play.m3u8?line=free';
-        log('play 813005 -> forge drama_id=' + dramaId + ' seq=' + seq);
+        log('play ' + pjson.errorCode + ' -> forge drama_id=' + dramaId + ' seq=' + seq);
         fetchHlsKey(m3u8Url, function (hlsKey) {
           var forged = forgePlayResponse(dramaId, seq, hlsKey);
           var penc = encryptBody(forged, requestId, deviceType);
@@ -709,11 +720,11 @@
           $done({ body: outputBytes(penc) });
         });
       } else {
-        log('play 813005 but cannot read drama_id/seq from request body');
+        log('play ' + pjson.errorCode + ' but cannot read drama_id/seq from request body');
         passThrough();
       }
     } else {
-      // 非 813005（已成功或其它错误）→ 放行
+      // 非付费错误（已成功或其它错误）→ 放行
       if (pjson) log('play resp pass-through status=' + pjson.status);
       passThrough();
     }

@@ -1,9 +1,9 @@
-# lzlukvca.cc（黄豆短剧）金币剧集解锁
+# lzlukvca.cc（黄豆短剧）金币剧集 + 会员剧集解锁
 
 对 `lzlukvca.cc` 短剧站 `/api/drama/detail` 与 `/api/drama/play` 接口的加密流量做**实时解锁**：
 
-- **detail 响应**：解密后将全部剧集改写为免费（`type=free` / `is_buy=true` / `price=0` / `coin_episodes` 清空 / `is_buy_whole=true` / `episode_price=0`），重加密返回，App 端不再显示锁与金币；
-- **play 响应**：命中 `813005（本集需金币解锁）` 时，从请求体读取 `drama_id + seq`，抓取可预测的 m3u8 直链并提取**真实 enc.key（AES-128）**，伪造成功响应（`status=y` + `hls_key`）重加密返回，金币剧集可直接播放；
+- **detail 响应**：解密后将全部剧集改写为已解锁（`type=free` / `pay_type=coin`（绕过 App 端 VIP 会员弹窗判定） / `is_buy=true` / `can_vip_watch=false`（自动连播直接判定可播） / `price=0` / `methods=[]`，同时清空 `coin_episodes` / `points_episodes` / `vip_episodes`，置 `is_buy_whole=true` / `episode_price=0` / `pay_type=free` / `can_vip_watch=true`），重加密返回，App 端不再显示锁与会员标记；
+- **play 响应**：命中 `813004（积分解锁）/ 813005（金币解锁）/ 813006（会员专享）` 任一付费错误时，从请求体读取 `drama_id + seq`，抓取可预测的 m3u8 直链并提取**真实 enc.key（AES-128）**，伪造成功响应（`status=y` + `hls_key`）重加密返回，金币/会员剧集均可直接播放；
 - **其余流量**（非 detail/play、已成功响应、请求阶段）原样放行，解密失败时同样放行，绝不影响正常访问。
 
 > ⚠️ 说明：本脚本用于学习研究目标站点的加密协议。请遵守目标站点的服务条款与当地法律法规。
@@ -26,8 +26,9 @@
 - 响应 `Requestid` 头与请求 `requestId` 头一致，直接用该值派生密钥。
 - 压缩：服务端返回 gzip；客户端请求同样为 gzip/zlib（脚本内置完整 inflate，支持 stored/fixed/dynamic Huffman 与 gzip/zlib 两种包装；重加密用 zlib stored block + Adler-32）。
 - 业务结构：
-  - `detail`：`data.episodes[]`（`seq/type/price/is_buy/methods`）、`coin_episodes[]`、`episode_price`、`free_episodes`、`is_buy_whole` 等。
-  - `play`：成功返回 `data.m3u8`/`data.lines[]`；收费剧集返回 `{"status":"n","error":"本集需金币解锁","errorCode":813005}`。
+  - `detail`：`data.episodes[]`（`seq/type/pay_type/price/methods`）、`coin_episodes[]`、`vip_episodes[]`、`points_episodes[]`、`episode_price`、`free_episodes`、`is_buy_whole`、`can_vip_watch` 等。
+  - `play`：成功返回 `data.m3u8`/`data.lines[]`；付费错误码：`813004`（积分）/ `813005`（金币）/ `813006`（会员专享），均为 `{"status":"n","error":"...","errorCode":xxx}`。
+- App 端播放判定（前端逆向）：点集数时若 `episodes[i].pay_type==='coin'/'points'` 走解锁弹窗并发 play 请求，**其它值（含 free/vip）一律弹“VIP 会员专享”窗且不发 play 请求**——因此解锁脚本必须把每集 `pay_type` 写成 `coin` 并 `is_buy=true` 才能让 App 发 play。
 - m3u8 直链可预测：`https://lzlukvca.cc/api/drama/hls/{drama_id}/{seq}/play.m3u8?line=free`，内部 `#EXT-X-KEY:...URI="...enc.key?auth_key=..."` 可直接抓取返回 16 字节真实 AES-128 密钥。
 
 ## 文件清单（raw 链接）
@@ -68,7 +69,7 @@ detail 响应全免费改写：
 [lzlukvca] detail unlocked episodes=8
 ```
 
-play 813005 伪造成功：
+play 813005/813006 伪造成功：
 ```
 [lzlukvca] play 813005 -> forge drama_id=rp_6a52d26d0e18e7c330a8d1f0 seq=4
 [lzlukvca] play forged hls_key=real
