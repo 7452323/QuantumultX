@@ -3,6 +3,7 @@
 对 `lzlukvca.cc` 短剧站 `/api/drama/detail` 与 `/api/drama/play` 接口的加密流量做**实时解锁**：
 
 - **detail 响应**：解密后将全部剧集改写为已解锁（免费剧保持 `type=free`，付费剧统一改 `type=coin`（App 端 anP 只认 coin/points，其它一律弹会员窗） / `is_buy=true` / `price=0` / `methods=[]`，同时清空 `coin_episodes` / `points_episodes` / `vip_episodes`，置 `is_buy_whole=true` / `episode_price=0` / `pay_type=free`），重加密返回，App 端不再显示锁与会员标记；
+- **doBuy 响应**（确认解锁/购买接口）：一律伪造成功（`status=true`，App 端 `J.w(status,true)` 判定必须为 boolean true），让“确认解锁”直接成功进入播放流程；
 - **play 响应**：命中 `813004（VIP 会员专享）/ 813005（金币解锁）/ 813006（其它付费）` 任一付费错误时，从请求体读取 `drama_id + seq`，抓取可预测的 m3u8 直链并提取**真实 enc.key（AES-128）**，伪造成功响应（`status=y` + `hls_key`）重加密返回，金币/会员剧集均可直接播放；
 - **其余流量**（非 detail/play、已成功响应、请求阶段）原样放行，解密失败时同样放行，绝不影响正常访问。
 
