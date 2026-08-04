@@ -1,20 +1,3 @@
-# 黄豆短剧 lzlukvca 金币+会员剧集解锁 —— Quantumult X 配置
-# 脚本远程地址（更新源，QX 会自动缓存远程脚本）:
-#   https://raw.githubusercontent.com/7452323/QuantumultX/main/script/pornography/lzlukvca.js
-# 使用方法：
-#   1. 把下面 [rewrite_local] 与 [mitm] 两段合并进自己的 Quantumult X 配置（脚本用远程 URL，无需手动下载）
-#      —— 若你的 QX 版本较老不识别远程脚本，可把 lzlukvca.js 下载到 Scripts 目录
-#         （iCloud Drive/Quantumult X/Scripts/），并把下面两处 https://raw...lzlukvca.js 改成 lzlukvca.js
-#   2. 开启「MitM」并安装/信任证书
-# 说明：
-#   - detail 响应：全部剧集改 type=free + is_buy=true + price=0（App 端 ans()=false → 直接发 play，不弹金币/会员窗）
-#   - play 请求：REQUEST 阶段把请求体存 $persistentStore（RESPONSE 阶段解密取 drama_id+seq 用）
-#   - play 响应：813004(VIP会员)/813005(金币)/813006(其它付费) 时同步伪造成功响应（status=y + 可播放 m3u8），金币/会员剧集可直接播放
-#   - doBuy 响应（确认解锁/购买）：一律伪造成功 status=true（兜底）
-#   - user/info、user/recharge 响应：金币 999999 + 显示钻石会员
-#   - 其余流量原样放行
-#   - QX 二进制响应体走 bodyBytes(ArrayBuffer)，脚本会自动处理；文本 body 为原始字符串
-
 [rewrite_local]
 ^https://lzlukvca\.cc/api/(drama/(detail|play|doBuy)|user/(info|recharge)) url script-request-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/pornography/lzlukvca.js
 ^https://lzlukvca\.cc/api/(drama/(detail|play|doBuy)|user/(info|recharge)) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/pornography/lzlukvca.js
