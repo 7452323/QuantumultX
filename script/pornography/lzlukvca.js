@@ -10,8 +10,8 @@
  *      同步伪造成功响应（status=y + 可预测 m3u8 URL）重加密返回 —— 必须同步 $done，
  *      规则引擎不支持异步回调 $done（旧版 fetchHlsKey 异步导致 play 伪造从未生效）。
  *      注意：规则引擎在 RESPONSE 脚本中读不到 $request.body，drama_id+seq 来自配套
- *      REQUEST 规则 lzlukvca-play-ctx（把 play 请求体 base64 存入 $persistentStore 的
- *      'lzlukvca_play_req'，响应阶段读取后解密）
+ *      REQUEST 规则（把 play 请求体 base64 存入 $persistentStore 的
+ *      'lzlukvca_req_body'，连同 requestId/deviceType 一起缓存，响应阶段优先使用）
  *   3. /api/drama/doBuy 响应：伪造 status=true（兜底，正常路径已不经过 doBuy）
  *   4. /api/user/info、/api/user/recharge：金币 999999 + 显示钻石会员
  *   5. 其余流量原样放行
@@ -420,7 +420,9 @@
   var FIXED_LIT_TABLE = buildHuffmanTable(FIXED_LIT);
   var FIXED_DIST_TABLE = buildHuffmanTable(FIXED_DIST);
   function inflateHuffmanBlock(reader, out, tableLit, tableDist) {
+    var guard = 0;
     for (;;) {
+      if (++guard > 300000) throw new Error('inflate guard lit');
       var sym = huffmanDecode(reader, tableLit);
       if (sym < 256) { out.push(sym); continue; }
       if (sym === 256) break;
@@ -433,7 +435,9 @@
     }
   }
   function inflateDeflate(reader, out) {
+    var guard = 0;
     for (;;) {
+      if (++guard > 2000) throw new Error('inflate guard block');
       var bfinal = reader.readBits(1);
       var btype = reader.readBits(2);
       if (btype === 0) {
@@ -453,7 +457,9 @@
         for (var j = 0; j < hclen; j++) clLengths[order[j]] = reader.readBits(3);
         var clTable = buildHuffmanTable(clLengths);
         var lengths = [];
+        var dguard = 0;
         while (lengths.length < hlit + hdist) {
+          if (++dguard > 30000) throw new Error('inflate guard dynamic');
           var s = huffmanDecode(reader, clTable);
           if (s < 16) lengths.push(s);
           else if (s === 16) {
@@ -669,22 +675,42 @@
   var isDoBuy = url.indexOf('/api/drama/doBuy') !== -1;
   var isUser = url.indexOf('/api/user/') !== -1;
 
+  // 优先使用 REQUEST 阶段缓存到 $persistentStore 的 requestId / deviceType（响应头不一定带）
+  if (typeof $persistentStore !== 'undefined' && $persistentStore.read) {
+    var ctxId = $persistentStore.read('lzlukvca_req_id');
+    var ctxDev = $persistentStore.read('lzlukvca_req_dev');
+    if (ctxId) requestId = ctxId;
+    if (ctxDev) deviceType = ctxDev;
+  }
+
   function log(msg) { console.log('[lzlukvca] ' + msg); }
   function passThrough() { $done({}); }
 
   // ---- REQUEST 阶段（三平台 http-request / script-request-body 挂载同一脚本） ----
-  // 规则引擎在 RESPONSE 脚本中读不到 $request.body；play 请求体（加密二进制）由
-  // REQUEST 阶段原样存入 $persistentStore('lzlukvca_play_req')，RESPONSE 阶段解密取
-  // drama_id+seq 伪造成功响应。内置抓包引擎另配独立 REQUEST 规则 lzlukvca-play-ctx。
-  if (!isResponse && isPlay) {
-    var reqBody = ($request && $request.body) || null;
-    if (reqBody != null && typeof $persistentStore !== 'undefined' && $persistentStore.write) {
-      var enc;
-      if (typeof reqBody === 'string') { enc = reqBody; }
-      else if (typeof reqBody.length === 'number' && reqBody.length > 0) { enc = bytesToBase64(reqBody); }
-      if (enc) {
-        $persistentStore.write(enc, 'lzlukvca_play_req');
-        log('REQ play ctx saved b64len=' + enc.length);
+  // 规则引擎在 RESPONSE 脚本中读不到 $request.body（且响应头不一定带 Requestid），
+  // 因此 REQUEST 阶段把请求体 base64 + requestId + deviceType 存入 $persistentStore，
+  // RESPONSE 阶段优先使用这些 ctx 解密（不再依赖 $response.headers）。
+  // 内置抓包引擎另配独立 REQUEST 规则 lzlukvca-play-ctx（同样存这三项）。
+  if (!isResponse) {
+    var reqHdrs = ($request && $request.headers) || {};
+    var rlower = {};
+    for (var rk in reqHdrs) {
+      if (Object.prototype.hasOwnProperty.call(reqHdrs, rk)) rlower[String(rk).toLowerCase()] = reqHdrs[rk];
+    }
+    if (typeof $persistentStore !== 'undefined' && $persistentStore.write) {
+      $persistentStore.write(rlower['requestid'] || '', 'lzlukvca_req_id');
+      $persistentStore.write(rlower['devicetype'] || 'web', 'lzlukvca_req_dev');
+      if (isPlay) {
+        var reqBody = ($request && $request.body) || null;
+        if (reqBody != null) {
+          var enc;
+          if (typeof reqBody === 'string') { enc = reqBody; }
+          else if (typeof reqBody.length === 'number' && reqBody.length > 0) { enc = bytesToBase64(reqBody); }
+          if (enc) {
+            $persistentStore.write(enc, 'lzlukvca_req_body');
+            log('REQ play ctx saved b64len=' + enc.length);
+          }
+        }
       }
     }
     passThrough();
@@ -737,7 +763,7 @@
       // 规则引擎（RESPONSE 脚本）读不到 $request.body；play 请求体由配套 REQUEST 规则
       // lzlukvca-play-ctx 在请求阶段解密失败前先原样存入 $persistentStore('lzlukvca_play_req')。
       var reqBytes = null;
-      var ctxB64 = (typeof $persistentStore !== 'undefined' && $persistentStore.read) ? $persistentStore.read('lzlukvca_play_req') : null;
+      var ctxB64 = (typeof $persistentStore !== 'undefined' && $persistentStore.read) ? $persistentStore.read('lzlukvca_req_body') : null;
       if (ctxB64) reqBytes = bodyToBytes(ctxB64);
       var rjson = reqBytes ? decryptBody(reqBytes, requestId, deviceType) : null;
       var dramaId = rjson && rjson.data ? rjson.data.id : null;
