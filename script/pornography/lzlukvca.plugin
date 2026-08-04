@@ -1,5 +1,5 @@
-#!name=黄豆短剧 lzlukvca 
-#!desc=解密 lzlukvca.cc 的 /api/drama/detail 与 /api/drama/play 加密请求/响应并在控制台输出诊断日志。流量原样放行，不做任何内容修改。需开启 MITM 并信任证书。
+#!name=黄豆短剧 lzlukvca 金币剧集解锁
+#!desc=解锁 lzlukvca.cc 金币剧集：detail 响应全剧集免费；play 813005 时伪造成功响应（status=y + 真实 hls_key），金币剧集可直接播放。其余流量原样放行。需开启 MITM 并信任证书。
 #!system=ios
 #!author=7452323
 #!homepage=https://github.com/7452323/QuantumultX

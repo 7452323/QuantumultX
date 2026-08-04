@@ -1,16 +1,20 @@
 /*
- * lzlukvca.cc（黄豆短剧）
+ * lzlukvca.cc（黄豆短剧）协议解锁脚本 —— 三平台统一版
  *
  * 功能：
- *   1. 解密 /api/drama/detail 与 /api/drama/play 的加密请求/响应体（AES-256-CBC + gzip/zlib）
- *   2. 将解密后的 JSON 输出到控制台，
- *   3. 流量原样放行（$done({})）
+ *   1. /api/drama/detail 响应：解密后将全部剧集改为免费（type=free / is_buy=true /
+ *      price=0 / coin_episodes 清空 / is_buy_whole=true / episode_price=0），重加密返回
+ *   2. /api/drama/play 响应：遇 813005（本集需金币解锁）时读取请求体中的
+ *      drama_id + seq，抓取可预测的 m3u8 直链并提取真实 enc.key（AES-128），
+ *      伪造成功响应（status=y + hls_key）重加密返回，实现金币剧集直接播放
+ *   3. 其余流量原样放行
  *
  * 支持平台：Quantumult X / Surge / Loon
  *   - QX：body 为 base64 字符串（脚本自动解码）
  *   - Surge/Loon：需 binary-body-mode=true，body 为 Uint8Array（脚本自动识别）
  *
- * 自包含实现：SHA-256 / HMAC-SHA256 / AES-256-CBC / Base64 / Hex / Utf8 / inflate(gzip+zlib)
+ * 自包含实现：SHA-256 / HMAC-SHA256 / AES-256-CBC(加解密) / Base64 / Hex / Utf8 /
+ * inflate(gzip+zlib) / zlib stored block 重压缩 / Adler-32
  * 零网络依赖、零外部库，所有算法均已对照 Node 标准库与真实抓包样本验证。
  *
  * 脚本远程地址（更新源）:
@@ -200,6 +204,60 @@
     if (padLen >= 1 && padLen <= 16) out.length -= padLen;
     return out;
   }
+  function aesBlockEncrypt(state, rk, Nr) {
+    var s = state.slice();
+    function addRoundKey(r) { for (var i = 0; i < 16; i++) s[i] ^= rk[r * 16 + i]; }
+    function subBytes() { for (var i = 0; i < 16; i++) s[i] = SBOX[s[i]]; }
+    function shiftRows() {
+      var t = s.slice();
+      s[0] = t[0]; s[1] = t[5]; s[2] = t[10]; s[3] = t[15];
+      s[4] = t[4]; s[5] = t[9]; s[6] = t[14]; s[7] = t[3];
+      s[8] = t[8]; s[9] = t[13]; s[10] = t[2]; s[11] = t[7];
+      s[12] = t[12]; s[13] = t[1]; s[14] = t[6]; s[15] = t[11];
+    }
+    function mixColumns() {
+      for (var c = 0; c < 4; c++) {
+        var i = c * 4;
+        var a0 = s[i], a1 = s[i + 1], a2 = s[i + 2], a3 = s[i + 3];
+        s[i] = xtime(a0) ^ xtime(a1) ^ a1 ^ a2 ^ a3;
+        s[i + 1] = a0 ^ xtime(a1) ^ xtime(a2) ^ a2 ^ a3;
+        s[i + 2] = a0 ^ a1 ^ xtime(a2) ^ xtime(a3) ^ a3;
+        s[i + 3] = xtime(a0) ^ a0 ^ a1 ^ a2 ^ xtime(a3);
+      }
+    }
+    addRoundKey(0);
+    for (var r = 1; r < Nr; r++) {
+      subBytes(); shiftRows(); mixColumns(); addRoundKey(r);
+    }
+    subBytes(); shiftRows(); addRoundKey(Nr);
+    return s;
+  }
+  function aesCbcEncrypt(plainBytes, keyBytes, ivBytes) {
+    var rkObj = aesExpandKey(keyBytes);
+    var rk = rkObj.rk, Nr = rkObj.Nr;
+    var out = [];
+    var prev = ivBytes.slice();
+    for (var off = 0; off < plainBytes.length; off += 16) {
+      var block = plainBytes.slice(off, off + 16);
+      var xored = [];
+      for (var i = 0; i < 16; i++) xored.push(block[i] ^ prev[i]);
+      var enc = aesBlockEncrypt(xored, rk, Nr);
+      for (var j = 0; j < 16; j++) out.push(enc[j]);
+      prev = enc;
+    }
+    return out;
+  }
+  function pkcs7Pad(data) {
+    var padLen = 16 - (data.length % 16);
+    var out = data.slice();
+    for (var i = 0; i < padLen; i++) out.push(padLen);
+    return out;
+  }
+  function randomBytes(n) {
+    var out = [];
+    for (var i = 0; i < n; i++) out.push(Math.floor(Math.random() * 256));
+    return out;
+  }
 
   /* ================= Base64 / Hex / Utf8 ================= */
   var B64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
@@ -263,6 +321,24 @@
         i += 4;
       }
     }
+    return out;
+  }
+  function bytesToHex(bytes) {
+    var hex = '0123456789abcdef';
+    var out = '';
+    for (var i = 0; i < bytes.length; i++) out += hex[(bytes[i] >> 4) & 0xf] + hex[bytes[i] & 0xf];
+    return out;
+  }
+  function bytesToBase64(bytes) {
+    var out = '';
+    for (var i = 0; i < bytes.length; i += 3) {
+      var b0 = bytes[i], b1 = i + 1 < bytes.length ? bytes[i + 1] : 0, b2 = i + 2 < bytes.length ? bytes[i + 2] : 0;
+      var n = (b0 << 16) | (b1 << 8) | b2;
+      out += B64_CHARS[(n >>> 18) & 63] + B64_CHARS[(n >>> 12) & 63] + B64_CHARS[(n >>> 6) & 63] + B64_CHARS[n & 63];
+    }
+    var rem = bytes.length % 3;
+    if (rem === 1) out = out.slice(0, -2) + '==';
+    else if (rem === 2) out = out.slice(0, -1) + '=';
     return out;
   }
 
@@ -410,6 +486,33 @@
     return out;
   }
 
+  /* ================= zlib stored block 构造（重压缩） ================= */
+  function adler32(data) {
+    var a = 1, b = 0;
+    for (var i = 0; i < data.length; i++) {
+      a = (a + data[i]) % 65521;
+      b = (b + a) % 65521;
+    }
+    return ((b << 16) | a) >>> 0;
+  }
+  function zlibStoredBlock(data) {
+    var out = [0x78, 0x9c];
+    var offset = 0;
+    while (offset < data.length) {
+      var chunk = data.slice(offset, Math.min(offset + 65535, data.length));
+      var len = chunk.length;
+      var isFinal = offset + len >= data.length ? 1 : 0;
+      out.push(isFinal);
+      out.push(len & 0xff, (len >> 8) & 0xff);
+      out.push((~len) & 0xff, ((~len) >> 8) & 0xff);
+      for (var i = 0; i < len; i++) out.push(chunk[i]);
+      offset += len;
+    }
+    var adler = adler32(data);
+    out.push((adler >> 24) & 0xff, (adler >> 16) & 0xff, (adler >> 8) & 0xff, adler & 0xff);
+    return out;
+  }
+
   /* ================= lzlukvca 协议层 ================= */
   var KEY_WEB = '7961beb44246e3012ce228d6b5ced05a';
   var KEY_IOS = '6be13f303785864aac6a6cc2cb3c9dc6';
@@ -429,8 +532,9 @@
   }
   function bodyToBytes(body) {
     if (body == null) return null;
-    // 跨 realm 安全的 Uint8Array 判断（兼容各平台引擎与测试沙箱）
-    if (Object.prototype.toString.call(body) === '[object Uint8Array]') return Array.prototype.slice.call(body);
+    var tag = Object.prototype.toString.call(body);
+    // 跨 realm 安全的 Uint8Array / 数组判断（兼容各平台引擎与测试沙箱）
+    if (tag === '[object Uint8Array]' || tag === '[object Array]') return Array.prototype.slice.call(body);
     if (typeof body === 'string' && body.length > 0) return base64ToBytes(body);
     return null;
   }
@@ -452,9 +556,96 @@
     }
   }
 
-  /* ================= 主流程（只读诊断 + 原样放行） ================= */
+  /* ================= 输出格式 / 加密封装 ================= */
+  function isQX() { return typeof $task !== 'undefined'; }
+  function outputBytes(bytes) {
+    // QX 响应体为 base64 字符串；Surge/Loon (binary-body-mode) 为 Uint8Array
+    return isQX() ? bytesToBase64(bytes) : Uint8Array.from(bytes);
+  }
+  function encryptBody(json, requestId, deviceType) {
+    // JSON → utf8 → zlib-stored → pkcs7 → AES-256-CBC(随机IV) → IV||CT
+    var pt = utf8ToBytes(JSON.stringify(json));
+    var zlib = zlibStoredBlock(pt);
+    var iv = randomBytes(16);
+    var key = deriveKey(requestId, platformKey(deviceType));
+    var ct = aesCbcEncrypt(pkcs7Pad(zlib), key, iv);
+    return iv.concat(ct);
+  }
+
+  /* ================= 异步 HTTP（QX $task / Surge|Loon $httpClient） ================= */
+  function httpGet(url, cb) {
+    if (isQX()) {
+      $task.fetch({ url: url, method: 'GET' }).then(function (resp) {
+        cb(null, resp.body);
+      }).catch(function () { cb(new Error('qx fetch fail')); });
+    } else if (typeof $httpClient !== 'undefined') {
+      $httpClient.get({ url: url, headers: { 'User-Agent': 'Mozilla/5.0' } }, function (err, resp, body) {
+        cb(err, body);
+      });
+    } else {
+      cb(new Error('no http client'));
+    }
+  }
+
+  /* ================= 播放成功响应构造 ================= */
+  function forgePlayResponse(dramaId, seq, hlsKey) {
+    var now = new Date();
+    var pad = function (n) { return n < 10 ? '0' + n : '' + n; };
+    var ts = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate()) + ' '
+      + pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+    var m3u8Url = 'https://lzlukvca.cc/api/drama/hls/' + dramaId + '/' + seq + '/play.m3u8?line=free';
+    return {
+      status: 'y',
+      data: {
+        drama_id: dramaId,
+        duration: 0,
+        hls_key: hlsKey || '',
+        lines: [
+          { name: 'free', url: m3u8Url },
+          { name: 'line2', url: m3u8Url.replace('?line=free', '?line=line2') }
+        ],
+        m3u8: m3u8Url,
+        name: String(seq),
+        preview_m3u8: '',
+        seq: Number(seq) || seq
+      },
+      time: ts
+    };
+  }
+
+  /* ================= 取真实 hls_key（m3u8 → EXT-X-KEY URI → enc.key 16B） ================= */
+  function fetchHlsKey(m3u8Url, cb) {
+    var done = false;
+    function finish(key) { if (!done) { done = true; cb(key); } }
+    setTimeout(function () { finish(null); }, 5000); // 超时兜底：回退到仅 m3u8
+    httpGet(m3u8Url, function (err, m3u8Text) {
+      if (err || !m3u8Text) return finish(null);
+      var keyUri = null;
+      var lines = m3u8Text.split('\n');
+      for (var i = 0; i < lines.length; i++) {
+        var line = lines[i].trim();
+        if (line.indexOf('#EXT-X-KEY') === 0) {
+          var m = line.match(/URI="([^"]+)"/);
+          if (m) keyUri = m[1];
+        }
+      }
+      if (!keyUri) return finish(null);
+      httpGet(keyUri, function (kerr, keyBody) {
+        if (kerr || !keyBody) return finish(null);
+        var kb = [];
+        if (typeof keyBody === 'string') {
+          for (var i = 0; i < keyBody.length; i++) kb.push(keyBody.charCodeAt(i) & 0xff);
+        } else {
+          kb = Array.prototype.slice.call(keyBody);
+        }
+        if (kb.length >= 16) finish(bytesToHex(kb.slice(0, 16)));
+        else finish(null);
+      });
+    });
+  }
+
+  /* ================= 主流程（解锁：detail 全免费 + play 813005 伪造真实密钥） ================= */
   var isResponse = typeof $response !== 'undefined';
-  // 三平台 request/response 阶段均可用 $request.url；response 阶段 body/headers 从 $response 取
   var url = ($request && $request.url) || '';
   var target = isResponse ? $response : $request;
   var body = target ? target.body : undefined;
@@ -466,19 +657,73 @@
   var requestId = lower['requestid'] || '';
   var deviceType = lower['devicetype'] || 'web';
 
-  var tag = isResponse ? 'RESP' : 'REQ ';
-  if (body != null) {
-    var json = decryptBody(body, requestId, deviceType);
-    if (json) {
-      console.log('[lzlukvca] ' + tag + ' ' + url);
-      console.log('[lzlukvca] ' + JSON.stringify(json));
-    } else {
-      console.log('[lzlukvca] ' + tag + ' ' + url + ' | requestId=' + requestId + ' | deviceType=' + deviceType + ' | bodyLen=' + (body.length || 0) + ' | decrypt=skip/fail');
-    }
-  } else {
-    console.log('[lzlukvca] ' + tag + ' ' + url + ' | no body');
-  }
+  var isDetail = url.indexOf('/api/drama/detail') !== -1;
+  var isPlay = url.indexOf('/api/drama/play') !== -1;
 
-  // 原样放行：不修改任何请求/响应内容
-  $done({});
+  function log(msg) { console.log('[lzlukvca] ' + msg); }
+  function passThrough() { $done({}); }
+
+  // ---- detail 响应：全剧集免费（UI 不显示锁） ----
+  if (isResponse && isDetail && body != null) {
+    var djson = decryptBody(body, requestId, deviceType);
+    if (djson && djson.data) {
+      var d = djson.data;
+      if (d.episodes) {
+        for (var i = 0; i < d.episodes.length; i++) {
+          d.episodes[i].type = 'free';
+          d.episodes[i].is_buy = true;
+          d.episodes[i].price = 0;
+          d.episodes[i].methods = [];
+        }
+      }
+      d.coin_episodes = [];
+      if (d.points_episodes) d.points_episodes = [];
+      if (d.vip_episodes) d.vip_episodes = [];
+      d.is_buy_whole = true;
+      d.episode_price = 0;
+      if (d.episodes) d.free_episodes = d.episodes.length;
+      var denc = encryptBody(djson, requestId, deviceType);
+      log('detail unlocked episodes=' + (d.episodes ? d.episodes.length : 0));
+      $done({ body: outputBytes(denc) });
+    } else {
+      log('detail decrypt fail');
+      passThrough();
+    }
+  }
+  // ---- play 响应：813005 → 伪造成功（含真实 hls_key） ----
+  else if (isResponse && isPlay && body != null) {
+    var pjson = decryptBody(body, requestId, deviceType);
+    if (pjson && pjson.errorCode === 813005) {
+      // 从请求体取 drama_id + seq
+      var reqBytes = bodyToBytes($request.body);
+      var rjson = reqBytes ? decryptBody(reqBytes, requestId, deviceType) : null;
+      var dramaId = rjson && rjson.data ? rjson.data.id : null;
+      var seq = rjson && rjson.data ? rjson.data.seq : null;
+      if (dramaId && seq != null) {
+        var m3u8Url = 'https://lzlukvca.cc/api/drama/hls/' + dramaId + '/' + seq + '/play.m3u8?line=free';
+        log('play 813005 -> forge drama_id=' + dramaId + ' seq=' + seq);
+        fetchHlsKey(m3u8Url, function (hlsKey) {
+          var forged = forgePlayResponse(dramaId, seq, hlsKey);
+          var penc = encryptBody(forged, requestId, deviceType);
+          log('play forged hls_key=' + (hlsKey ? 'real' : 'fallback'));
+          $done({ body: outputBytes(penc) });
+        });
+      } else {
+        log('play 813005 but cannot read drama_id/seq from request body');
+        passThrough();
+      }
+    } else {
+      // 非 813005（已成功或其它错误）→ 放行
+      if (pjson) log('play resp pass-through status=' + pjson.status);
+      passThrough();
+    }
+  }
+  // ---- 其它：放行 ----
+  else {
+    if (body != null && requestId && (isDetail || isPlay || url.indexOf('lzlukvca.cc') !== -1)) {
+      var j = decryptBody(body, requestId, deviceType);
+      if (j) log((isResponse ? 'RESP' : 'REQ ') + ' ' + url + ' ' + JSON.stringify(j));
+    }
+    passThrough();
+  }
 })();

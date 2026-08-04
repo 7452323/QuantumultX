@@ -1,4 +1,4 @@
-# 黄豆短剧 lzlukvca 
+# 黄豆短剧 lzlukvca 金币剧集解锁 —— Quantumult X 配置
 # 脚本远程地址（更新源，.js 文件）:
 #   https://raw.githubusercontent.com/7452323/QuantumultX/main/script/pornography/lzlukvca.js
 # 使用方法：
@@ -6,8 +6,9 @@
 #   2. 把下面 [rewrite_local] 与 [mitm] 两段合并进自己的 Quantumult X 配置
 #   3. 开启「MitM」并安装/信任证书
 # 说明：
-#   - 仅解密 /api/drama/detail 与 /api/drama/play 的请求/响应
-#   - 
+#   - detail 响应：全部剧集改写为免费（type=free / is_buy=true / price=0 / coin_episodes 清空 / is_buy_whole=true）
+#   - play 响应：813005（本集需金币解锁）时伪造成功响应（status=y + 真实 hls_key），金币剧集可直接播放
+#   - 其余流量原样放行
 #   - 二进制 body 在 QX 中为 base64 字符串，脚本会自动解码
 
 [rewrite_local]
