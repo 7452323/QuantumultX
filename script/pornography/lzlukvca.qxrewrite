@@ -1,7 +1,7 @@
 # 黄豆短剧 lzlukvca 金币+会员剧集解锁 
 [rewrite_local]
-^https://lzlukvca\.cc/api/(drama/(detail|play|doBuy)|user/(info|recharge)) url script-request-body lzlukvca.js
-^https://lzlukvca\.cc/api/(drama/(detail|play|doBuy)|user/(info|recharge)) url script-response-body lzlukvca.js
+^https://lzlukvca\.cc/api/(drama/(detail|play|doBuy)|user/(info|recharge)) url script-request-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/pornography/lzlukvca.js
+^https://lzlukvca\.cc/api/(drama/(detail|play|doBuy)|user/(info|recharge)) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/pornography/lzlukvca.js
 
 [mitm]
 hostname = lzlukvca.cc
