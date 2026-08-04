@@ -41,7 +41,8 @@
 | [`lzlukvca.js`](https://raw.githubusercontent.com/7452323/QuantumultX/main/script/pornography/lzlukvca.js) | 三平台统一脚本（QX / Surge / Loon），纯 JS 自包含，零外部依赖 |
 | [`lzlukvca.sgmodule`](https://raw.githubusercontent.com/7452323/QuantumultX/main/script/pornography/lzlukvca.sgmodule) | Surge 模块 |
 | [`lzlukvca.plugin`](https://raw.githubusercontent.com/7452323/QuantumultX/main/script/pornography/lzlukvca.plugin) | Loon 插件 |
-| [`lzlukvca.qxrewrite`](https://raw.githubusercontent.com/7452323/QuantumultX/main/script/pornography/lzlukvca.qxrewrite) | Quantumult X 配置片段 |
+| [`lzlukvca.conf`](https://raw.githubusercontent.com/7452323/QuantumultX/main/script/pornography/lzlukvca.conf) | Quantumult X **远程 rewrite 配置**（`[rewrite_remote]` 一行引用，自动更新） |
+| [`lzlukvca.qxrewrite`](https://raw.githubusercontent.com/7452323/QuantumultX/main/script/pornography/lzlukvca.qxrewrite) | Quantumult X 配置片段（本地合并用） |
 
 目录：https://github.com/7452323/QuantumultX/tree/main/script/pornography
 
@@ -57,7 +58,16 @@
 2. 开启 **HTTPS 解密（MitM）**，安装并信任证书。
 3. 打开 App 触发 detail/play 请求，金币/会员剧集即可直接播放。
 
-### Quantumult X
+### Quantumult X（推荐：远程 conf）
+1. 在主配置 `[rewrite_remote]` 段加入一行（QX 自动拉取更新，无需下载任何文件）：
+   ```
+   https://raw.githubusercontent.com/7452323/QuantumultX/main/script/pornography/lzlukvca.conf, tag=黄豆短剧解锁, update-interval=86400, opt-parser=false, enabled=true
+   ```
+2. 在主配置 `[mitm]` 段加入 `hostname = lzlukvca.cc`（远程配置只加载 rewrite 规则，MitM 域名需在主配置）。
+3. 开启 **MitM**，安装并信任证书。
+4. 打开 App 触发 detail/play 请求，金币/会员剧集即可直接播放。
+
+### Quantumult X（备选：本地合并）
 1. 将 `lzlukvca.qxrewrite` 中的 `[rewrite_local]` 与 `[mitm]` 段合并进自己的配置（脚本为**远程 URL**，QX 自动缓存更新，无需手动下载）。
 2. 若你的 QX 版本较老不识别远程脚本：把 `lzlukvca.js` 下载到 Scripts 目录（iCloud Drive/Quantumult X/Scripts/），并把 `qxrewrite` 里两处 `https://raw...lzlukvca.js` 改为 `lzlukvca.js`。
 3. 开启 **MitM**，安装并信任证书。
