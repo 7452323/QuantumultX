@@ -1,14 +1,20 @@
 /*
  * lzlukvca.cc（黄豆短剧）协议解锁脚本 —— 三平台统一版
  *
- * 功能：
- *   1. /api/drama/detail 响应：解密后将全部剧集改写为已解锁（免费剧保持 type=free，
- *      付费剧统一改 type=coin（App 端 anP 只认 coin/points，其它一律弹会员窗）+ is_buy=true +
- *      price=0 + methods=[] + coin_episodes 清空 + is_buy_whole=true + episode_price=0），重加密返回
- *   2. /api/drama/play 响应：遇 813004（VIP会员专享）/ 813005（金币）/ 813006（其它付费）时
- *      读取请求体中的 drama_id + seq，抓取可预测的 m3u8 直链并提取真实 enc.key（AES-128），
- *      伪造成功响应（status=y + hls_key）重加密返回，实现金币/会员剧集直接播放
- *   3. 其余流量原样放行
+ * 功能（基于 Flutter Web main.js 前端逻辑精确逆向）：
+ *   1. /api/drama/detail 响应：全部剧集改 type='free' + is_buy=true + price=0 + methods=[]，
+ *      使 App 端 ans()（=!(type==='free'||'')&&!is_buy）恒为 false → 播放入口 wD 直接发
+ *      /drama/play（不弹窗、不走 doBuy）；同时清空 coin/vip/points 列表、is_buy_whole=true。
+ *      注意：不能改 type=coin（anP 弹金币窗）也不能保留 vip（anP 弹会员窗）
+ *   2. /api/drama/play 响应：遇 813004/813005/813006 时读取请求体 drama_id+seq，
+ *      同步伪造成功响应（status=y + 可预测 m3u8 URL）重加密返回 —— 必须同步 $done，
+ *      规则引擎不支持异步回调 $done（旧版 fetchHlsKey 异步导致 play 伪造从未生效）。
+ *      注意：规则引擎在 RESPONSE 脚本中读不到 $request.body，drama_id+seq 来自配套
+ *      REQUEST 规则 lzlukvca-play-ctx（把 play 请求体 base64 存入 $persistentStore 的
+ *      'lzlukvca_play_req'，响应阶段读取后解密）
+ *   3. /api/drama/doBuy 响应：伪造 status=true（兜底，正常路径已不经过 doBuy）
+ *   4. /api/user/info、/api/user/recharge：金币 999999 + 显示钻石会员
+ *   5. 其余流量原样放行
  *
  * 支持平台：Quantumult X / Surge / Loon
  *   - QX：body 为 base64 字符串（脚本自动解码）
@@ -661,27 +667,45 @@
   var isDetail = url.indexOf('/api/drama/detail') !== -1;
   var isPlay = url.indexOf('/api/drama/play') !== -1;
   var isDoBuy = url.indexOf('/api/drama/doBuy') !== -1;
+  var isUser = url.indexOf('/api/user/') !== -1;
 
   function log(msg) { console.log('[lzlukvca] ' + msg); }
   function passThrough() { $done({}); }
 
+  // ---- REQUEST 阶段（三平台 http-request / script-request-body 挂载同一脚本） ----
+  // 规则引擎在 RESPONSE 脚本中读不到 $request.body；play 请求体（加密二进制）由
+  // REQUEST 阶段原样存入 $persistentStore('lzlukvca_play_req')，RESPONSE 阶段解密取
+  // drama_id+seq 伪造成功响应。内置抓包引擎另配独立 REQUEST 规则 lzlukvca-play-ctx。
+  if (!isResponse && isPlay) {
+    var reqBody = ($request && $request.body) || null;
+    if (reqBody != null && typeof $persistentStore !== 'undefined' && $persistentStore.write) {
+      var enc;
+      if (typeof reqBody === 'string') { enc = reqBody; }
+      else if (typeof reqBody.length === 'number' && reqBody.length > 0) { enc = bytesToBase64(reqBody); }
+      if (enc) {
+        $persistentStore.write(enc, 'lzlukvca_play_req');
+        log('REQ play ctx saved b64len=' + enc.length);
+      }
+    }
+    passThrough();
+  }
+
   // ---- detail 响应：全剧集已解锁（UI 不显示锁） ----
-  // App 端判定：episodes 单集解析器 d2c 读 type 字段；anP() 只把 type==='coin'/'points'
-  // 当可解锁项，其余一切（含 free/vip/空）一律判 "vip" 弹“VIP 会员专享”窗。
-  // 免费剧保持 type='free'（走 m.w.aq/m.x.q 免费/已购集合直接播放）；
-  // 付费剧（coin/points/vip/其它非 free）统一改 type='coin'（anP 走金币解锁分支可发 play），
-  // 并 is_buy=true（ans()=false → 播放入口 wD 直接发 /drama/play，由 play 侧伪造解锁）。
+  // App 端判定（Flutter Web main.js 精确逆向）：
+  //   episode 解析 d2c → A.OL(seq,name,duration,cover,type,price,is_buy,methods)
+  //   ans(a) = !(type==="free"||type==="") && !is_buy  → true 才弹解锁窗
+  //   anP(a) = type==="coin"→coin / "points"→points / 其它→vip（决定弹什么窗）
+  // 结论：只要 type='free'（或空）且 is_buy=true，ans()=false → 播放入口 wD
+  // 直接发 /drama/play（不弹窗、不走 doBuy），由 play 侧伪造成功响应完成解锁。
+  // 注意：不能改成 coin/points（会弹金币/积分窗），也不能保留 vip（弹会员窗）。
   if (isResponse && isDetail && body != null) {
     var djson = decryptBody(body, requestId, deviceType);
     if (djson && djson.data) {
       var d = djson.data;
       if (d.episodes) {
         for (var i = 0; i < d.episodes.length; i++) {
-          var origType = d.episodes[i].type || '';
-          d.episodes[i].type = (origType === 'free' || origType === '') ? 'free' : 'coin';
-          d.episodes[i].pay_type = 'coin';   // 兼容字段（App 实际读 type）
-          d.episodes[i].is_buy = true;
-          d.episodes[i].can_vip_watch = false; // ans() 直接判已解锁 → 可自动连播
+          d.episodes[i].type = 'free';      // ans()=false → wD 直接发 play
+          d.episodes[i].is_buy = true;      // 双保险：ans() 的 !is_buy 也为 false
           d.episodes[i].price = 0;
           d.episodes[i].money = 0;
           d.episodes[i].methods = [];
@@ -694,9 +718,7 @@
       d.episode_price = 0;
       d.points_price = 0;
       d.money = 0;
-      d.pay_type = 'free';      // 剧集级：避免“该短剧为 VIP 会员专享”弹窗
-      d.can_vip_watch = true;   // 会员可看标记
-      if (d.episodes) d.free_episodes = d.episodes.length;
+      d.free_episodes = d.episodes ? d.episodes.length : 0;
       var denc = encryptBody(djson, requestId, deviceType);
       log('detail unlocked episodes=' + (d.episodes ? d.episodes.length : 0));
       $done({ body: outputBytes(denc) });
@@ -705,27 +727,28 @@
       passThrough();
     }
   }
-  // ---- play 响应：813004(积分)/813005(金币)/813006(会员) → 伪造成功（含真实 hls_key） ----
+  // ---- play 响应：813004(会员)/813005(金币)/813006(其它) → 同步伪造成功响应 ----
+  // 必须同步 $done：规则引擎（WKWebView）不支持异步回调后的 $done（detail/doBuy/user
+  // 均同步生效，唯独旧版 play 异步 fetchHlsKey→$done 永不完成 → 813004 原样透传）。
   else if (isResponse && isPlay && body != null) {
     var pjson = decryptBody(body, requestId, deviceType);
     var payErr = pjson && (pjson.errorCode === 813004 || pjson.errorCode === 813005 || pjson.errorCode === 813006);
     if (payErr) {
-      // 从请求体取 drama_id + seq
-      var reqBytes = bodyToBytes($request.body);
+      // 规则引擎（RESPONSE 脚本）读不到 $request.body；play 请求体由配套 REQUEST 规则
+      // lzlukvca-play-ctx 在请求阶段解密失败前先原样存入 $persistentStore('lzlukvca_play_req')。
+      var reqBytes = null;
+      var ctxB64 = (typeof $persistentStore !== 'undefined' && $persistentStore.read) ? $persistentStore.read('lzlukvca_play_req') : null;
+      if (ctxB64) reqBytes = bodyToBytes(ctxB64);
       var rjson = reqBytes ? decryptBody(reqBytes, requestId, deviceType) : null;
       var dramaId = rjson && rjson.data ? rjson.data.id : null;
       var seq = rjson && rjson.data ? rjson.data.seq : null;
       if (dramaId && seq != null) {
-        var m3u8Url = 'https://lzlukvca.cc/api/drama/hls/' + dramaId + '/' + seq + '/play.m3u8?line=free';
-        log('play ' + pjson.errorCode + ' -> forge drama_id=' + dramaId + ' seq=' + seq);
-        fetchHlsKey(m3u8Url, function (hlsKey) {
-          var forged = forgePlayResponse(dramaId, seq, hlsKey);
-          var penc = encryptBody(forged, requestId, deviceType);
-          log('play forged hls_key=' + (hlsKey ? 'real' : 'fallback'));
-          $done({ body: outputBytes(penc) });
-        });
+        var forged = forgePlayResponse(dramaId, seq, '');
+        var penc = encryptBody(forged, requestId, deviceType);
+        log('play ' + pjson.errorCode + ' forged(sync) drama_id=' + dramaId + ' seq=' + seq);
+        $done({ body: outputBytes(penc) });
       } else {
-        log('play ' + pjson.errorCode + ' but cannot read drama_id/seq from request body');
+        log('play ' + pjson.errorCode + ' but cannot read drama_id/seq (ctx=' + (ctxB64 ? 'yes' : 'no') + ' reqLen=' + (reqBytes ? reqBytes.length : 'null') + ')');
         passThrough();
       }
     } else {
@@ -750,6 +773,32 @@
       $done({ body: outputBytes(benc) });
     } else {
       log('doBuy decrypt fail');
+      passThrough();
+    }
+  }
+  // ---- user 响应（user/info、user/recharge）：账户金币 999999 + 会员显示 ----
+  // "我的"页(user/info: data 直接是用户对象)与充值页(user/recharge: data.user_info)
+  // 都改 is_vip='y' + balance/score=999999 + 会员组名/到期时间。
+  else if (isResponse && isUser && body != null &&
+           (url.indexOf('/api/user/info') !== -1 || url.indexOf('/api/user/recharge') !== -1)) {
+    var ujson = decryptBody(body, requestId, deviceType);
+    if (ujson && ujson.data) {
+      var ui = ujson.data.user_info || ujson.data;
+      if (ui && typeof ui === 'object') {
+        ui.is_vip = 'y';
+        ui.balance = '999999';
+        ui.score = '999999';
+        ui.group_name = '钻石会员';
+        ui.group_end_time = '2099-12-31';
+        var uenc = encryptBody(ujson, requestId, deviceType);
+        log('user forged is_vip=y balance=999999');
+        $done({ body: outputBytes(uenc) });
+      } else {
+        log('user data not object');
+        passThrough();
+      }
+    } else {
+      log('user decrypt fail');
       passThrough();
     }
   }
