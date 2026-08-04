@@ -546,9 +546,13 @@
   function bodyToBytes(body) {
     if (body == null) return null;
     var tag = Object.prototype.toString.call(body);
-    // 跨 realm 安全的 Uint8Array / 数组判断（兼容各平台引擎与测试沙箱）
+    // 跨 realm 安全的 Uint8Array / 数组 / ArrayBuffer 判断（兼容各平台引擎与测试沙箱）
     if (tag === '[object Uint8Array]' || tag === '[object Array]') return Array.prototype.slice.call(body);
-    if (typeof body === 'string' && body.length > 0) return base64ToBytes(body);
+    if (tag === '[object ArrayBuffer]') return Array.prototype.slice.call(new Uint8Array(body));
+    if (typeof body === 'string' && body.length > 0) {
+      // QX: body 是原始字符串（二进制走 bodyBytes）；Surge/Loon (binary-body-mode): body 是 base64
+      return isQX() ? utf8ToBytes(body) : base64ToBytes(body);
+    }
     return null;
   }
   function decryptBody(body, requestId, deviceType) {
@@ -571,9 +575,31 @@
 
   /* ================= 输出格式 / 加密封装 ================= */
   function isQX() { return typeof $task !== 'undefined'; }
-  function outputBytes(bytes) {
-    // QX 响应体为 base64 字符串；Surge/Loon (binary-body-mode) 为 Uint8Array
-    return isQX() ? bytesToBase64(bytes) : Uint8Array.from(bytes);
+  function toU8(bytes) {
+    if (bytes instanceof Uint8Array) return bytes;
+    return new Uint8Array(bytes);
+  }
+  function rawBodyBytes(target) {
+    // 统一取原始字节：优先 bodyBytes（QX 二进制 / 各平台二进制），否则按平台解码 body 字符串
+    // QX: body 是原始字符串（二进制走 bodyBytes）；Surge/Loon (binary-body-mode): body 是 base64
+    if (!target) return null;
+    if (target.bodyBytes !== undefined && target.bodyBytes !== null) {
+      var bb = bodyToBytes(target.bodyBytes);
+      return bb ? toU8(bb) : null;
+    }
+    if (typeof target.body === 'string' && target.body.length > 0) {
+      return isQX() ? utf8ToBytes(target.body) : base64ToBytes(target.body);
+    }
+    return null;
+  }
+  function doneWithBytes(bytes) {
+    // QX: $done({bodyBytes: ArrayBuffer})；Surge/Loon: $done({body: Uint8Array})
+    var u8 = toU8(bytes);
+    if (isQX()) {
+      $done({ bodyBytes: u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength) });
+    } else {
+      $done({ body: Uint8Array.from(u8) });
+    }
   }
   function encryptBody(json, requestId, deviceType) {
     // JSON → utf8 → zlib-stored → pkcs7 → AES-256-CBC(随机IV) → IV||CT
@@ -661,7 +687,8 @@
   var isResponse = typeof $response !== 'undefined';
   var url = ($request && $request.url) || '';
   var target = isResponse ? $response : $request;
-  var body = target ? target.body : undefined;
+  // 统一取原始字节：QX 用 bodyBytes(ArrayBuffer)，Surge/Loon 用 base64 body，内部一律数组字节
+  var raw = target ? rawBodyBytes(target) : null;
   var hdrs = (target && target.headers) || {};
   var lower = {};
   for (var k in hdrs) {
@@ -701,15 +728,11 @@
       $persistentStore.write(rlower['requestid'] || '', 'lzlukvca_req_id');
       $persistentStore.write(rlower['devicetype'] || 'web', 'lzlukvca_req_dev');
       if (isPlay) {
-        var reqBody = ($request && $request.body) || null;
-        if (reqBody != null) {
-          var enc;
-          if (typeof reqBody === 'string') { enc = reqBody; }
-          else if (typeof reqBody.length === 'number' && reqBody.length > 0) { enc = bytesToBase64(reqBody); }
-          if (enc) {
-            $persistentStore.write(enc, 'lzlukvca_req_body');
-            log('REQ play ctx saved b64len=' + enc.length);
-          }
+        var reqRaw = $request ? rawBodyBytes($request) : null;
+        if (reqRaw && reqRaw.length > 0) {
+          var enc = bytesToBase64(reqRaw);
+          $persistentStore.write(enc, 'lzlukvca_req_body');
+          log('REQ play ctx saved b64len=' + enc.length);
         }
       }
     }
@@ -724,8 +747,8 @@
   // 结论：只要 type='free'（或空）且 is_buy=true，ans()=false → 播放入口 wD
   // 直接发 /drama/play（不弹窗、不走 doBuy），由 play 侧伪造成功响应完成解锁。
   // 注意：不能改成 coin/points（会弹金币/积分窗），也不能保留 vip（弹会员窗）。
-  if (isResponse && isDetail && body != null) {
-    var djson = decryptBody(body, requestId, deviceType);
+  if (isResponse && isDetail && raw != null) {
+    var djson = decryptBody(raw, requestId, deviceType);
     if (djson && djson.data) {
       var d = djson.data;
       if (d.episodes) {
@@ -747,7 +770,7 @@
       d.free_episodes = d.episodes ? d.episodes.length : 0;
       var denc = encryptBody(djson, requestId, deviceType);
       log('detail unlocked episodes=' + (d.episodes ? d.episodes.length : 0));
-      $done({ body: outputBytes(denc) });
+      doneWithBytes(denc);
     } else {
       log('detail decrypt fail');
       passThrough();
@@ -756,15 +779,16 @@
   // ---- play 响应：813004(会员)/813005(金币)/813006(其它) → 同步伪造成功响应 ----
   // 必须同步 $done：规则引擎（WKWebView）不支持异步回调后的 $done（detail/doBuy/user
   // 均同步生效，唯独旧版 play 异步 fetchHlsKey→$done 永不完成 → 813004 原样透传）。
-  else if (isResponse && isPlay && body != null) {
-    var pjson = decryptBody(body, requestId, deviceType);
+  else if (isResponse && isPlay && raw != null) {
+    var pjson = decryptBody(raw, requestId, deviceType);
     var payErr = pjson && (pjson.errorCode === 813004 || pjson.errorCode === 813005 || pjson.errorCode === 813006);
     if (payErr) {
       // 规则引擎（RESPONSE 脚本）读不到 $request.body；play 请求体由配套 REQUEST 规则
       // lzlukvca-play-ctx 在请求阶段解密失败前先原样存入 $persistentStore('lzlukvca_play_req')。
       var reqBytes = null;
       var ctxB64 = (typeof $persistentStore !== 'undefined' && $persistentStore.read) ? $persistentStore.read('lzlukvca_req_body') : null;
-      if (ctxB64) reqBytes = bodyToBytes(ctxB64);
+      // ctx 存的是“请求字节的 base64”，跨平台显式 base64 解码（不能走 bodyToBytes：QX 会把字符串当原始文本）
+      if (ctxB64) reqBytes = base64ToBytes(ctxB64);
       var rjson = reqBytes ? decryptBody(reqBytes, requestId, deviceType) : null;
       var dramaId = rjson && rjson.data ? rjson.data.id : null;
       var seq = rjson && rjson.data ? rjson.data.seq : null;
@@ -772,7 +796,7 @@
         var forged = forgePlayResponse(dramaId, seq, '');
         var penc = encryptBody(forged, requestId, deviceType);
         log('play ' + pjson.errorCode + ' forged(sync) drama_id=' + dramaId + ' seq=' + seq);
-        $done({ body: outputBytes(penc) });
+        doneWithBytes(penc);
       } else {
         log('play ' + pjson.errorCode + ' but cannot read drama_id/seq (ctx=' + (ctxB64 ? 'yes' : 'no') + ' reqLen=' + (reqBytes ? reqBytes.length : 'null') + ')');
         passThrough();
@@ -788,15 +812,15 @@
   // boolean true（'y'==true 为 false）。服务端对金币/会员剧返回 813004/813005/203001
   // 等错误 → 弹窗拦截。这里无论什么响应都伪造 {"status":true}，让 App 走
   // “解锁成功”→ wD 播放 → /drama/play（由上方 play 伪造兜底）。
-  else if (isResponse && isDoBuy && body != null) {
-    var bjson = decryptBody(body, requestId, deviceType);
+  else if (isResponse && isDoBuy && raw != null) {
+    var bjson = decryptBody(raw, requestId, deviceType);
     if (bjson) {
       bjson.status = true;
       delete bjson.error;
       delete bjson.errorCode;
       var benc = encryptBody(bjson, requestId, deviceType);
       log('doBuy forged status=true');
-      $done({ body: outputBytes(benc) });
+      doneWithBytes(benc);
     } else {
       log('doBuy decrypt fail');
       passThrough();
@@ -805,9 +829,9 @@
   // ---- user 响应（user/info、user/recharge）：账户金币 999999 + 会员显示 ----
   // "我的"页(user/info: data 直接是用户对象)与充值页(user/recharge: data.user_info)
   // 都改 is_vip='y' + balance/score=999999 + 会员组名/到期时间。
-  else if (isResponse && isUser && body != null &&
+  else if (isResponse && isUser && raw != null &&
            (url.indexOf('/api/user/info') !== -1 || url.indexOf('/api/user/recharge') !== -1)) {
-    var ujson = decryptBody(body, requestId, deviceType);
+    var ujson = decryptBody(raw, requestId, deviceType);
     if (ujson && ujson.data) {
       var ui = ujson.data.user_info || ujson.data;
       if (ui && typeof ui === 'object') {
@@ -818,7 +842,7 @@
         ui.group_end_time = '2099-12-31';
         var uenc = encryptBody(ujson, requestId, deviceType);
         log('user forged is_vip=y balance=999999');
-        $done({ body: outputBytes(uenc) });
+        doneWithBytes(uenc);
       } else {
         log('user data not object');
         passThrough();
@@ -830,8 +854,8 @@
   }
   // ---- 其它：放行 ----
   else {
-    if (body != null && requestId && (isDetail || isPlay || url.indexOf('lzlukvca.cc') !== -1)) {
-      var j = decryptBody(body, requestId, deviceType);
+    if (raw != null && requestId && (isDetail || isPlay || url.indexOf('lzlukvca.cc') !== -1)) {
+      var j = decryptBody(raw, requestId, deviceType);
       if (j) log((isResponse ? 'RESP' : 'REQ ') + ' ' + url + ' ' + JSON.stringify(j));
     }
     passThrough();

@@ -1,5 +1,5 @@
 #!name=黄豆短剧 lzlukvca 金币+会员剧集解锁
-#!desc=解锁 lzlukvca.cc 金币/会员剧集
+#!desc=解锁 lzlukvca.cc 金币/会员剧集：detail 响应全剧集 type=free（App 端不弹窗直接播放）；play 请求存体到 $persistentStore，play 响应 813004(VIP会员)/813005(金币)/813006 时同步伪造成功响应（status=y + 可播放 m3u8）；doBuy 伪造成功兜底；user/info、user/recharge 金币 999999 + 钻石会员。其余流量原样放行。需开启 MITM 并信任证书。
 #!system=ios
 #!author=7452323
 #!homepage=https://github.com/7452323/QuantumultX
