@@ -2,11 +2,12 @@
  * lzlukvca.cc（黄豆短剧）协议解锁脚本 —— 三平台统一版
  *
  * 功能：
- *   1. /api/drama/detail 响应：解密后将全部剧集改为免费（type=free / is_buy=true /
- *      price=0 / coin_episodes 清空 / is_buy_whole=true / episode_price=0），重加密返回
- *   2. /api/drama/play 响应：遇 813005（本集需金币解锁）时读取请求体中的
- *      drama_id + seq，抓取可预测的 m3u8 直链并提取真实 enc.key（AES-128），
- *      伪造成功响应（status=y + hls_key）重加密返回，实现金币剧集直接播放
+ *   1. /api/drama/detail 响应：解密后将全部剧集改写为已解锁（免费剧保持 type=free，
+ *      付费剧统一改 type=coin（App 端 anP 只认 coin/points，其它一律弹会员窗）+ is_buy=true +
+ *      price=0 + methods=[] + coin_episodes 清空 + is_buy_whole=true + episode_price=0），重加密返回
+ *   2. /api/drama/play 响应：遇 813004（VIP会员专享）/ 813005（金币）/ 813006（其它付费）时
+ *      读取请求体中的 drama_id + seq，抓取可预测的 m3u8 直链并提取真实 enc.key（AES-128），
+ *      伪造成功响应（status=y + hls_key）重加密返回，实现金币/会员剧集直接播放
  *   3. 其余流量原样放行
  *
  * 支持平台：Quantumult X / Surge / Loon
@@ -644,7 +645,7 @@
     });
   }
 
-  /* ================= 主流程（解锁：detail 全免费 + play 813004/813005/813006 伪造真实密钥） ================= */
+  /* ================= 主流程（解锁：detail 全剧集已解锁 + play 813004/813005/813006 伪造真实密钥） ================= */
   var isResponse = typeof $response !== 'undefined';
   var url = ($request && $request.url) || '';
   var target = isResponse ? $response : $request;
@@ -663,18 +664,21 @@
   function log(msg) { console.log('[lzlukvca] ' + msg); }
   function passThrough() { $done({}); }
 
-  // ---- detail 响应：全剧集免费（UI 不显示锁） ----
-  // 注意：App 端 anP() 只把 pay_type==='coin'/'points' 当可解锁项，其余（含 free/vip）
-  // 一律弹“VIP 会员专享”窗且不发 play 请求。因此必须把每集 pay_type 写成 'coin'
-  // 并 is_buy=true + can_vip_watch=false，让 ans() 直接判定已解锁、可发起 play。
+  // ---- detail 响应：全剧集已解锁（UI 不显示锁） ----
+  // App 端判定：episodes 单集解析器 d2c 读 type 字段；anP() 只把 type==='coin'/'points'
+  // 当可解锁项，其余一切（含 free/vip/空）一律判 "vip" 弹“VIP 会员专享”窗。
+  // 免费剧保持 type='free'（走 m.w.aq/m.x.q 免费/已购集合直接播放）；
+  // 付费剧（coin/points/vip/其它非 free）统一改 type='coin'（anP 走金币解锁分支可发 play），
+  // 并 is_buy=true（ans()=false → 播放入口 wD 直接发 /drama/play，由 play 侧伪造解锁）。
   if (isResponse && isDetail && body != null) {
     var djson = decryptBody(body, requestId, deviceType);
     if (djson && djson.data) {
       var d = djson.data;
       if (d.episodes) {
         for (var i = 0; i < d.episodes.length; i++) {
-          d.episodes[i].type = 'free';
-          d.episodes[i].pay_type = 'coin';   // 关键：绕过 App 端 VIP 会员弹窗（anP 判定）
+          var origType = d.episodes[i].type || '';
+          d.episodes[i].type = (origType === 'free' || origType === '') ? 'free' : 'coin';
+          d.episodes[i].pay_type = 'coin';   // 兼容字段（App 实际读 type）
           d.episodes[i].is_buy = true;
           d.episodes[i].can_vip_watch = false; // ans() 直接判已解锁 → 可自动连播
           d.episodes[i].price = 0;
@@ -693,7 +697,7 @@
       d.can_vip_watch = true;   // 会员可看标记
       if (d.episodes) d.free_episodes = d.episodes.length;
       var denc = encryptBody(djson, requestId, deviceType);
-      log('detail unlocked episodes=' + (d.episodes ? d.episodes.length : 0) + ' pay_type=free/can_vip_watch=true');
+      log('detail unlocked episodes=' + (d.episodes ? d.episodes.length : 0));
       $done({ body: outputBytes(denc) });
     } else {
       log('detail decrypt fail');

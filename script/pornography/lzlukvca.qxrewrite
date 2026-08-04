@@ -6,8 +6,8 @@
 #   2. 把下面 [rewrite_local] 与 [mitm] 两段合并进自己的 Quantumult X 配置
 #   3. 开启「MitM」并安装/信任证书
 # 说明：
-#   - detail 响应：全部剧集改写为已解锁（type=free / pay_type=coin(绕过会员弹窗) / is_buy=true / price=0 / coin_episodes 清空 / is_buy_whole=true）
-#   - play 响应：813004(积分)/813005(金币)/813006(会员) 时伪造成功响应（status=y + 真实 hls_key），金币/会员剧集可直接播放
+#   - detail 响应：全部剧集改写为已解锁（免费剧保持 type=free，付费剧改 type=coin / is_buy=true / price=0 / coin_episodes 清空 / is_buy_whole=true）
+#   - play 响应：813004(VIP会员)/813005(金币)/813006(其它付费) 时伪造成功响应（status=y + 真实 hls_key），金币/会员剧集可直接播放
 #   - 其余流量原样放行
 #   - 二进制 body 在 QX 中为 base64 字符串，脚本会自动解码
 

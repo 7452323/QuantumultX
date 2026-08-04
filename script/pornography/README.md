@@ -2,8 +2,8 @@
 
 对 `lzlukvca.cc` 短剧站 `/api/drama/detail` 与 `/api/drama/play` 接口的加密流量做**实时解锁**：
 
-- **detail 响应**：解密后将全部剧集改写为已解锁（`type=free` / `pay_type=coin`（绕过 App 端 VIP 会员弹窗判定） / `is_buy=true` / `can_vip_watch=false`（自动连播直接判定可播） / `price=0` / `methods=[]`，同时清空 `coin_episodes` / `points_episodes` / `vip_episodes`，置 `is_buy_whole=true` / `episode_price=0` / `pay_type=free` / `can_vip_watch=true`），重加密返回，App 端不再显示锁与会员标记；
-- **play 响应**：命中 `813004（积分解锁）/ 813005（金币解锁）/ 813006（会员专享）` 任一付费错误时，从请求体读取 `drama_id + seq`，抓取可预测的 m3u8 直链并提取**真实 enc.key（AES-128）**，伪造成功响应（`status=y` + `hls_key`）重加密返回，金币/会员剧集均可直接播放；
+- **detail 响应**：解密后将全部剧集改写为已解锁（免费剧保持 `type=free`，付费剧统一改 `type=coin`（App 端 anP 只认 coin/points，其它一律弹会员窗） / `is_buy=true` / `price=0` / `methods=[]`，同时清空 `coin_episodes` / `points_episodes` / `vip_episodes`，置 `is_buy_whole=true` / `episode_price=0` / `pay_type=free`），重加密返回，App 端不再显示锁与会员标记；
+- **play 响应**：命中 `813004（VIP 会员专享）/ 813005（金币解锁）/ 813006（其它付费）` 任一付费错误时，从请求体读取 `drama_id + seq`，抓取可预测的 m3u8 直链并提取**真实 enc.key（AES-128）**，伪造成功响应（`status=y` + `hls_key`）重加密返回，金币/会员剧集均可直接播放；
 - **其余流量**（非 detail/play、已成功响应、请求阶段）原样放行，解密失败时同样放行，绝不影响正常访问。
 
 > ⚠️ 说明：本脚本用于学习研究目标站点的加密协议。请遵守目标站点的服务条款与当地法律法规。
@@ -27,8 +27,8 @@
 - 压缩：服务端返回 gzip；客户端请求同样为 gzip/zlib（脚本内置完整 inflate，支持 stored/fixed/dynamic Huffman 与 gzip/zlib 两种包装；重加密用 zlib stored block + Adler-32）。
 - 业务结构：
   - `detail`：`data.episodes[]`（`seq/type/pay_type/price/methods`）、`coin_episodes[]`、`vip_episodes[]`、`points_episodes[]`、`episode_price`、`free_episodes`、`is_buy_whole`、`can_vip_watch` 等。
-  - `play`：成功返回 `data.m3u8`/`data.lines[]`；付费错误码：`813004`（积分）/ `813005`（金币）/ `813006`（会员专享），均为 `{"status":"n","error":"...","errorCode":xxx}`。
-- App 端播放判定（前端逆向）：点集数时若 `episodes[i].pay_type==='coin'/'points'` 走解锁弹窗并发 play 请求，**其它值（含 free/vip）一律弹“VIP 会员专享”窗且不发 play 请求**——因此解锁脚本必须把每集 `pay_type` 写成 `coin` 并 `is_buy=true` 才能让 App 发 play。
+  - `play`：成功返回 `data.m3u8`/`data.lines[]`；付费错误码：`813004`（VIP 会员专享，“该短剧为 VIP 专享，开通会员后即可观看”）/ `813005`（金币，“本集需金币解锁”）/ `813006`（其它付费），均为 `{"status":"n","error":"...","errorCode":xxx}`。
+- App 端播放判定（前端逆向）：episodes 单集解析器 d2c 读 **`type`** 字段（非 pay_type）；点集数播放入口 wD：若 `ans(seq)=true`（type 非 free/空 且 `is_buy=false`）走 qu 解锁弹窗，`anP()` 只把 `type==='coin'/'points'` 当可解锁项，**其它值（含 free/vip/空）一律弹“VIP 会员专享”窗且不发 play**；若 `ans(seq)=false`（免费剧或 `is_buy=true`）**直接发 /drama/play**。因此脚本把付费剧 type 改成 `coin` + `is_buy=true`（ans=false → 直接发 play，由 play 侧伪造解锁），免费剧保持 `free`。
 - m3u8 直链可预测：`https://lzlukvca.cc/api/drama/hls/{drama_id}/{seq}/play.m3u8?line=free`，内部 `#EXT-X-KEY:...URI="...enc.key?auth_key=..."` 可直接抓取返回 16 字节真实 AES-128 密钥。
 
 ## 文件清单（raw 链接）
