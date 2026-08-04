@@ -580,16 +580,38 @@
     return new Uint8Array(bytes);
   }
   function rawBodyBytes(target) {
-    // 统一取原始字节：优先 bodyBytes（QX 二进制 / 各平台二进制），否则按平台解码 body 字符串
-    // QX: body 是原始字符串（二进制走 bodyBytes）；Surge/Loon (binary-body-mode): body 是 base64
+    // 统一取响应字节，覆盖三平台所有 body 形态：
+    //  QX: 二进制走 bodyBytes(ArrayBuffer)，body 是原始字符串
+    //  Surge/Loon (binary-body-mode): body 可能是 base64 字符串，也可能是 Uint8Array/Array/ArrayBuffer
     if (!target) return null;
-    if (target.bodyBytes !== undefined && target.bodyBytes !== null) {
-      var bb = bodyToBytes(target.bodyBytes);
+    var src = (target.bodyBytes !== undefined && target.bodyBytes !== null) ? target.bodyBytes : target.body;
+    if (src == null) return null;
+    var tag = Object.prototype.toString.call(src);
+    if (tag === '[object Uint8Array]' || tag === '[object Array]' || tag === '[object ArrayBuffer]') {
+      var bb = bodyToBytes(src);
       return bb ? toU8(bb) : null;
     }
-    if (typeof target.body === 'string' && target.body.length > 0) {
-      return isQX() ? utf8ToBytes(target.body) : base64ToBytes(target.body);
+    if (typeof src === 'string' && src.length > 0) {
+      return isQX() ? utf8ToBytes(src) : base64ToBytes(src);
     }
+    return null;
+  }
+  function reqBodyBytes() {
+    // REQUEST 阶段取请求字节：三平台 script-request-body / http-request 的 body 均为 base64
+    // （QX 官方 script-request-body 语义、Surge/Loon requires-body 语义一致），另兼容 Uint8Array/bodyBytes
+    if (!$request) return null;
+    if ($request.bodyBytes !== undefined && $request.bodyBytes !== null) {
+      var bb = bodyToBytes($request.bodyBytes);
+      return bb ? toU8(bb) : null;
+    }
+    var b = $request.body;
+    if (b == null) return null;
+    var tag = Object.prototype.toString.call(b);
+    if (tag === '[object Uint8Array]' || tag === '[object Array]' || tag === '[object ArrayBuffer]') {
+      var bb2 = bodyToBytes(b);
+      return bb2 ? toU8(bb2) : null;
+    }
+    if (typeof b === 'string' && b.length > 0) return base64ToBytes(b);
     return null;
   }
   function doneWithBytes(bytes) {
@@ -728,7 +750,7 @@
       $persistentStore.write(rlower['requestid'] || '', 'lzlukvca_req_id');
       $persistentStore.write(rlower['devicetype'] || 'web', 'lzlukvca_req_dev');
       if (isPlay) {
-        var reqRaw = $request ? rawBodyBytes($request) : null;
+        var reqRaw = reqBodyBytes();
         if (reqRaw && reqRaw.length > 0) {
           var enc = bytesToBase64(reqRaw);
           $persistentStore.write(enc, 'lzlukvca_req_body');
@@ -854,10 +876,6 @@
   }
   // ---- 其它：放行 ----
   else {
-    if (raw != null && requestId && (isDetail || isPlay || url.indexOf('lzlukvca.cc') !== -1)) {
-      var j = decryptBody(raw, requestId, deviceType);
-      if (j) log((isResponse ? 'RESP' : 'REQ ') + ' ' + url + ' ' + JSON.stringify(j));
-    }
     passThrough();
   }
 })();
