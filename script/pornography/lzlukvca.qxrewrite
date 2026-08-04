@@ -7,13 +7,14 @@
 #   3. 开启「MitM」并安装/信任证书
 # 说明：
 #   - detail 响应：全部剧集改写为已解锁（免费剧保持 type=free，付费剧改 type=coin / is_buy=true / price=0 / coin_episodes 清空 / is_buy_whole=true）
+#   - doBuy 响应（确认解锁/购买）：一律伪造成功 status=true，App 端走解锁成功→播放
 #   - play 响应：813004(VIP会员)/813005(金币)/813006(其它付费) 时伪造成功响应（status=y + 真实 hls_key），金币/会员剧集可直接播放
 #   - 其余流量原样放行
 #   - 二进制 body 在 QX 中为 base64 字符串，脚本会自动解码
 
 [rewrite_local]
-^https://lzlukvca\.cc/api/drama/(detail|play) url script-request-body lzlukvca.js
-^https://lzlukvca\.cc/api/drama/(detail|play) url script-response-body lzlukvca.js
+^https://lzlukvca\.cc/api/drama/(detail|play|doBuy) url script-request-body lzlukvca.js
+^https://lzlukvca\.cc/api/drama/(detail|play|doBuy) url script-response-body lzlukvca.js
 
 [mitm]
 hostname = lzlukvca.cc

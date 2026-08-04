@@ -1,12 +1,12 @@
 #!name=黄豆短剧 lzlukvca 金币+会员剧集解锁
-#!desc=解锁 lzlukvca.cc 金币/会员剧集：detail 响应全剧集已解锁（免费保持 free、付费改 type=coin 绕过会员弹窗）；play 813004(VIP会员)/813005(金币)/813006 时伪造成功响应（status=y + 真实 hls_key），金币/会员剧集可直接播放。其余流量原样放行。需开启 MITM 并信任证书。
+#!desc=解锁 lzlukvca.cc 金币/会员剧集：detail 响应全剧集已解锁（免费保持 free、付费改 type=coin 绕过会员弹窗）；doBuy 确认解锁伪造成功；play 813004(VIP会员)/813005(金币)/813006 时伪造成功响应（status=y + 真实 hls_key），金币/会员剧集可直接播放。其余流量原样放行。需开启 MITM 并信任证书。
 #!system=ios
 #!author=7452323
 #!homepage=https://github.com/7452323/QuantumultX
 
 [Script]
-lzlukvca-req = type=http-request, pattern=^https://lzlukvca\.cc/api/drama/(detail|play), requires-body=true, binary-body-mode=true, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/pornography/lzlukvca.js
-lzlukvca-resp = type=http-response, pattern=^https://lzlukvca\.cc/api/drama/(detail|play), requires-body=true, binary-body-mode=true, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/pornography/lzlukvca.js
+lzlukvca-req = type=http-request, pattern=^https://lzlukvca\.cc/api/drama/(detail|play|doBuy), requires-body=true, binary-body-mode=true, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/pornography/lzlukvca.js
+lzlukvca-resp = type=http-response, pattern=^https://lzlukvca\.cc/api/drama/(detail|play|doBuy), requires-body=true, binary-body-mode=true, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/pornography/lzlukvca.js
 
 [MITM]
 hostname = %APPEND% lzlukvca.cc

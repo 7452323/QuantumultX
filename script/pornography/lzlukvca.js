@@ -660,6 +660,7 @@
 
   var isDetail = url.indexOf('/api/drama/detail') !== -1;
   var isPlay = url.indexOf('/api/drama/play') !== -1;
+  var isDoBuy = url.indexOf('/api/drama/doBuy') !== -1;
 
   function log(msg) { console.log('[lzlukvca] ' + msg); }
   function passThrough() { $done({}); }
@@ -730,6 +731,25 @@
     } else {
       // 非付费错误（已成功或其它错误）→ 放行
       if (pjson) log('play resp pass-through status=' + pjson.status);
+      passThrough();
+    }
+  }
+  // ---- doBuy 响应（确认解锁/购买）：一律伪造成功 status=true ----
+  // App 端 wC 确认解锁调 /drama/doBuy（am_），成功后判定 J.w(p.status, true) 必须为
+  // boolean true（'y'==true 为 false）。服务端对金币/会员剧返回 813004/813005/203001
+  // 等错误 → 弹窗拦截。这里无论什么响应都伪造 {"status":true}，让 App 走
+  // “解锁成功”→ wD 播放 → /drama/play（由上方 play 伪造兜底）。
+  else if (isResponse && isDoBuy && body != null) {
+    var bjson = decryptBody(body, requestId, deviceType);
+    if (bjson) {
+      bjson.status = true;
+      delete bjson.error;
+      delete bjson.errorCode;
+      var benc = encryptBody(bjson, requestId, deviceType);
+      log('doBuy forged status=true');
+      $done({ body: outputBytes(benc) });
+    } else {
+      log('doBuy decrypt fail');
       passThrough();
     }
   }
