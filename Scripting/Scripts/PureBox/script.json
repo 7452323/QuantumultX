@@ -1,0 +1,22 @@
+{
+  "name": "PureBox",
+  "description": "A private cleanup toolbox for contacts, photos, schedules, local data, and Safari extensions.",
+  "localizedNames": {
+    "en": "PureBox",
+    "zh": "PureBox"
+  },
+  "localizedDescriptions": {
+    "en": "Safely organize contacts, photos, schedules, local data, and Safari extensions.",
+    "zh": "安全整理联系人、照片、日程、本地数据与 Safari 扩展。"
+  },
+  "version": "2.8.0",
+  "entry": "index.tsx",
+  "icon": "sparkles.rectangle.stack.fill",
+  "color": "rgba(0, 122, 255, 1)",
+  "runInApp": false,
+  "author": {
+    "name": "7452323",
+    "email": "7452323@gmail.com",
+    "homepage": "https://github.com/7452323"
+  }
+}
