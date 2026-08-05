@@ -190,6 +190,19 @@ export function lunar2solar(
   Animal: string; astro: string;
   cYear: number; cMonth: number; cDay: number;
 } {
+  if (year < 1900 || year > 2100 || month < 1 || month > 12 || day < 1) {
+    throw new Error('农历日期超出支持范围');
+  }
+
+  const leap = leapMonth(year);
+  if (isLeap && leap !== month) {
+    throw new Error(`年份 ${year} 的 ${month} 月不是闰月`);
+  }
+  const maxDay = isLeap ? leapMonthDays(year) : monthDays(year, month);
+  if (day > maxDay) {
+    throw new Error(`农历 ${month} 月没有第 ${day} 天`);
+  }
+
   // 计算农历新年日期
   const nyd = lunarNewYearDate(year);
   let offset = 0;
@@ -198,11 +211,7 @@ export function lunar2solar(
     offset += monthDays(year, m);
   }
   
-  const leap = leapMonth(year);
   if (isLeap) {
-    if (leap !== month) {
-      throw new Error(`年份 ${year} 的 ${month} 月不是闰月`);
-    }
     // 正常月的天数已在前面加上
     offset += monthDays(year, month); // 跳过正常月
   } else if (leap > 0 && month > leap) {
@@ -296,7 +305,8 @@ export function getNextBirthday(
   isNongli: boolean, isLeapMonth: boolean
 ): { cYear: number; cMonth: number; cDay: number; daysUntil: number } {
   const now = new Date();
-  const currentYear = now.getFullYear();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const currentYear = today.getFullYear();
   let targetYear = currentYear;
   
   let solarDate: { cYear: number; cMonth: number; cDay: number };
@@ -312,9 +322,9 @@ export function getNextBirthday(
       }
       
       const birthdayThisYear = new Date(solarDate.cYear, solarDate.cMonth - 1, solarDate.cDay);
-      if (birthdayThisYear.getTime() >= now.getTime()) {
-        // 今年的生日还没过
-        const diff = Math.round((birthdayThisYear.getTime() - now.getTime()) / 86400000);
+      if (birthdayThisYear.getTime() >= today.getTime()) {
+        // 今年的生日还没过，生日当天返回 0
+        const diff = Math.round((birthdayThisYear.getTime() - today.getTime()) / 86400000);
         return { ...solarDate, daysUntil: diff };
       }
     } catch (e) {
@@ -332,7 +342,7 @@ export function getNextBirthday(
     solarDate = { cYear: targetYear, cMonth: birthMonth, cDay: birthDay };
   }
   const birthdayNext = new Date(solarDate.cYear, solarDate.cMonth - 1, solarDate.cDay);
-  const diff = Math.round((birthdayNext.getTime() - now.getTime()) / 86400000);
+  const diff = Math.round((birthdayNext.getTime() - today.getTime()) / 86400000);
   return { ...solarDate, daysUntil: diff };
 }
 
@@ -381,9 +391,10 @@ export function getAge(birthStr: string): { year: number; month: number; day: nu
 
 /** 计算从相识日到今天的总天数 */
 export function getMeetDays(edayStr: string): number {
-  if (!edayStr) return 0;
+  if (!verifyTime(edayStr)) return 0;
   const parts = edayStr.split('-').map(Number);
   const start = new Date(parts[0], parts[1] - 1, parts[2]);
-  const today = new Date();
-  return Math.round(Math.abs((today.getTime() - start.getTime()) / 86400000));
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.max(0, Math.round((today.getTime() - start.getTime()) / 86400000));
 }
