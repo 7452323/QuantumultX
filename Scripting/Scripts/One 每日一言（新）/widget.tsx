@@ -35,13 +35,13 @@ function OneWidget(props: { desc: string; author: string; bgImage: UIImage | nul
   const sc = props.subColor as any
   return (
     <ZStack>
-      {props.bgImage ? <Image image={props.bgImage} resizable scaleToFill frame={{ width: s.width, height: s.height }} /> : null}
+      {props.bgImage ? <Image image={props.bgImage} resizable scaleToFill widgetAccentedRenderingMode="desaturated" frame={{ width: s.width, height: s.height }} /> : null}
       <VStack>
-        <Text font={sm ? 8 : md ? 9 : 11} foregroundStyle={sc} padding={{ horizontal: sm ? 8 : 12, vertical: sm ? 4 : 6 }}>ONE · 每日一言</Text>
+        <Text widgetAccentable font={sm ? 8 : md ? 9 : 11} foregroundStyle={sc} padding={{ horizontal: sm ? 8 : 12, vertical: sm ? 4 : 6 }}>ONE · 每日一言</Text>
         <Spacer />
         <VStack padding={{ horizontal: sm ? 10 : 14, vertical: sm ? 8 : 10 }}>
-          <Text font={sm ? 10 : md ? 12 : 15} foregroundStyle={tc} lineLimit={sm ? 5 : md ? 4 : 8}>{props.desc}</Text>
-          {props.author ? <Text font={sm ? 9 : md ? 10 : 12} foregroundStyle={sc}>—— {props.author}</Text> : null}
+          <Text widgetAccentable font={sm ? 10 : md ? 12 : 15} foregroundStyle={tc} lineLimit={sm ? 5 : md ? 4 : 8}>{props.desc}</Text>
+          {props.author ? <Text widgetAccentable font={sm ? 9 : md ? 10 : 12} foregroundStyle={sc}>—— {props.author}</Text> : null}
         </VStack>
       </VStack>
     </ZStack>
