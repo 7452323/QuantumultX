@@ -175,7 +175,10 @@ function UploadPage() {
       const name = filePath.split('/').pop() ?? 'unknown'
       newItems.push({ name, relativePath: name, originalPath: filePath, size: data.size })
     }
-    setFiles(prev => [...prev, ...newItems])
+    setFiles(prev => {
+      const existing = new Set(prev.map(item => item.originalPath))
+      return [...prev, ...newItems.filter(item => !existing.has(item.originalPath))]
+    })
   }
 
   /** 递归选择整个文件夹，并保留所有子目录层级 */
@@ -226,7 +229,10 @@ function UploadPage() {
       await alert({ title: '文件夹为空', message: '所选文件夹中没有可读取的文件。' })
       return
     }
-    setFiles(prev => [...prev, ...newItems])
+    setFiles(prev => {
+      const existing = new Set(prev.map(item => item.originalPath))
+      return [...prev, ...newItems.filter(item => !existing.has(item.originalPath))]
+    })
   }
 
   function removeFile(index: number) {
@@ -310,7 +316,7 @@ function UploadPage() {
           owner: owner.trim(),
           repo: repo.trim(),
           path: destPath,
-          message: commitMsg.trim() || `Upload ${file.name}`,
+          message: commitMsg.trim() || `Upload ${file.relativePath}`,
           content,
           sha,
           branch: branchVal,
