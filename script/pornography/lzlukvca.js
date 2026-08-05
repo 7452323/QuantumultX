@@ -1,29 +1,6 @@
 /*
  * lzlukvca.cc（黄豆短剧）协议解锁脚本 —— 三平台统一版
  *
- * 功能（基于 Flutter Web main.js 前端逻辑精确逆向）：
- *   1. /api/drama/detail 响应：全部剧集改 type='free' + is_buy=true + price=0 + methods=[]，
- *      使 App 端 ans()（=!(type==='free'||'')&&!is_buy）恒为 false → 播放入口 wD 直接发
- *      /drama/play（不弹窗、不走 doBuy）；同时清空 coin/vip/points 列表、is_buy_whole=true。
- *      注意：不能改 type=coin（anP 弹金币窗）也不能保留 vip（anP 弹会员窗）
- *   2. /api/drama/play 响应：遇 813004/813005/813006 时读取请求体 drama_id+seq，
- *      同步伪造成功响应（status=y + 可预测 m3u8 URL）重加密返回 —— 必须同步 $done，
- *      规则引擎不支持异步回调 $done（旧版 fetchHlsKey 异步导致 play 伪造从未生效）。
- *      注意：规则引擎在 RESPONSE 脚本中读不到 $request.body，drama_id+seq 来自配套
- *      REQUEST 规则（把 play 请求体 base64 存入 $persistentStore 的
- *      'lzlukvca_req_body'，连同 requestId/deviceType 一起缓存，响应阶段优先使用）
- *   3. /api/drama/doBuy 响应：伪造 status=true（兜底，正常路径已不经过 doBuy）
- *   4. /api/user/info、/api/user/recharge：金币 999999 + 显示钻石会员
- *   5. 其余流量原样放行
- *
- * 支持平台：Quantumult X / Surge / Loon
- *   - QX：body 为 base64 字符串（脚本自动解码）
- *   - Surge/Loon：需 binary-body-mode=true，body 为 Uint8Array（脚本自动识别）
- *
- * 自包含实现：SHA-256 / HMAC-SHA256 / AES-256-CBC(加解密) / Base64 / Hex / Utf8 /
- * inflate(gzip+zlib) / zlib stored block 重压缩 / Adler-32
- * 零网络依赖、零外部库，所有算法均已对照 Node 标准库与真实抓包样本验证。
- *
  * 脚本远程地址（更新源）:
  *   https://raw.githubusercontent.com/7452323/QuantumultX/main/script/pornography/lzlukvca.js
  * 仓库目录:
