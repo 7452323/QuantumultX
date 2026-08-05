@@ -1,44 +1,44 @@
 {
+  "color" : "rgba(102, 196, 235,1)",
+  "iconImage" : "",
+  "localizedNames" : {
+    "pt" : "",
+    "es" : "",
+    "en" : "",
+    "ja" : "",
+    "it" : "",
+    "de" : "",
+    "fr" : "",
+    "zh" : "",
+    "ru" : ""
+  },
+  "icon" : "text.alignleft",
+  "runInApp" : false,
+  "name" : "One 每日一言（旧）",
   "version" : "1.0.0",
+  "remoteResource" : null,
+  "entry" : "index.tsx",
+  "localizedDescriptions" : {
+    "de" : "",
+    "ja" : "",
+    "it" : "",
+    "en" : "",
+    "zh" : "",
+    "es" : "",
+    "fr" : "",
+    "ru" : "",
+    "pt" : ""
+  },
   "intentInputTypes" : [
 
   ],
-  "runInApp" : false,
-  "localizedNames" : {
-    "fr" : "",
-    "de" : "",
-    "ja" : "",
-    "zh" : "",
-    "es" : "",
-    "ru" : "",
-    "en" : "",
-    "it" : "",
-    "pt" : ""
-  },
   "author" : {
-    "email" : null,
+    "name" : "7452323",
     "homepage" : null,
-    "name" : "7452323"
+    "email" : null
   },
-  "color" : "rgba(102, 196, 235,1)",
+  "description" : "ONE 每日一言小组件，支持小/中/大尺寸，暗色遮罩自适应，最新内容与手动指定日期模式。\n\n数据来源：v3.wufazhuce.com\n致敬韩寒 🫡",
   "contributors" : [
 
-  ],
-  "description" : "本人作用于中组件负一屏顶部来用",
-  "icon" : "text.alignleft",
-  "iconImage" : "",
-  "remoteResource" : null,
-  "localizedDescriptions" : {
-    "fr" : "",
-    "de" : "",
-    "ja" : "",
-    "zh" : "",
-    "es" : "",
-    "ru" : "",
-    "en" : "",
-    "it" : "",
-    "pt" : ""
-  },
-  "entry" : "index.tsx",
-  "name" : "One 每日一言（旧）"
+  ]
 }
