@@ -1,48 +1,49 @@
 {
+  "localizedNames" : {
+    "fr" : "",
+    "zh" : "",
+    "en" : "",
+    "it" : "",
+    "pt" : "",
+    "es" : "",
+    "de" : "",
+    "ru" : "",
+    "ja" : ""
+  },
+  "runInApp" : false,
+  "icon" : "level.fill",
+  "permissions" : null,
   "iconImage" : "https:\/\/raw.githubusercontent.com\/7452323\/QuantumultX\/main\/icon\/GitHub.png",
-  "intentInputTypes" : [
-
-  ],
+  "remoteResource" : {
+    "url" : "https:\/\/github.com\/7452323\/QuantumultX\/tree\/main\/Scripting\/Scripts\/Github%E4%B8%8A%E4%BC%A0",
+    "autoUpdateInterval" : null,
+    "hash" : "13f85f93ad8522d9277059cd3f231391"
+  },
+  "description" : "",
   "author" : {
-    "homepage" : null,
+    "name" : "7452323",
     "email" : null,
-    "name" : "7452323"
+    "homepage" : null
   },
   "localizedDescriptions" : {
     "ru" : "",
-    "it" : "",
+    "ja" : "",
+    "en" : "",
     "pt" : "",
-    "ja" : "",
     "de" : "",
     "zh" : "",
     "es" : "",
-    "en" : "",
-    "fr" : ""
-  },
-  "name" : "Github上传",
-  "remoteResource" : {
-    "url" : "https:\/\/github.com\/7452323\/QuantumultX\/tree\/main\/Scripting\/Github%E4%B8%8A%E4%BC%A0",
-    "hash" : "cd8f01205ae3cfda670be5b4442f8849",
-    "autoUpdateInterval" : null
-  },
-  "localizedNames" : {
-    "zh" : "",
-    "de" : "",
-    "ru" : "",
-    "ja" : "",
     "fr" : "",
-    "es" : "",
-    "it" : "",
-    "en" : "",
-    "pt" : ""
+    "it" : ""
   },
-  "version" : "1.0.0",
-  "runInApp" : false,
-  "color" : "rgba(128, 138, 148,1)",
-  "entry" : "index.tsx",
-  "icon" : "level.fill",
+  "intentInputTypes" : [
+
+  ],
   "contributors" : [
 
   ],
-  "description" : ""
+  "entry" : "index.tsx",
+  "version" : "1.0.0",
+  "name" : "Github上传",
+  "color" : "rgba(128, 138, 148,1)"
 }
