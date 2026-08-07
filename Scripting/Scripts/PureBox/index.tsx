@@ -23,6 +23,7 @@ import {
   VStack,
   ZStack,
   useEffect,
+  useRef,
   useState,
 } from "scripting"
 
@@ -76,7 +77,13 @@ const META: Record<CleanerKind, { title: string; icon: string; tint: string; des
 
 const TEMP_MEDIA_KEY = "purebox_temp_media_paths"
 const LEGACY_TEMP_MEDIA_KEY = "content_cleaner_temp_media_paths"
-const PHOTO_PAGE_SIZE = 50
+const PHOTO_PAGE_SIZE = 40
+const PHOTO_MAX_ITEMS = 160
+const PHOTO_THUMBNAIL_SIZE = 240
+const PHOTO_PREVIEW_MAX_SIZE = 2048
+const DUPLICATE_PHOTO_SCAN_LIMIT = 250
+const SAFARI_SCAN_LIMIT = 2000
+const MAX_CONTACT_DUPLICATE_GROUP_SIZE = 10
 
 function registeredTempMedia(): string[] {
   const current = Storage.get<string[]>(TEMP_MEDIA_KEY)
@@ -120,10 +127,10 @@ function mediaSubtitle(asset: PHAsset): string {
   return `${type} · ${asset.pixelWidth} × ${asset.pixelHeight} · ${dateText(asset.creationDate)}`
 }
 
-async function requestThumbnail(asset: PHAsset, pixelSize = 320): Promise<UIImage | null> {
+async function requestThumbnail(asset: PHAsset, pixelSize = PHOTO_THUMBNAIL_SIZE): Promise<UIImage | null> {
   try {
     return await asset.requestImage({
-      // requestImage 使用像素而非 point；320px 足以清晰覆盖当前 68–82pt 的 Retina 缩略图。
+      // 240px 足以覆盖当前 68–82pt 缩略图，同时显著降低大量 UIImage 的常驻内存。
       targetWidth: pixelSize,
       targetHeight: pixelSize,
       contentMode: "aspectFill",
@@ -139,39 +146,58 @@ async function requestThumbnail(asset: PHAsset, pixelSize = 320): Promise<UIImag
 
 async function loadThumbnails(assets: PHAsset[]): Promise<(UIImage | null)[]> {
   const result: (UIImage | null)[] = []
-  const batchSize = 12
+  const batchSize = 6
   for (let index = 0; index < assets.length; index += batchSize) {
     result.push(...await Promise.all(assets.slice(index, index + batchSize).map(asset => requestThumbnail(asset))))
   }
   return result
 }
 
-function normalizedPhone(value: string): string {
-  return value.replace(/[^\d+]/g, "")
+function normalizedPhone(value: string | null | undefined): string {
+  return (value || "").replace(/[^\d+]/g, "")
 }
 
 function duplicateContactGroups(contacts: ContactInfo[]): ContactInfo[][] {
   const parent = new Map<string, string>()
+  const rank = new Map<string, number>()
   const byKey = new Map<string, string>()
-  const byId = new Map(contacts.map(contact => [contact.identifier, contact]))
+  // 使用迭代式并查集，避免大量联系人命中同一号码时递归 find 导致栈溢出。
   const find = (id: string): string => {
-    const current = parent.get(id) || id
-    if (current === id) return id
-    const root = find(current)
-    parent.set(id, root)
+    let root = id
+    while ((parent.get(root) || root) !== root) root = parent.get(root)!
+    let current = id
+    while ((parent.get(current) || current) !== current) {
+      const next = parent.get(current)!
+      parent.set(current, root)
+      current = next
+    }
     return root
   }
   const union = (left: string, right: string) => {
-    const a = find(left), b = find(right)
-    if (a !== b) parent.set(b, a)
+    let a = find(left), b = find(right)
+    if (a === b) return
+    const rankA = rank.get(a) || 0
+    const rankB = rank.get(b) || 0
+    if (rankA < rankB) [a, b] = [b, a]
+    parent.set(b, a)
+    if (rankA === rankB) rank.set(a, rankA + 1)
   }
   for (const contact of contacts) {
     parent.set(contact.identifier, contact.identifier)
-    // 只把标准化电话或邮箱完全相同视为可自动合并；同名只能提示，不能作为删除依据。
-    const keys = [
-      ...contact.phoneNumbers.map(phone => `phone:${normalizedPhone(phone.value)}`).filter(key => key.length > 9),
-      ...contact.emailAddresses.map(email => `email:${email.value.trim().toLowerCase()}`).filter(key => key.length > 6),
-    ]
+    rank.set(contact.identifier, 0)
+  }
+  for (const contact of contacts) {
+    // 只把标准化电话或邮箱完全相同视为可自动合并；同名不能作为删除依据。
+    const phoneKeys = (contact.phoneNumbers || []).flatMap(phone => {
+      const value = normalizedPhone(phone.value)
+      const digitCount = value.replace(/\D/g, "").length
+      return digitCount >= 7 ? [`phone:${value}`] : []
+    })
+    const emailKeys = (contact.emailAddresses || []).flatMap(email => {
+      const value = (email.value || "").trim().toLowerCase()
+      return value.includes("@") && value.length >= 5 ? [`email:${value}`] : []
+    })
+    const keys = new Set([...phoneKeys, ...emailKeys])
     for (const key of keys) {
       const existing = byKey.get(key)
       if (existing) union(contact.identifier, existing)
@@ -179,11 +205,15 @@ function duplicateContactGroups(contacts: ContactInfo[]): ContactInfo[][] {
     }
   }
   const groups = new Map<string, ContactInfo[]>()
-  for (const id of byId.keys()) {
-    const root = find(id)
-    groups.set(root, [...(groups.get(root) || []), byId.get(id)!])
+  for (const contact of contacts) {
+    const root = find(contact.identifier)
+    const group = groups.get(root)
+    if (group) group.push(contact)
+    else groups.set(root, [contact])
   }
-  return [...groups.values()].filter(group => group.length > 1)
+  // 超大连通组通常来自公司总机、家庭公共邮箱等共享资料，不应自动合并；
+  // 同时限制一次更新携带的数据量，防止原生通讯录保存时长时间阻塞。
+  return [...groups.values()].filter(group => group.length > 1 && group.length <= MAX_CONTACT_DUPLICATE_GROUP_SIZE)
 }
 
 function uniqueLabeled(values: ContactLabeledValue[], normalize: (value: string) => string): ContactLabeledValue[] {
@@ -198,18 +228,21 @@ function uniqueLabeled(values: ContactLabeledValue[], normalize: (value: string)
 
 async function mergeContactGroup(group: ContactInfo[]): Promise<void> {
   const [primary, ...duplicates] = group
+  if (!primary) throw new Error("重复联系人组为空")
   const first = <T,>(values: (T | undefined)[]): T | undefined => values.find(value => value != null && (typeof value !== "string" || value.trim().length > 0))
+  const optional = <T,>(key: string, value: T | undefined): Record<string, T> => value == null ? {} : { [key]: value }
+  // 不读取或回写头像：一次把整本通讯录的 imageData 桥接到 JS 很容易造成内存峰值，
+  // 且 updateContact 省略 imageData 时会保留主联系人的原头像。
   await Contact.updateContact({
     identifier: primary.identifier,
-    givenName: first(group.map(contact => contact.givenName)),
-    familyName: first(group.map(contact => contact.familyName)),
-    middleName: first(group.map(contact => contact.middleName)),
-    nickname: first(group.map(contact => contact.nickname)),
-    organizationName: first(group.map(contact => contact.organizationName)),
-    departmentName: first(group.map(contact => contact.departmentName)),
-    jobTitle: first(group.map(contact => contact.jobTitle)),
-    birthday: first(group.map(contact => contact.birthday)),
-    imageData: first(group.map(contact => contact.imageData)),
+    ...optional("givenName", first(group.map(contact => contact.givenName))),
+    ...optional("familyName", first(group.map(contact => contact.familyName))),
+    ...optional("middleName", first(group.map(contact => contact.middleName))),
+    ...optional("nickname", first(group.map(contact => contact.nickname))),
+    ...optional("organizationName", first(group.map(contact => contact.organizationName))),
+    ...optional("departmentName", first(group.map(contact => contact.departmentName))),
+    ...optional("jobTitle", first(group.map(contact => contact.jobTitle))),
+    ...optional("birthday", first(group.map(contact => contact.birthday))),
     dates: group.flatMap(contact => contact.dates || []),
     phoneNumbers: uniqueLabeled(group.flatMap(contact => contact.phoneNumbers || []), normalizedPhone),
     emailAddresses: uniqueLabeled(group.flatMap(contact => contact.emailAddresses || []), value => value.trim().toLowerCase()),
@@ -229,8 +262,9 @@ async function photoFingerprint(asset: PHAsset): Promise<string | null> {
   const image = await asset.requestImage({ targetWidth: 16, targetHeight: 16, contentMode: "aspectFill", deliveryMode: "fastFormat", allowNetworkAccess: true })
   if (!image) return null
   const colors: string[] = []
-  for (let y = 1; y < 8; y += 2) {
-    for (let x = 1; x < 8; x += 2) {
+  // 均匀采样整张 16×16 缩略图，而不是只取左上区域，降低不同照片误判为重复项的概率。
+  for (let y = 1; y < 16; y += 2) {
+    for (let x = 1; x < 16; x += 2) {
       const color = image.pixelColor(Math.min(x, Math.max(0, Math.round(image.width * image.scale) - 1)), Math.min(y, Math.max(0, Math.round(image.height * image.scale) - 1)))
       if (!color) return null
       colors.push(`${Math.round(color.red * 31)}-${Math.round(color.green * 31)}-${Math.round(color.blue * 31)}`)
@@ -271,33 +305,38 @@ function fileName(path: string): string {
   return path.split("/").filter(Boolean).pop() || path
 }
 
-function safariFiles(directory: string, scriptsOnly = false): CleanItem[] {
-  if (!FileManager.existsSync(directory)) return []
-  // readDirectory 返回相对于 directory 的条目名，文件操作前必须拼成绝对路径。
-  return FileManager.readDirectorySync(directory, true)
-    .map(entry => entry.startsWith("/") ? entry : `${directory}/${entry}`)
-    .filter(path => FileManager.isFileSync(path))
-    .filter(path => !scriptsOnly || /\.(user\.js|js)$/i.test(path))
-    .map(path => {
-      const stat = FileManager.statSync(path)
-      if (!scriptsOnly) {
-        return {
-          id: `safari-download:${path}`,
-          title: fileName(path),
-          subtitle: `${formatBytes(stat.size)} · ${dateText(stat.modificationDate)}`,
-          raw: { type: "safariDownload", path },
-        }
-      }
-      let source = ""
-      try { source = FileManager.readAsStringSync(path) } catch {}
-      const metadata = (key: string) => source.match(new RegExp(`^\\s*//\\s*@${key}\\s+(.+)$`, "mi"))?.[1]?.trim() || ""
-      return {
-        id: `safari-script:${path}`,
-        title: metadata("name") || fileName(path),
-        subtitle: `${metadata("version") ? `v${metadata("version")} · ` : ""}${formatBytes(stat.size)} · ${metadata("description") || fileName(path)}`,
-        raw: { type: "safariScript", path },
-      }
+async function safariFiles(directory: string, scriptsOnly = false): Promise<CleanItem[]> {
+  if (!await FileManager.exists(directory)) return []
+  // 异步扫描并限制条目数，避免大目录的同步递归读取阻塞界面。
+  const entries = (await FileManager.readDirectory(directory, true)).slice(0, SAFARI_SCAN_LIMIT)
+  const items: CleanItem[] = []
+  for (const entry of entries) {
+    const path = entry.startsWith("/") ? entry : `${directory}/${entry}`
+    if (!await FileManager.isFile(path) || (scriptsOnly && !/\.(user\.js|js)$/i.test(path))) continue
+    const stat = await FileManager.stat(path)
+    if (!scriptsOnly) {
+      items.push({
+        id: `safari-download:${path}`,
+        title: fileName(path),
+        subtitle: `${formatBytes(stat.size)} · ${dateText(stat.modificationDate)}`,
+        raw: { type: "safariDownload", path },
+      })
+      continue
+    }
+    let source = ""
+    // 用户脚本元数据位于文件头；超大脚本不在列表扫描阶段读入内存。
+    if (stat.size <= 1024 * 1024) {
+      try { source = await FileManager.readAsString(path) } catch {}
+    }
+    const metadata = (key: string) => source.match(new RegExp(`^\\s*//\\s*@${key}\\s+(.+)$`, "mi"))?.[1]?.trim() || ""
+    items.push({
+      id: `safari-script:${path}`,
+      title: metadata("name") || fileName(path),
+      subtitle: `${metadata("version") ? `v${metadata("version")} · ` : ""}${formatBytes(stat.size)} · ${metadata("description") || fileName(path)}`,
+      raw: { type: "safariScript", path },
     })
+  }
+  return items
 }
 
 function loadAppCacheItems(): CleanItem[] {
@@ -326,7 +365,8 @@ async function loadItems(kind: CleanerKind, options: { photoType: string; remind
       }))
     }
     case "contactDuplicates": {
-      const groups = duplicateContactGroups(await Contact.fetchAllContacts({ fetchImageData: true }))
+      // 去重只依赖电话和邮箱；不要批量读取头像，避免大通讯录因 imageData 内存峰值闪退。
+      const groups = duplicateContactGroups(await Contact.fetchAllContacts({ fetchImageData: false }))
       return groups.map((group, index) => ({
         id: `contact-duplicate-${index}`,
         title: contactName(group[0]),
@@ -341,9 +381,11 @@ async function loadItems(kind: CleanerKind, options: { photoType: string; remind
     case "photos":
       return loadPhotoPage(options.photoType, PHOTO_PAGE_SIZE)
     case "photoDuplicates": {
-      const assets = await Photos.fetchAssets({ sortBy: "creationDate", ascending: false, limit: 500, includeHidden: false })
+      const assets = await Photos.fetchAssets({ sortBy: "creationDate", ascending: false, limit: DUPLICATE_PHOTO_SCAN_LIMIT, includeHidden: false })
       const groups = await duplicatePhotoGroups(assets)
-      const groupThumbnails = await Promise.all(groups.map(group => loadThumbnails(group)))
+      // 分组顺序加载，避免重复项较多时同时解码大量 UIImage 导致内存峰值。
+      const groupThumbnails: (UIImage | null)[][] = []
+      for (const group of groups) groupThumbnails.push(await loadThumbnails(group))
       return groups.map((group, index) => ({
         id: `photo-duplicate-${index}`,
         title: group[0].mediaType === "video" ? "重复视频" : "重复照片",
@@ -596,7 +638,10 @@ function MediaPreviewPage({ asset, thumbnail, namespace, transitionID }: {
           setPlayer(createdPlayer)
           createdPlayer.play()
         } else {
+          // 限制解码尺寸，避免 48MP、全景图等原图产生上百 MB 内存峰值。
           const original = await asset.requestImage({
+            targetWidth: PHOTO_PREVIEW_MAX_SIZE,
+            targetHeight: PHOTO_PREVIEW_MAX_SIZE,
             contentMode: "aspectFit",
             deliveryMode: "highQualityFormat",
             version: "current",
@@ -690,31 +735,38 @@ function CleanerPage({ kind, onChanged, namespace }: { kind: CleanerKind; onChan
   const [reminderScope, setReminderScope] = useState("completed")
   const [startDate, setStartDate] = useState(Date.now() - 365 * 24 * 60 * 60 * 1000)
   const [endDate, setEndDate] = useState(Date.now() + 24 * 60 * 60 * 1000)
+  const reloadGeneration = useRef(0)
 
   const reload = async () => {
+    const generation = ++reloadGeneration.current
     setLoading(true)
     setError("")
     try {
       const result = kind === "photos"
         ? await loadPhotoPage(photoType, photoLimit)
         : await loadItems(kind, { photoType, reminderScope, startDate, endDate })
+      if (generation !== reloadGeneration.current) return
       setItems(result)
       setSelected([])
     } catch (err) {
+      if (generation !== reloadGeneration.current) return
       console.error(err)
       setItems([])
       setError(err instanceof Error ? err.message : "读取失败，请检查系统权限")
     } finally {
-      setLoading(false)
+      if (generation === reloadGeneration.current) setLoading(false)
     }
   }
 
-  useEffect(() => { reload() }, [kind, photoType, photoLimit, reminderScope, startDate, endDate])
+  useEffect(() => {
+    reload()
+    return () => { reloadGeneration.current += 1 }
+  }, [kind, photoType, photoLimit, reminderScope, startDate, endDate])
 
   const loadMorePhotos = async () => {
-    if (kind !== "photos" || loadingMore || items.length < photoLimit) return
+    if (kind !== "photos" || loadingMore || loading || items.length < photoLimit || photoLimit >= PHOTO_MAX_ITEMS) return
     setLoadingMore(true)
-    setPhotoLimit(previous => previous + PHOTO_PAGE_SIZE)
+    setPhotoLimit(previous => Math.min(PHOTO_MAX_ITEMS, previous + PHOTO_PAGE_SIZE))
   }
 
   useEffect(() => {
@@ -763,11 +815,17 @@ function CleanerPage({ kind, onChanged, namespace }: { kind: CleanerKind; onChan
     })
     if (!confirmed) return
     setDeleting(true)
-    const result = await deleteItems(kind, targets)
-    setDeleting(false)
-    await Dialog.alert({ title: kind === "contactDuplicates" || kind === "photoDuplicates" ? "去重完成" : "清理完成", message: `成功处理 ${result.success} 项，失败 ${result.failed} 项` })
-    await reload()
-    onChanged()
+    try {
+      const result = await deleteItems(kind, targets)
+      await Dialog.alert({ title: kind === "contactDuplicates" || kind === "photoDuplicates" ? "去重完成" : "清理完成", message: `成功处理 ${result.success} 项，失败 ${result.failed} 项` })
+      await reload()
+      onChanged()
+    } catch (err) {
+      console.error("批量处理失败", err)
+      await Dialog.alert({ title: "处理失败", message: err instanceof Error ? err.message : "发生未知错误，请稍后重试" })
+    } finally {
+      setDeleting(false)
+    }
   }
 
   const photoThumbnail = (image: UIImage | null | undefined, asset?: PHAsset, size = 64) => (
@@ -852,7 +910,7 @@ function CleanerPage({ kind, onChanged, namespace }: { kind: CleanerKind; onChan
       <Picker title="媒体类型" value={photoType} onChanged={setPhotoType} pickerStyle="menu">
         <Text tag="all">全部</Text><Text tag="image">照片</Text><Text tag="video">视频</Text>
       </Picker>
-      <Text foregroundStyle="secondaryLabel">每次加载 {PHOTO_PAGE_SIZE} 项高清缩略图，按需继续加载以降低运行内存占用。</Text>
+      <Text foregroundStyle="secondaryLabel">每次加载 {PHOTO_PAGE_SIZE} 项缩略图，本页最多保留 {PHOTO_MAX_ITEMS} 项，以避免内存过高导致闪退。</Text>
     </Section>
   ) : kind === "reminders" ? (
     <Section title="筛选">
@@ -897,7 +955,7 @@ function CleanerPage({ kind, onChanged, namespace }: { kind: CleanerKind; onChan
             ))}
           </Section>
         ) : null}
-        {kind === "photos" && items.length >= photoLimit ? (
+        {kind === "photos" && items.length >= photoLimit && photoLimit < PHOTO_MAX_ITEMS ? (
           <Section>
             <Button title={loadingMore ? "正在加载…" : `继续加载 ${PHOTO_PAGE_SIZE} 项`} systemImage="arrow.down.circle" action={loadMorePhotos} disabled={loadingMore || loading} />
           </Section>
@@ -909,42 +967,57 @@ function CleanerPage({ kind, onChanged, namespace }: { kind: CleanerKind; onChan
 function App() {
   const [overview, setOverview] = useState<Overview>(EMPTY_OVERVIEW)
   const [loading, setLoading] = useState(true)
+  const overviewGeneration = useRef(0)
+  const overviewRunning = useRef(false)
 
   const refreshOverview = async () => {
+    if (overviewRunning.current) return
+    overviewRunning.current = true
+    const generation = ++overviewGeneration.current
     setLoading(true)
+    const next: Overview = { ...EMPTY_OVERVIEW }
+    const safeCount = async (loader: () => Promise<unknown[]>): Promise<number | null> => {
+      try { return (await loader()).length } catch (error) { console.error("统计读取失败", error); return null }
+    }
     try {
+      // 原生资料库读取按顺序执行，避免通讯录、照片、日历等同时桥接大量对象造成卡死。
+      try {
+        const contacts = await Contact.fetchAllContacts({ fetchImageData: false })
+        next.contacts = contacts.length
+        next.contactDuplicates = duplicateContactGroups(contacts).length
+      } catch (error) { console.error("联系人统计失败", error) }
+      next.contactGroups = await safeCount(() => Contact.fetchGroups())
+      // Photos 暂无轻量 count API；首页不再 fetchAssets({ limit: 0 }) 拉取整个图库。
+      // 进入照片页面后仍按 50 项分页加载。
+      next.photos = null
+      next.photoDuplicates = null
+      next.albums = await safeCount(() => Photos.fetchAlbums({ type: "album" }))
+      next.reminders = await safeCount(() => Reminder.getAll())
       const start = new Date(new Date().getFullYear() - 1, 0, 1)
       const end = new Date(new Date().getFullYear() + 1, 0, 1)
-      const settled = await Promise.allSettled([
-      Contact.fetchAllContacts({ fetchImageData: false }),
-      Contact.fetchGroups(),
-      Photos.fetchAssets({ limit: 0 }),
-      Photos.fetchAlbums({ type: "album" }),
-      Reminder.getAll(),
-      CalendarEvent.getAll(start, end),
-      Promise.all([Notification.getAllDelivereds(), Notification.getAllPendings()]),
-      ])
-      const count = (index: number): number | null => settled[index].status === "fulfilled" ? (settled[index] as PromiseFulfilledResult<unknown[]>).value.flat().length : null
-      const contacts = settled[0].status === "fulfilled" ? settled[0].value as ContactInfo[] : null
-      setOverview({
-      contacts: count(0),
-      contactDuplicates: contacts ? duplicateContactGroups(contacts).length : null,
-      contactGroups: count(1),
-      photos: count(2),
-      photoDuplicates: null,
-      albums: count(3), reminders: count(4), events: count(5), notifications: count(6),
-      safariDownloads: safariFiles(FileManager.safariBrowserDownloadsDirectory).length,
-      safariScripts: safariFiles(FileManager.safariBrowserUserscriptsDirectory, true).length,
-        appCache: loadAppCacheItems().length,
-      })
+      next.events = await safeCount(() => CalendarEvent.getAll(start, end))
+      try {
+        const delivered = await Notification.getAllDelivereds()
+        const pending = await Notification.getAllPendings()
+        next.notifications = delivered.length + pending.length
+      } catch (error) { console.error("通知统计失败", error) }
+      // Safari 目录可能非常大：首页不递归扫描，进入对应页面时再异步读取。
+      next.safariDownloads = null
+      next.safariScripts = null
+      next.appCache = loadAppCacheItems().length
+      if (generation === overviewGeneration.current) setOverview(next)
     } catch (error) {
       console.error("首页统计刷新失败", error)
     } finally {
-      setLoading(false)
+      overviewRunning.current = false
+      if (generation === overviewGeneration.current) setLoading(false)
     }
   }
 
-  useEffect(() => { refreshOverview() }, [])
+  useEffect(() => {
+    refreshOverview()
+    return () => { overviewGeneration.current += 1 }
+  }, [])
 
   return (
     <NamespaceReader>
