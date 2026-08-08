@@ -1,7 +1,9 @@
-// Sampler —— WebViewController 封装。
-// 职责：页面加载、请求拦截记录、Hook 注入与采样回传、脚本枚举/源码提取、Cookie、证据导出。
+// Sampler —— WebViewController 封装 v2.0。
+// 职责：页面加载、请求拦截记录、响应拦截记录、Hook 注入与采样回传、
+//        脚本枚举/源码提取、Cookie、证据导出含统计摘要。
 import {
   INJECT_BASE,
+  INJECT_RESPONSE_TRACKING,
   listScriptsJS,
   fetchScriptJS,
   evalUserJS,
@@ -17,11 +19,31 @@ export interface RequestRecord {
   ts: number
 }
 
+export interface ResponseRecord {
+  url: string
+  status: number
+  statusText: string
+  headers: Record<string, string>
+  body: string
+  method: string
+  ts: number
+  // 关联到 request（按 url+method+时间近似匹配，非精确）
+}
+
 export interface HookSample {
-  kind: string
-  path: string
-  args: string[]
-  ret: string
+  kind: string        // "call" | "response"
+  path?: string       // call 时是函数路径
+  args?: string[]
+  ret?: string
+  error?: string
+  async?: boolean
+  // response 专属字段
+  url?: string
+  status?: number
+  statusText?: string
+  headers?: Record<string, string>
+  body?: string
+  method?: string
   ts: number
 }
 
@@ -38,9 +60,21 @@ export interface FetchedScript {
 }
 
 export interface Evidence {
+  version: string
   exportedAt: string
   currentURL: string
+  summary: {
+    requests: number
+    responses: number
+    hookSamples: number
+    hookCallSamples: number
+    hookResponseSamples: number
+    scripts: number
+    hookedPaths: number
+    cookies: number
+  }
   requests: RequestRecord[]
+  responses: ResponseRecord[]
   hookSamples: HookSample[]
   scripts: string[]
   hookedPaths: string[]
@@ -52,6 +86,7 @@ let nextId = 1
 export class Sampler {
   readonly webView: WebViewController
   requests: RequestRecord[] = []
+  responses: ResponseRecord[] = []
   hookSamples: HookSample[] = []
   scripts: string[] = []
   hookedPaths: string[] = []
@@ -62,7 +97,7 @@ export class Sampler {
   constructor() {
     this.webView = new WebViewController()
 
-    // 请求拦截：记录每一个被发起的请求（含 body / headers）
+    // 请求拦截
     this.webView.shouldAllowRequest = async (request) => {
       this.requests.push({
         id: nextId++,
@@ -73,7 +108,6 @@ export class Sampler {
         navigationType: request.navigationType,
         ts: Date.now(),
       })
-      // 防止内存无限增长：最多保留最近 500 条
       if (this.requests.length > 500) {
         this.requests = this.requests.slice(-500)
       }
@@ -81,16 +115,33 @@ export class Sampler {
       return true
     }
 
-    // Hook 采样回传
+    // Hook 采样 + 响应回传（同一个 messageHandler，kind 区分）
     this.webView
       .addScriptMessageHandler("jsrvHook", (payload?: HookSample) => {
-        if (payload && typeof payload === "object") {
+        if (!payload || typeof payload !== "object") return
+
+        if (payload.kind === "response") {
+          // 页面内 fetch/XHR hook 回传的响应
+          this.responses.push({
+            url: payload.url ?? "",
+            status: payload.status ?? 0,
+            statusText: payload.statusText ?? "",
+            headers: payload.headers ?? {},
+            body: payload.body ?? "",
+            method: payload.method ?? "GET",
+            ts: payload.ts ?? Date.now(),
+          })
+          if (this.responses.length > 500) {
+            this.responses = this.responses.slice(-500)
+          }
+        } else {
+          // Hook 采样
           this.hookSamples.push(payload)
           if (this.hookSamples.length > 1000) {
             this.hookSamples = this.hookSamples.slice(-1000)
           }
-          this.emit()
         }
+        this.emit()
       })
       .catch((e) => console.log("addScriptMessageHandler failed:", e))
   }
@@ -99,7 +150,7 @@ export class Sampler {
     if (this.onChange) this.onChange()
   }
 
-  // 打开目标页面，等待加载完成后自动安装 Hook 基础设施
+  // 打开目标页面，自动安装基础 Hook + 响应拦截
   async open(url: string): Promise<string> {
     const normalized = /^https?:\/\//i.test(url) ? url : "https://" + url
     this.loading = true
@@ -119,17 +170,22 @@ export class Sampler {
       return "加载异常：" + (e?.message ?? String(e))
     }
     this.loading = false
-    // 页面就绪后自动安装 hook 基础（失败不影响整体）
+    // 自动安装基础 + 响应拦截
     try {
       await this.webView.evaluateJavaScript(INJECT_BASE)
     } catch (e) {
       console.log("install base failed:", e)
     }
+    try {
+      await this.webView.evaluateJavaScript(INJECT_RESPONSE_TRACKING)
+    } catch (e) {
+      console.log("install response tracking failed:", e)
+    }
     this.emit()
     return "已加载：" + normalized
   }
 
-  // 安装 hook 基础设施（页面加载后手动补装）
+  // 安装 Hook 基础设施
   async installBase(): Promise<string> {
     try {
       const r = await this.webView.evaluateJavaScript<string>(INJECT_BASE)
@@ -139,7 +195,17 @@ export class Sampler {
     }
   }
 
-  // Hook 指定函数路径（如 window.a.b.c 或 a.b.c）
+  // 安装响应拦截（fetch + XHR hook）
+  async installResponseTracking(): Promise<string> {
+    try {
+      const r = await this.webView.evaluateJavaScript<string>(INJECT_RESPONSE_TRACKING)
+      return String(r ?? "")
+    } catch (e: any) {
+      return "跟踪安装失败：" + (e?.message ?? String(e))
+    }
+  }
+
+  // Hook 指定函数路径
   async hook(path: string): Promise<string> {
     const trimmed = path.trim()
     if (!trimmed) return "路径为空"
@@ -209,13 +275,27 @@ export class Sampler {
     }
   }
 
-  // 汇总导出证据
+  // 汇总导出证据（含统计摘要）
   async buildEvidence(): Promise<Evidence> {
     const cookies = await this.getCookies()
+    const callSamples = this.hookSamples.filter((s) => s.kind === "call")
+    const responseSamples = this.hookSamples.filter((s) => s.kind === "response")
     return {
+      version: "2.0",
       exportedAt: new Date().toISOString(),
       currentURL: this.currentURL,
+      summary: {
+        requests: this.requests.length,
+        responses: this.responses.length,
+        hookSamples: this.hookSamples.length,
+        hookCallSamples: callSamples.length,
+        hookResponseSamples: responseSamples.length,
+        scripts: this.scripts.length,
+        hookedPaths: this.hookedPaths.length,
+        cookies: cookies.length,
+      },
       requests: this.requests,
+      responses: this.responses,
       hookSamples: this.hookSamples,
       scripts: this.scripts,
       hookedPaths: this.hookedPaths,
@@ -232,6 +312,7 @@ export class Sampler {
 
   clearRequests() {
     this.requests = []
+    this.responses = []
     this.emit()
   }
 
