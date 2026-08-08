@@ -1,0 +1,13 @@
+{
+  "name": "JS逆向采样工作台",
+  "icon": "wrench.and.screwdriver.fill",
+  "color": "#6366F1",
+  "version": "1.0.0",
+  "description": "基于 WebViewController 的 JS 逆向采样工作台：真实浏览器加载目标页、网络请求拦截、函数 Hook 采样、脚本源码提取、证据 JSON 导出",
+  "localizedNames": {
+    "zh": "JS逆向采样工作台"
+  },
+  "localizedDescriptions": {
+    "zh": "基于 WebViewController 的 JS 逆向采样工作台：真实浏览器加载目标页、网络请求拦截、函数 Hook 采样、脚本源码提取、证据 JSON 导出"
+  }
+}
