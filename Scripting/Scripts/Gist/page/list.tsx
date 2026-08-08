@@ -13,6 +13,7 @@ import {
   VStack,
   Menu,
   Image,
+  Script,
 } from "scripting";
 import { View as AddView } from "./add";
 import { View as EditorView } from "./edit";
@@ -65,6 +66,26 @@ export function View({ navigationTitle }: { navigationTitle?: string }) {
     Storage.set("gist_expanded_ids", "[]");
     init();
     fetchUser();
+
+    // Home Tab 场景（Script.env === "home_screen"）下组件常驻，
+    // 切回本 Tab 时列表不会自动重建，这里监听事件手动刷新。
+    // 在 index.tsx 普通运行场景中注册无害：回调永远不会被触发。
+    const off = Script.onHomeTabEvent((event) => {
+      switch (event) {
+        case "selected":
+          // 从别的 Tab 切回来：整表刷新（带加载态）
+          list.setValue(undefined);
+          init();
+          fetchUser();
+          break;
+        case "reselected":
+          // 已经在 Home 上又点了一次 Home：静默刷新，避免闪加载态
+          init();
+          fetchUser();
+          break;
+      }
+    });
+    return () => off();
   }, []);
 
   if (list.value === undefined) return <ProgressView />;
