@@ -161,6 +161,7 @@ const DEFAULT_BASE = "https://moon.1314k.eu.org"
 const STORAGE_KEY_BASE = "moontvplus_base_url"
 const STORAGE_KEY_AUTH = "moontvplus_auth"
 const STORAGE_KEY_USERNAME = "moontvplus_username"
+const KEYCHAIN_KEY_PASSWORD = "moontvplus_password"
 const SEARCH_CACHE_PREFIX = "moontvplus_search_cache_"
 const SEARCH_CACHE_TTL = 10 * 60 * 1000
 
@@ -202,6 +203,9 @@ class MoonTVClient {
     Storage.set(STORAGE_KEY_USERNAME, username)
     const valid = await this.validateSession()
     if (!valid) throw new Error("登录凭据已返回，但会话验证失败")
+    if (!Keychain.set(KEYCHAIN_KEY_PASSWORD, password)) {
+      throw new Error("登录成功，但无法安全保存密码")
+    }
     return true
   }
 
@@ -220,7 +224,18 @@ class MoonTVClient {
     try {
       await fetch(`${this.baseUrl}/api/logout`, { headers: this.authHeaders() })
     } catch {}
-    this.clearAuth()
+    this.clearAuth(true)
+  }
+
+  async refreshLogin(): Promise<"valid" | "relogged"> {
+    const username = this.getSavedUsername()
+    const password = Keychain.get(KEYCHAIN_KEY_PASSWORD)
+    if (await this.validateSession()) return "valid"
+    if (!username || !password) {
+      throw new Error("登录已失效，请输入一次密码重新登录")
+    }
+    await this.login(username, password)
+    return "relogged"
   }
 
   async validateSession(): Promise<boolean> {
@@ -254,10 +269,13 @@ class MoonTVClient {
     finally { clearTimeout(timer) }
   }
 
-  private clearAuth(): void {
+  private clearAuth(clearCredentials = false): void {
     this.authCookie = null
     Storage.remove(STORAGE_KEY_AUTH)
-    Storage.remove(STORAGE_KEY_USERNAME)
+    if (clearCredentials) {
+      Storage.remove(STORAGE_KEY_USERNAME)
+      Keychain.remove(KEYCHAIN_KEY_PASSWORD)
+    }
   }
 
   // ========== Content ==========

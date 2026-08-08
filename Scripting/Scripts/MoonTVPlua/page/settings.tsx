@@ -39,16 +39,11 @@ export default function SettingsView() {
     setLoading(true)
     setStatus("正在检查登录状态...")
     try {
-      const valid = await moonClient.validateSession()
-      if (valid) {
-        setLoggedIn(true)
-        setStatus("登录状态有效")
-      } else {
-        setLoggedIn(false)
-        setPassword("")
-        setStatus("登录已失效，请重新登录")
-      }
+      const result = await moonClient.refreshLogin()
+      setLoggedIn(true)
+      setStatus(result === "relogged" ? "登录已失效，已自动重新登录" : "登录状态有效")
     } catch (e: any) {
+      setLoggedIn(moonClient.isLoggedIn())
       setStatus(e.message || "检查登录状态失败")
     }
     setLoading(false)
