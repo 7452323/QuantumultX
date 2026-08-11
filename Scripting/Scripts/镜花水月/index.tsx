@@ -901,6 +901,11 @@ function loadSavedUsers(): SavedUser[] {
   try { const raw = Storage.get<string>(KEY_SAVED_USERS); if (!raw) return []; return Array.isArray(JSON.parse(raw)) ? JSON.parse(raw) : [] }
   catch { return [] }
 }
+function loadCurrentSavedUser(): SavedUser | null {
+  const uid = loadSecUid()
+  if (!uid) return null
+  return loadSavedUsers().find((u) => u.id === uid) || null
+}
 function saveUser(user: SavedUser) {
   const users = loadSavedUsers(); const idx = users.findIndex((u) => u.id === user.id)
   if (idx >= 0) users.splice(idx, 1); users.unshift(user)
@@ -1710,7 +1715,8 @@ function SettingsView({ isActive }: { isActive: boolean }) {
   const [status, setStatus] = useState<{ type: string; text: string }>({ type: "", text: "" })
   const [cookieStatus, setCookieStatus] = useState<{ checking: boolean; valid: boolean; detail: string }>({ checking: true, valid: false, detail: "检查中..." })
   const [savingCookie, setSavingCookie] = useState(false)
-  const [savedInfo, setSavedInfo] = useState<SavedUser | null>(null)
+  // 首次渲染直接读取作品页已写入的当前用户，避免等 effect 后顶部仍是空白。
+  const [savedInfo, setSavedInfo] = useState<SavedUser | null>(() => loadCurrentSavedUser())
   const [savedUsers, setSavedUsers] = useState<SavedUser[]>(() => loadSavedUsers())
   const [currentUid, setCurrentUid] = useState(() => loadSecUid())
 
@@ -1749,7 +1755,26 @@ function SettingsView({ isActive }: { isActive: boolean }) {
           }).catch(() => {})
         }
       }
-      else setSavedInfo({ id: uid, nickname: "", avatar: "", savedAt: Date.now() })
+      else {
+        // 兼容只有当前 uid、尚未写入用户列表的旧数据：立即显示占位并主动补齐资料。
+        const placeholder: SavedUser = { id: uid, nickname: "", avatar: "", savedAt: Date.now() }
+        setSavedInfo(placeholder)
+        fetchUserProfile(uid).then((profile) => {
+          if (!profile || loadSecUid() !== uid) return
+          const user: SavedUser = {
+            ...placeholder,
+            ...profile,
+            id: uid,
+            savedAt: placeholder.savedAt,
+            nickname: profile.nickname || "",
+            avatar: profile.avatar || "",
+          }
+          saveUser(user)
+          const newUsers = loadSavedUsers()
+          setSavedUsers(newUsers)
+          if (loadSecUid() === uid) setSavedInfo(newUsers.find((u) => u.id === uid) || user)
+        }).catch(() => {})
+      }
     } else { setSavedInfo(null) }
   }
 
@@ -2029,15 +2054,19 @@ function App() {
   const dismiss = Navigation.useDismiss()
   const [tabIndex, setTabIndex] = useState(0)
 
+  function handleTabIndexChanged(index: number) {
+    setTabIndex(index)
+  }
+
   return (
-    <TabView tabIndex={tabIndex} onTabIndexChanged={setTabIndex}>
-      <Tab title="作品" systemImage="rectangle.grid.2x2">
+    <TabView tabIndex={tabIndex} onTabIndexChanged={handleTabIndexChanged}>
+      <Tab title="作品" systemImage="rectangle.grid.2x2" value={0}>
         <HomeView dismissApp={() => dismiss()} isActive={tabIndex === 0} />
       </Tab>
-      <Tab title="历史" systemImage="clock">
+      <Tab title="历史" systemImage="clock" value={1}>
         <HistoryView dismissApp={() => dismiss()} isActive={tabIndex === 1} />
       </Tab>
-      <Tab title="设置" systemImage="gear">
+      <Tab title="设置" systemImage="gear" value={2}>
         <SettingsView isActive={tabIndex === 2} />
       </Tab>
     </TabView>
