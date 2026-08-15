@@ -210,6 +210,14 @@ async function safeJSON(config: Config, path: string): Promise<unknown | null> {
   }
 }
 
+async function safeText(config: Config, path: string): Promise<string | null> {
+  try {
+    return await apiText(config, path)
+  } catch {
+    return null
+  }
+}
+
 async function captureCore(config: Config): Promise<CoreSnapshot> {
   try {
     const metrics = parsePrometheus(await apiText(config, "/v1/metrics"))
@@ -227,7 +235,7 @@ async function captureCore(config: Config): Promise<CoreSnapshot> {
 }
 
 async function fetchDetails(config: Config): Promise<Record<string, unknown | null>> {
-  const [outbound, recent, dns, rules, groups, testResults, benchmarkResults, policies] = await Promise.all([
+  const [outbound, recent, dns, rules, groups, testResults, benchmarkResults, policies, profile] = await Promise.all([
     safeJSON(config, "/v1/outbound"),
     safeJSON(config, "/v1/requests/recent"),
     safeJSON(config, "/v1/dns"),
@@ -236,8 +244,9 @@ async function fetchDetails(config: Config): Promise<Record<string, unknown | nu
     safeJSON(config, "/v1/policy_groups/test_results"),
     safeJSON(config, "/v1/policies/benchmark_results"),
     safeJSON(config, "/v1/policies"),
+    safeText(config, "/v1/profiles/current?sensitive=0"),
   ])
-  return { outbound, recent, dns, rules, groups, testResults, benchmarkResults, policies }
+  return { outbound, recent, dns, rules, groups, testResults, benchmarkResults, policies, profile }
 }
 
 function parsePrometheus(text: string): Metric[] {
@@ -514,15 +523,54 @@ function normalizeGroups(raw: unknown, testResults: unknown, policiesRaw: unknow
   }
   if (Array.isArray(raw)) raw.forEach(item => addValue(item))
   else if (isRecord(raw)) {
-    const list = raw.groups || raw.policyGroups || raw.policy_groups || raw.items || raw.data
-    if (Array.isArray(list)) list.forEach(item => addValue(item))
-    Object.entries(raw).forEach(([key, value]) => addValue(value, key))
+    const ordered = raw["policy-groups"] || raw.groups || raw.policyGroups || raw.policy_groups || raw.items || raw.data
+    if (Array.isArray(ordered)) {
+      ordered.forEach(item => addValue(item))
+    } else if (isRecord(ordered)) {
+      Object.entries(ordered).forEach(([key, value]) => addValue(value, key))
+    } else {
+      Object.entries(raw).forEach(([key, value]) => addValue(value, key))
+    }
   }
   if (!groups.length) {
     const list = extractArray(policiesRaw, ["policies", "items", "data"])
     if (list.length) groups.push({ name: "可用策略", type: "策略", selected: "", optionCount: list.length, policies: namesFrom(list), nodes: namesFrom(list).map(name => ({ name, latency: Number(latency[name] || 0) })), latency: 0 })
   }
   return groups.slice(0, 40)
+}
+
+function profileGroupOrder(profile: unknown): string[] {
+  if (typeof profile !== "string") return []
+  let text = profile
+  try {
+    const parsed = JSON.parse(profile)
+    if (isRecord(parsed)) text = String(parsed.content || parsed.profile || parsed.text || parsed.data || "")
+  } catch {}
+  const section = text.match(/(?:^|\r?\n)\s*\[Proxy Group\]\s*\r?\n([\s\S]*?)(?=\r?\n\s*\[[^\]]+\]|$)/i)?.[1] || ""
+  const order: string[] = []
+  for (const rawLine of section.split(/\r?\n/)) {
+    const line = rawLine.trim()
+    if (!line || line.startsWith("#") || line.startsWith(";")) continue
+    const equal = line.indexOf("=")
+    if (equal <= 0) continue
+    const name = line.slice(0, equal).trim()
+    if (name && !order.includes(name)) order.push(name)
+  }
+  return order
+}
+
+function sortGroupsLikeSurge(groups: PolicyGroup[], profile: unknown): PolicyGroup[] {
+  const order = profileGroupOrder(profile)
+  if (!order.length) return groups
+  const ranks = new Map(order.map((name, index) => [name, index]))
+  return groups.map((group, index) => ({ group, index })).sort((a, b) => {
+    const rankA = ranks.get(a.group.name)
+    const rankB = ranks.get(b.group.name)
+    if (rankA !== undefined && rankB !== undefined) return rankA - rankB
+    if (rankA !== undefined) return -1
+    if (rankB !== undefined) return 1
+    return a.index - b.index
+  }).map(item => item.group)
 }
 
 function updateHistory(history: HistoryPoint[], current: CoreSnapshot, speed: { download: number; upload: number }): HistoryPoint[] {
@@ -550,7 +598,7 @@ function buildModel(current: CoreSnapshot, previous: CoreSnapshot | null, detail
     activeRequests: current.activeRequests, dnsCacheEntries: current.dnsCacheEntries, activeBans: current.activeBans,
     virtualIPs: countVirtualIPs(details.dns), failedRequests: failed, rejectedRequests: rejected, temporaryRules,
     nodes: buildTrafficRows(current.policyIn, current.policyOut), interfaces: buildTrafficRows(current.interfaceIn, current.interfaceOut),
-    groups: normalizeGroups(details.groups, [details.testResults, details.benchmarkResults], details.policies), history: nextHistory,
+    groups: sortGroupsLikeSurge(normalizeGroups(details.groups, [details.testResults, details.benchmarkResults], details.policies), details.profile), history: nextHistory,
     engine: { version: current.build.version || "-", build: current.build.build || "-", system: current.build.system || "iOS" }, config,
   }
 }
@@ -764,7 +812,7 @@ function Dashboard({ config, onOpenSettings, onChangeRefreshSeconds }: { config:
     try {
       if (webLoaded.current) await webView.current.evaluateJavaScript("window.setPolicyTestLoading && window.setPolicyTestLoading(true)")
       const before = await fetchDetails(config)
-      const groupsBefore = normalizeGroups(before.groups, [before.testResults, before.benchmarkResults], before.policies)
+      const groupsBefore = sortGroupsLikeSurge(normalizeGroups(before.groups, [before.testResults, before.benchmarkResults], before.policies), before.profile)
       if (!groupsBefore.length) throw new Error("没有可测速的策略组")
       const targets = groupName ? groupsBefore.filter(group => group.name === groupName) : groupsBefore
       if (!targets.length) throw new Error("找不到当前策略组")
@@ -781,7 +829,7 @@ function Dashboard({ config, onOpenSettings, onChangeRefreshSeconds }: { config:
           safeJSON(config, "/v1/policies"),
         ])
         savedResults = latestResults
-        groups = normalizeGroups(groupsRaw, [testResponse, latestResults, benchmarks], policies)
+        groups = sortGroupsLikeSurge(normalizeGroups(groupsRaw, [testResponse, latestResults, benchmarks], policies), before.profile)
         const current = groupName ? groups.find(group => group.name === groupName) : undefined
         if ((current?.nodes || []).some(node => node.latency > 0)) break
       }
@@ -792,7 +840,7 @@ function Dashboard({ config, onOpenSettings, onChangeRefreshSeconds }: { config:
           safeJSON(config, "/v1/policy_groups"),
           safeJSON(config, "/v1/policies/benchmark_results"),
         ])
-        groups = normalizeGroups(groupsRaw, [testResponse, savedResults, benchmarks, policyResponse], null)
+        groups = sortGroupsLikeSurge(normalizeGroups(groupsRaw, [testResponse, savedResults, benchmarks, policyResponse], null), before.profile)
       }
       setModel(previousModel => {
         const next = { ...previousModel, groups, error: groups.length ? "" : previousModel.error }
