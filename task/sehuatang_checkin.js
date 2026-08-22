@@ -26,11 +26,20 @@ const SIGN_URL = `${BASE}/plugin.php?id=dd_sign&ac=sign_v2`;
 
 !(async () => {
   if (typeof $request !== 'undefined') {
+    const url = String($request.url || '');
     const headers = $request.headers || {};
     const cookie = headers.Cookie || headers.cookie || '';
-    if (cookie && /(?:^|;\s*)(?:sehuatang|discuz|sid|auth)/i.test(cookie)) {
-      $.setdata(cookie, COOKIE_KEY);
-      $.log('登录 Cookie 已保存');
+
+    // Discuz 使用随机前缀，例如 xxxx_auth / xxxx_saltkey。
+    // 只采集本站请求中的登录认证 Cookie。
+    const isSite = /^https:\/\/sehuatang\.org\//i.test(url);
+    const isDiscuzAuth = /(?:^|;\s*)[^=;\s]+_(?:auth|saltkey)=/i.test(cookie);
+    if (isSite && cookie && isDiscuzAuth) {
+      const old = $.getdata(COOKIE_KEY);
+      if (old !== cookie) {
+        $.setdata(cookie, COOKIE_KEY);
+        $.log('登录 Cookie 已自动保存');
+      }
     }
     $.done();
     return;
