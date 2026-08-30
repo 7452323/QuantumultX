@@ -100,6 +100,30 @@
                     "desc": "www.txtnovel.vip，单账号"
                 }
             ]
+        },
+        {
+            "id": "7452323_hdhive",
+            "name": "HDHive影巢签到",
+            "author": "@7452323",
+            "repo": "https://github.com/7452323/QuantumultX",
+            "icons": [
+                "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png",
+                "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png"
+            ],
+            "keys": [
+                "HDHIVE_ACCOUNTS"
+            ],
+            "settings": [
+                {
+                    "id": "HDHIVE_ACCOUNTS",
+                    "name": "影巢账号密码",
+                    "val": "",
+                    "type": "textarea",
+                    "autoGrow": true,
+                    "rows": 5,
+                    "desc": "账号#密码，多账号用;分隔，如 user1#pass1;user2#pass2"
+                }
+            ]
         }
     ]
 }
