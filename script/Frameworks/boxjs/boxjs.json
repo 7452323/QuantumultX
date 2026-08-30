@@ -1,0 +1,111 @@
+{
+  "id": "com.7452323.quantumultx",
+  "name": "QuantumultX 签到脚本",
+  "author": "7452323",
+  "repo": "https://github.com/7452323/QuantumultX",
+  "apps": [
+    {
+      "id": "weread",
+      "name": "微信读书",
+      "desc": "每日领取阅读奖励 (APP版)",
+      "keys": [
+        {
+          "id": "weread_auth",
+          "name": "微信读书凭证",
+          "type": "textarea",
+          "placeholder": "JSON: {vid, skey, basever, channelid, ua, refreshToken}，多账号 | 分隔"
+        }
+      ]
+    },
+    {
+      "id": "kuwoczz",
+      "name": "酷我音乐每日任务",
+      "desc": "Cookie 自动采集",
+      "keys": [
+        {
+          "id": "kuwo_data",
+          "name": "酷我 Cookie",
+          "type": "textarea",
+          "placeholder": "多账号用 & 分隔"
+        }
+      ]
+    },
+    {
+      "id": "kuwo_upgrade",
+      "name": "酷我音乐升级",
+      "desc": "Cookie 自动采集",
+      "keys": [
+        {
+          "id": "kuwo_upgrade",
+          "name": "酷我 Cookie",
+          "type": "textarea",
+          "placeholder": "多账号用 & 分隔"
+        }
+      ]
+    },
+    {
+      "id": "sehuatang",
+      "name": "色花堂签到",
+      "desc": "验证码需人工完成，仅自动保存 Cookie",
+      "keys": [
+        {
+          "id": "SEHUATANG_COOKIE",
+          "name": "色花堂 Cookie",
+          "type": "textarea"
+        }
+      ]
+    },
+    {
+      "id": "sxmd",
+      "name": "书香门第签到",
+      "desc": "txtnovel.vip",
+      "keys": [
+        {
+          "id": "sxmd_data",
+          "name": "书香门第 Cookie",
+          "type": "textarea"
+        }
+      ]
+    },
+    {
+      "id": "thtv",
+      "name": "囧次元签到",
+      "desc": "thtv 签到，多账号换行分隔",
+      "keys": [
+        {
+          "id": "THTV_COOKIE",
+          "name": "囧次元 Cookie",
+          "type": "textarea",
+          "placeholder": "多账号用换行分隔"
+        }
+      ]
+    },
+    {
+      "id": "lyrebird",
+      "name": "Lyrebird 签到",
+      "keys": [
+        {
+          "id": "lyrebird_token",
+          "name": "Lyrebird Token",
+          "type": "textarea"
+        },
+        {
+          "id": "lyrebird_cookie",
+          "name": "Lyrebird Cookie",
+          "type": "textarea"
+        }
+      ]
+    },
+    {
+      "id": "txtnovel",
+      "name": "书香门第 txtnovel 签到",
+      "keys": [
+        {
+          "id": "txtnovel_cookie",
+          "name": "txtnovel Cookie",
+          "type": "textarea"
+        }
+      ]
+    }
+  ]
+}
