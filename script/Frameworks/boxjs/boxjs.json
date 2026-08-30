@@ -2,7 +2,7 @@
     "id": "com.7452323.checkin",
     "name": "7452323 签到脚本订阅",
     "author": "@7452323",
-    "icon": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png",
+    "icon": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/7452323.png",
     "repo": "https://github.com/7452323/QuantumultX",
     "apps": [
         {
@@ -11,8 +11,8 @@
             "author": "@7452323",
             "repo": "https://github.com/7452323/QuantumultX",
             "icons": [
-                "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png",
-                "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png"
+                "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/7452323.png",
+                "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/7452323.png"
             ],
             "keys": [
                 "weread_auth"
@@ -35,8 +35,8 @@
             "author": "@7452323",
             "repo": "https://github.com/7452323/QuantumultX",
             "icons": [
-                "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png",
-                "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png"
+                "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/7452323.png",
+                "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/7452323.png"
             ],
             "keys": [
                 "kuwo_data"
@@ -59,8 +59,8 @@
             "author": "@7452323",
             "repo": "https://github.com/7452323/QuantumultX",
             "icons": [
-                "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png",
-                "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png"
+                "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/7452323.png",
+                "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/7452323.png"
             ],
             "keys": [
                 "SEHUATANG_COOKIE"
@@ -83,8 +83,8 @@
             "author": "@7452323",
             "repo": "https://github.com/7452323/QuantumultX",
             "icons": [
-                "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png",
-                "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png"
+                "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/7452323.png",
+                "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/7452323.png"
             ],
             "keys": [
                 "sxmd_data"
@@ -107,8 +107,8 @@
             "author": "@7452323",
             "repo": "https://github.com/7452323/QuantumultX",
             "icons": [
-                "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png",
-                "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png"
+                "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/7452323.png",
+                "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/7452323.png"
             ],
             "keys": [
                 "THTV_COOKIE"
