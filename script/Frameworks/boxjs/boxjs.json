@@ -100,30 +100,6 @@
                     "desc": "www.txtnovel.vip，单账号"
                 }
             ]
-        },
-        {
-            "id": "7452323_thtv",
-            "name": "探花TV论坛签到",
-            "author": "@7452323",
-            "repo": "https://github.com/7452323/QuantumultX",
-            "icons": [
-                "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png",
-                "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png"
-            ],
-            "keys": [
-                "THTV_COOKIE"
-            ],
-            "settings": [
-                {
-                    "id": "THTV_COOKIE",
-                    "name": "探花TV Cookie",
-                    "val": "",
-                    "type": "textarea",
-                    "autoGrow": true,
-                    "rows": 5,
-                    "desc": "navix.site，多账号用换行分隔"
-                }
-            ]
         }
     ]
 }
