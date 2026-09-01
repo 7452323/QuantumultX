@@ -1,0 +1,10 @@
+#!name=影巢签到
+#!desc=HDHive 影巢多账号自动签到
+#!author=7452323
+
+[Script]
+http-request ^https?:\/\/hdhive\.com\/api\/customer\/user\/checkin script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js, tag=影巢Cookie, require-body=false
+cron "30 8 * * *" script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js, tag=影巢签到
+
+[MITM]
+hostname = hdhive.com
