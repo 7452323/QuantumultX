@@ -1,5 +1,5 @@
 #!name=影巢签到
-#!desc=HDHive 影巢多账号自动签到
+#!desc=HDHive 影巢多账号自动签到（Next.js动态追踪+POST登录）
 #!author=7452323
 
 [Script]
