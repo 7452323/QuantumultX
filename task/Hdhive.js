@@ -1,7 +1,6 @@
 /*
 RE0(影巢/HDHive) 每日签到 — Next.js Server Action 版
-版本：2.0.0（2026-09-06）— 因站点启用 X-HDH WASM 签名，弃用 /api/customer/user/checkin，
-       改用抓包还原的 Server Action 协议（无需 X-HDH）。
+版本：2.0.1（2026-09-06）— Server Action 协议；$argument 值支持 URL 解码（模块参数多账号用 %26）
 
 替代旧的裸 /api/customer/user/checkin 方案（该接口需 X-HDH WASM 签名，脚本无法实现）。
 
@@ -14,7 +13,7 @@ RE0(影巢/HDHive) 每日签到 — Next.js Server Action 版
   纯 Cookie 鉴权，无需 X-HDH 签名。
 - 所有响应都会轮换 hdh_sa_token，脚本逐次解析 Set-Cookie 维持会话。
 
-变量名：re0_accounts       多账号 user#pass&user2#pass2
+变量名：re0_accounts       多账号 user#pass&user2#pass2（Surge/Loon 模块参数里多账号用 %26 连接）
 可选：re0_cookie          手动/Cookie采集得到的完整 Cookie（未配账号时使用）
 可选：re0_base_url        默认 https://re0.me
 可选：re0_login_action    登录 action id（留空自动从 /login 页扫描）
@@ -46,7 +45,7 @@ const CONFIG = (() => {
     $argument.split('&').forEach(p => { const i = p.indexOf('='); if (i > 0) args[p.slice(0, i).trim()] = p.slice(i + 1).trim(); });
   }
   const get = (k, f) => {
-    if (args[k] != null) return args[k];
+    if (args[k] != null) { try { return decodeURIComponent(args[k]); } catch { return args[k]; } }
     if ($.isNode() && process.env[k.toUpperCase()]) return process.env[k.toUpperCase()];
     return $.getdata(k) || f;
   };
