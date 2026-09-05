@@ -1,18 +1,6 @@
 /*
-RE0(影巢/HDHive) 每日签到 — Next.js Server Action 版
+RE0(影巢每日签到) 因为每日签到和赌狗签到每天只能二选一，所以目前只有每日签到
 版本：2.0.3（2026-09-06）— 通知显示站内昵称/积分；修复 Set-Cookie 解析
-
-替代旧的裸 /api/customer/user/checkin 方案（该接口需 X-HDH WASM 签名，脚本无法实现）。
-
-协议（2026-09 抓包实证）：
-- 登录 = Next.js server action：GET /login 绑定 hdh_sa_token → POST /login?redirect=/
-  带 next-action(createServerReference …,"login")，body [{username,password:base64,password_transport:"base64"},"/"]。
-  返回 Set-Cookie：token / refresh_token / csrf_access_token / hdh_uid / hdh_sa_token。
-- 每日签到 = Next.js server action：GET /manager/account（刷新 hdh_sa_token 绑定）→
-  POST /manager/account 带 next-action(createServerReference …,"checkIn")，body [true]。
-  纯 Cookie 鉴权，无需 X-HDH 签名。
-- 所有响应都会轮换 hdh_sa_token，脚本逐次解析 Set-Cookie 维持会话。
-
 变量名：re0_accounts       多账号 user#pass&user2#pass2
 可选：re0_cookie          手动/Cookie采集得到的完整 Cookie（未配账号时使用）
 可选：re0_base_url        默认 https://re0.me
