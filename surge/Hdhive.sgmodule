@@ -1,13 +1,12 @@
-#!name=影巢签到
-#!desc=HDHive 影巢多账号自动签到（Next.js动态追踪+POST登录）
+#!name=RE0 每日签到
+#!desc=RE0(re0.me，原HDHive影巢) 每日签到 — Next.js Server Action 协议（免 X-HDH 签名）v2.0.1
 #!author=7452323
-#!arguments=hdhive_accounts=
-#!arguments=hdhive_next_action=
-#!arguments-desc=hdhive_accounts: 账号格式 user#pass 或 user#pass#cookie，多账号用 ; 分隔\nhdhive_next_action: 留空自动扫描
+#!arguments=re0_accounts=
+#!arguments-desc=re0_accounts: 账号 user#pass，多账号用 %26 连接（例 a#1%26b#2）；留空则读持久化存储 re0_accounts
 
 [Script]
-影巢签到 = type=cron, cronexp="30 8 * * *", script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js, argument=hdhive_accounts={{{hdhive_accounts}}}&hdhive_next_action={{{hdhive_next_action}}}
-影巢Cookie = type=http-request, pattern=^https?:\/\/hdhive\.com\/api\/customer\/user\/checkin, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js
+RE0签到 = type=cron, cronexp="20 0 * * *", script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js, argument=re0_accounts={{{re0_accounts}}}
+RE0Cookie = type=http-request, pattern=^https?:\/\/re0\.me, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js
 
 [MITM]
-hostname = hdhive.com
+hostname = %APPEND% re0.me
