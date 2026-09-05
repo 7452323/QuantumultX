@@ -1,10 +1,10 @@
-#!name=影巢签到
-#!desc=HDHive 影巢多账号自动签到（Next.js动态追踪+POST登录）
+#!name=RE0 每日签到
+#!desc=RE0(re0.me，原HDHive影巢) 每日签到 — Next.js Server Action 协议（免 X-HDH 签名）v2.0.1；re0_accounts 需写入 Loon 持久化存储
 #!author=7452323
 
 [Script]
-http-request ^https?:\/\/hdhive\.com\/api\/customer\/user\/checkin script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js, tag=影巢Cookie, require-body=false
-cron "30 8 * * *" script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js, tag=影巢签到
+http-request ^https?:\/\/re0\.me script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js, tag=RE0Cookie, require-body=false
+cron "20 0 * * *" script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js, tag=RE0签到
 
 [MITM]
-hostname = hdhive.com
+hostname = re0.me
