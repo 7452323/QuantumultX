@@ -1,6 +1,6 @@
 /*
 RE0(影巢/HDHive) 每日签到 — Next.js Server Action 版
-版本：2.0.2（2026-09-06）— Server Action 协议（免 X-HDH）；Set-Cookie 白名单解析 + 响应头大小写兼容 + 登录失败诊断
+版本：2.0.3（2026-09-06）— 通知显示站内昵称/积分；修复 Set-Cookie 解析
 
 替代旧的裸 /api/customer/user/checkin 方案（该接口需 X-HDH WASM 签名，脚本无法实现）。
 
@@ -200,13 +200,11 @@ class Re0Worker {
     return { http: r.status, body: r.body, page };
   }
 
-  // --- 账号信息（从 account 页 RSC 里抠 积分/昵称） ---
-  parseUserInfo(rsc) {
+  // --- 账号资料（从 account 页 RSC 抠昵称/积分/连续天数） ---
+  parseProfile(rsc) {
     const o = {};
-    let m = rsc.match(/"points"\s*:\s*(\d+)/); if (m) o.points = +m[1];
-    m = rsc.match(/"nickname"\s*:\s*"([^"]+)"/); if (m) o.nickname = m[1];
-    m = rsc.match(/可用积分/g); 
-    m = rsc.match(/"signin_days_total"\s*:\s*(\d+)/); if (m) o.days = +m[1];
+    let m = rsc.match(/"nickname":"([^"]*)"/); if (m) o.nickname = m[1];
+    m = rsc.match(/"user_meta":\{"points":(\d+),"signin_days_total":(\d+)/); if (m) { o.points = +m[1]; o.days = +m[2]; }
     return o;
   }
 }
@@ -358,20 +356,24 @@ async function main() {
         } catch (e2) { $.log(` [warn] 重扫 checkin 失败: ${fmtErr(e2)}`); }
       }
 
-      // 持久化 Cookie（供下次复用 / 展示）
-      const meta = w.getMeta(); meta.cookie = w.cookieNow(); w.saveMeta(meta);
+      // 真实用户名：优先站内昵称，回退登录账号
+      const pf = w.parseProfile((resp.page || '') + ' ' + (resp.body || ''));
+      const display = pf.nickname || acc.username;
+      const extra = (pf.points != null ? ` ｜ 积分 ${pf.points}${pf.days != null ? ' / 连续 ' + pf.days + ' 天' : ''}` : '');
 
-      const line = `[账号 ${idx + 1}] ${acc.username}`;
+      // 持久化 Cookie（供下次复用 / 展示）
+      const meta = w.getMeta(); meta.cookie = w.cookieNow(); meta.display = display; meta.points = pf.points; w.saveMeta(meta);
+
       let sub = '';
       if (r.isAlready) { sub = `⏭️ 今日已签到：${r.message || ''}`; }
       else if (r.ok) { sub = `✅ 签到成功：${r.message || ''}`; }
       else { sub = `❌ 签到失败：${r.message || ''}`; }
-      $.log(line + ' | ' + sub);
-      collect(line); collect(sub);
+      $.log(`[账号 ${idx + 1}] ${acc.username} | ${sub}`);
+      collect(`${display}${extra}`); collect(sub);
     } catch (e) {
       const msg = fmtErr(e);
       $.log(`[账号 ${idx + 1}] ${acc.username} ❌ ${msg}`);
-      collect(`[账号 ${idx + 1}] ${acc.username} ❌ ${msg}`);
+      collect(`${acc.username} ❌ ${msg}`);
     }
   }
 
