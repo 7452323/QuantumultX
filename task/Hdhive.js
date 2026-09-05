@@ -1,775 +1,356 @@
 /*
-影巢(HDHive) 多账号签到
+RE0(影巢/HDHive) 每日签到 — Next.js Server Action 版
+版本：2.0.0（2026-09-06）— 因站点启用 X-HDH WASM 签名，弃用 /api/customer/user/checkin，
+       改用抓包还原的 Server Action 协议（无需 X-HDH）。
 
-变量名：hdhive_accounts
-多账号格式：user#pass 或 user#pass#cookie（&分隔多账号）
-可选：hdhive_next_action（留空自动动态扫描）
-可选：hdhive_base_url（默认 https://hdhive.com）
+替代旧的裸 /api/customer/user/checkin 方案（该接口需 X-HDH WASM 签名，脚本无法实现）。
+
+协议（2026-09 抓包实证）：
+- 登录 = Next.js server action：GET /login 绑定 hdh_sa_token → POST /login?redirect=/
+  带 next-action(createServerReference …,"login")，body [{username,password:base64,password_transport:"base64"},"/"]。
+  返回 Set-Cookie：token / refresh_token / csrf_access_token / hdh_uid / hdh_sa_token。
+- 每日签到 = Next.js server action：GET /manager/account（刷新 hdh_sa_token 绑定）→
+  POST /manager/account 带 next-action(createServerReference …,"checkIn")，body [true]。
+  纯 Cookie 鉴权，无需 X-HDH 签名。
+- 所有响应都会轮换 hdh_sa_token，脚本逐次解析 Set-Cookie 维持会话。
+
+变量名：re0_accounts       多账号 user#pass&user2#pass2
+可选：re0_cookie          手动/Cookie采集得到的完整 Cookie（未配账号时使用）
+可选：re0_base_url        默认 https://re0.me
+可选：re0_login_action    登录 action id（留空自动从 /login 页扫描）
+可选：re0_checkin_action  签到 action id（留空用内置默认，登录后可自动扫描刷新）
 
 [rewrite_local]
-^https?:\/\/hdhive\.com\/api\/customer\/user\/checkin url script-request-header https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js
+^https?:\/\/re0\.me url script-request-header https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js
 
 [task_local]
-30 8 * * * https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js, tag=影巢签到, enabled=true
+20 0 * * * https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js, tag=RE0每日签到, enabled=true
 
 [MITM]
-hostname = hdhive.com
+hostname = %APPEND% re0.me
 */
 
-const BASE_URL = 'https://hdhive.com';
-const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0';
+// ============ 常量与默认值 ============
+const DEF_BASE = 'https://re0.me';
+const DEF_LOGIN_ACTION = '60fa5517c023301ab84757ba19fd91f0ef5cc482dd';   // createServerReference(...,"login")
+const DEF_CHECKIN_ACTION = '4004fe56299e6451fc007a19f6df5f592551ab9c78'; // createServerReference(...,"checkIn")
+const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
 
-let $ = new Env('影巢');
+let $ = new Env('RE0每日签到');
+let allMsg = '';
 
-// ========== 全局配置（从 $argument 或环境变量读取） ==========
+// ============ 配置读取 ============
 const CONFIG = (() => {
-  let args = {};
+  const args = {};
   if (typeof $argument === 'string' && $argument) {
-    $argument.split('&').forEach(pair => {
-      const idx = pair.indexOf('=');
-      if (idx > 0) args[pair.slice(0, idx).trim()] = pair.slice(idx + 1).trim();
-    });
+    $argument.split('&').forEach(p => { const i = p.indexOf('='); if (i > 0) args[p.slice(0, i).trim()] = p.slice(i + 1).trim(); });
   }
-  const get = (key, fallback = '') => {
-    if (args[key] != null) return args[key];
-    if ($.isNode() && process.env[key.toUpperCase()]) return process.env[key.toUpperCase()];
-    return $.getdata(key) || fallback;
+  const get = (k, f) => {
+    if (args[k] != null) return args[k];
+    if ($.isNode() && process.env[k.toUpperCase()]) return process.env[k.toUpperCase()];
+    return $.getdata(k) || f;
   };
   return {
-    base_url: (get('hdhive_base_url') || BASE_URL).replace(/\/+$/, ''),
-    accounts: get('hdhive_accounts'),
-    next_action: get('hdhive_next_action'),
-    max_retries: parseInt(get('hdhive_max_retries') || '3'),
-    retry_interval: parseInt(get('hdhive_retry_interval') || '30'),
-    history_days: parseInt(get('hdhive_history_days') || '30'),
+    base_url: (get('re0_base_url') || DEF_BASE).replace(/\/+$/, ''),
+    accounts: get('re0_accounts', ''),
+    cookie: get('re0_cookie', ''),
+    login_action: get('re0_login_action', ''),
+    checkin_action: get('re0_checkin_action', ''),
   };
 })();
 
-const REQUESTS_KW = { timeout: 30000 };
+// ============ 工具 ============
+function nowStr() { const d = new Date(), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`; }
+function collect(m) { const c = (m || '').trim(); if (!c) return; if (/^[=\-─]+$/.test(c)) return; if (c.includes('[流程]') || c.includes('[INFO]')) return; allMsg += c + '\n'; }
 
-// ========== 主入口（延迟执行，等 class 定义完成后调用） ==========
-async function main() {
-  if (typeof $request !== 'undefined') { handleCookie(); return; }
-
-  $.log(`🔔 ${$.name}, 开始!`);
-  $.log(`HDHIVE_BASE_URL = ${CONFIG.base_url}`);
-
-  if (CONFIG.next_action) {
-    $.log('[INFO] 已检测到手动配置 hdhive_next_action，将跳过动态扫描');
-  }
-
-  const accounts = parseAccounts(CONFIG.accounts);
-  if (!accounts.length) {
-    $.msg($.name, '', '⚠️ 未配置 hdhive_accounts\n\n示例：user#pass 或 user#pass#cookie\n多账号用 & 分隔\n\n🎯 失败');
-    $.done(); return;
-  }
-
-  for (let idx = 0; idx < accounts.length; idx++) {
-    const acc = accounts[idx];
-    $.log(`\n${'─'.repeat(60)}`);
-    $.log(`[INFO] 开始处理账号 ${idx + 1} -> ${acc.username}`);
-
-    const worker = new HdhiveSign(CONFIG.base_url, acc.username, acc.password, acc.cookie);
-    const result = await worker.signOnce();
-    printResultBlock(idx + 1, acc.username, result, worker);
-  }
-
-  $.log(`\n[INFO] 所有账号签到流程完成`);
-
-  if (all_message) {
-    $.msg($.name, '', all_message);
-  }
-  $.done();
+function parseCookiesToMap(str) {
+  const m = {};
+  (str || '').split(';').forEach(p => { const i = p.indexOf('='); if (i > 0) m[p.slice(0, i).trim()] = p.slice(i + 1).trim(); });
+  return m;
 }
-
-// ========== 通知消息收集（对标 Python all_message） ==========
-let all_message = '';
-function collectMsg(msg) {
-  const clean = msg.trim();
-  if (!clean || clean.startsWith('=') || clean.startsWith('-')) return;
-  if (clean.includes('[INFO]') || clean.includes('[流程]') || clean.includes('无法从token')) return;
-  all_message += msg + '\n';
-  if (clean.includes('[本次奖励]')) all_message += '\n';
-}
-
-// ========== Cookie 采集 ==========
-function handleCookie() {
-  const cookie = $request.headers['Cookie'] || $request.headers['cookie'] || '';
-  if (!cookie) { $.done(); return; }
-  const token = (cookie.match(/token=([^;]+)/) || [])[1];
-  const csrf = (cookie.match(/csrf_access_token=([^;]+)/) || [])[1];
-  if (token) {
-    const val = csrf ? `token=${token}; csrf_access_token=${csrf}` : `token=${token}`;
-    let list = ($.getdata('hdhive_cookie') || '').split('&').filter(Boolean);
-    if (!list.includes(val)) {
-      list.push(val);
-      $.setdata(list.join('&'), 'hdhive_cookie');
-      $.msg($.name, `✅ Cookie 已保存 (${list.length} 个账号)`, '');
-    }
-  }
-  $.done();
-}
-
-// ========== 账号解析 ==========
-function parseAccounts(envValue) {
-  if (!envValue) return [];
-  return envValue.split(';').map(item => {
-    item = item.trim();
-    if (!item) return null;
-    const parts = item.split('#');
-    if (parts.length < 2) return null;
-    return {
-      username: parts[0].trim(),
-      password: parts[1].trim(),
-      cookie: parts.length >= 3 ? parts[2].trim() : '',
-    };
-  }).filter(Boolean);
-}
-
-function safeName(name) {
-  return (name || 'default').replace(/[^a-zA-Z0-9_.-]/g, '_');
-}
-
-// ========== 签到核心类（1:1 对标 Python HdhiveSignCamoufox） ==========
-class HdhiveSign {
-  constructor(baseUrl, username, password, cookie = '') {
-    this._base_url = (baseUrl || 'https://hdhive.com').replace(/\/+$/, '');
-    this._site_url = `${this._base_url}/`;
-    this._signin_api = `${this._base_url}/api/customer/user/checkin`;
-    this._username = username;
-    this._password = password;
-
-    const tag = safeName(username);
-    this._history_key = `hdhive_history_${tag}`;
-    this._meta_key = `hdhive_meta_${tag}`;
-    this._user_info_key = `hdhive_userinfo_${tag}`;
-
-    const meta = this.getMeta();
-    this._cookie = cookie || meta.cookie || '';
-    this._sessionCookies = {};
-  }
-
-  // ---------- 本地数据存取 ----------
-  _loadJson(key, def) {
-    const val = $.getdata(key);
-    if (!val) return def;
-    try { return JSON.parse(val); } catch { return def; }
-  }
-  _saveJson(key, data) {
-    try { $.setdata(JSON.stringify(data), key); } catch {}
-  }
-  getHistory() { return this._loadJson(this._history_key, []); }
-  saveHistory(h) { this._saveJson(this._history_key, h); }
-  getMeta() { return this._loadJson(this._meta_key, {}); }
-  saveMeta(m) { this._saveJson(this._meta_key, m); }
-  saveUserInfo(info) { this._saveJson(this._user_info_key, info); }
-
-  // ---------- 签到历史 & 连续签到 ----------
-  _saveSignHistory(signData) {
-    const history = this.getHistory();
-    if (!signData.date) signData.date = nowStr();
-    history.push(signData);
-    const now = Date.now();
-    const valid = history.filter(r => {
-      try {
-        const rd = new Date(r.date).getTime();
-        return (now - rd) < CONFIG.history_days * 86400000;
-      } catch {
-        r.date = nowStr();
-        return true;
-      }
-    });
-    this.saveHistory(valid);
-  }
-
-  _isAlreadySignedToday() {
-    const history = this.getHistory();
-    if (!history.length) return false;
-    const today = new Date().toISOString().slice(0, 10);
-    return history.some(r =>
-      (r.date || '').startsWith(today) &&
-      ['签到成功', '已签到'].includes(r.status)
-    );
-  }
-
-  _updateConsecutive(success) {
-    const meta = this.getMeta();
-    let consecutive = parseInt(meta.consecutive_days || '0');
-    if (!success) return consecutive;
-
-    const todayStr = new Date().toISOString().slice(0, 10);
-    const yesterdayStr = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-
-    if (meta.last_success_date === todayStr) {
-      // pass
-    } else if (meta.last_success_date === yesterdayStr) {
-      consecutive += 1;
-    } else {
-      consecutive = 1;
-    }
-
-    meta.last_success_date = todayStr;
-    meta.consecutive_days = consecutive;
-    this.saveMeta(meta);
-    return consecutive;
-  }
-
-  // ---------- Cookie 工具 ----------
-  _parseCookieDict(cookieStr) {
-    const cookies = {};
-    if (!cookieStr) return cookies;
-    for (const item of cookieStr.split(';')) {
-      const idx = item.indexOf('=');
-      if (idx < 0) continue;
-      cookies[item.slice(0, idx).trim()] = item.slice(idx + 1).trim();
-    }
-    return cookies;
-  }
-
-  _cookieLooksExpired() {
-    if (!this._cookie) return true;
-    const token = (this._cookie.match(/token=([^;]+)/) || [])[1];
-    if (!token) return true;
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      if (!payload.exp) return false;
-      return payload.exp <= Math.floor(Date.now() / 1000) + 60;
-    } catch { return false; }
-  }
-
-  // ---------- 用户信息 ----------
-  async _fetchUserInfo(cookies, token) {
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      const userId = payload.sub || payload.user_id;
-      if (!userId) { $.log('无法从token解析user_id'); return null; }
-
-      const referer = `${this._base_url}/manager/account`;
-      const rscUrl = `${this._base_url}/user/${userId}`;
-      const headers = {
-        'User-Agent': UA,
-        'Accept': 'text/x-component',
-        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-        'Origin': this._base_url,
-        'Referer': referer,
-        'rsc': '1',
-        'Authorization': `Bearer ${token}`,
-      };
-
-      const resp = await this._httpGet(rscUrl, headers, cookies);
-      if (resp.status !== 200) { $.log(`RSC请求失败: ${resp.status}`); return null; }
-
-      const text = resp.body || '';
-      const result = { id: userId };
-
-      const mNick = text.match(/"nickname":"([^"]+)"/);
-      const mAvatar = text.match(/"avatar_url":"([^"]+)"/);
-      const mCreated = text.match(/"created_at":"([^"]+)"/);
-      const mPoints = text.match(/"points":(\d+)/);
-      const mDays = text.match(/"signin_days_total":(\d+)/);
-
-      if (mNick) result.nickname = mNick[1];
-      if (mAvatar) result.avatar_url = mAvatar[1];
-      if (mCreated) result.created_at = mCreated[1];
-      if (mPoints) result.points = parseInt(mPoints[1]);
-      if (mDays) result.signin_days_total = parseInt(mDays[1]);
-
-      if (!result.nickname || result.points == null) {
-        const mUser = text.match(/"user":(\{.*?\})/);
-        if (mUser) {
-          try {
-            const obj = JSON.parse(mUser[1]);
-            if (!result.nickname) result.nickname = obj.nickname;
-            const meta = obj.user_meta || {};
-            if (result.points == null) result.points = meta.points;
-            if (!result.signin_days_total) result.signin_days_total = meta.signin_days_total;
-          } catch {}
-        }
-      }
-
-      this.saveUserInfo(result);
-      return result;
-    } catch (e) {
-      $.log(`获取用户信息失败: ${e}`);
-      return null;
-    }
-  }
-
-  // ---------- 动态扫描 next-action ----------
-  async _getDynamicNextAction() {
-    const loginPageUrl = `${this._base_url}/login`;
-    const headers = {
-      'User-Agent': UA,
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-      'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-    };
-
-    try {
-      const resp = await this._httpGet(loginPageUrl, headers, {});
-      this._mergeCookies(resp.cookies);
-      if (resp.status !== 200) { $.log(` [警告] 获取登录页失败，状态码: ${resp.status}`); return ''; }
-
-      let scriptPaths = (resp.body.match(/src=["']([^"']*\/_next\/static\/chunks\/[^"']+\.js[^"']*)["']/g) || [])
-        .map(m => (m.match(/src=["']([^"']+)["']/) || [])[1])
-        .filter(Boolean);
-      scriptPaths = [...new Set(scriptPaths)];
-
-      if (!scriptPaths.length) { $.log(' [警告] 页面中未找到 Next.js chunk 脚本'); return ''; }
-
-      $.log(` [INFO] 准备扫描 ${scriptPaths.length} 个 JS 脚本以获取 next-action...`);
-
-      const actionRegex = /createServerReference\)\s*\(\s*["']([^"']+)["'][^)]+?,\s*["']login["']\s*\)/;
-
-      for (const path of scriptPaths) {
-        const jsUrl = path.startsWith('http') ? path : `${this._base_url}${path}`;
-        try {
-          const jsResp = await this._httpGet(jsUrl, headers, {});
-          this._mergeCookies(jsResp.cookies);
-          if (jsResp.status !== 200) continue;
-          const match = jsResp.body.match(actionRegex);
-          if (match) {
-            const actionId = match[1].trim();
-            $.log(` [INFO] 精准定位 next-action: ${actionId}`);
-            return actionId;
-          }
-        } catch { continue; }
-      }
-
-      $.log(' [警告] 扫描所有 chunk 结束，未找到绑定的 login next-action。');
-      return '';
-    } catch (e) {
-      $.log(` [错误] 动态获取 next-action 出现异常: ${e}`);
-      return '';
-    }
-  }
-
-  async _resolveNextAction() {
-    if (CONFIG.next_action) {
-      $.log(' [INFO] 使用手动传入的 hdhive_next_action');
-      return CONFIG.next_action;
-    }
-    return this._getDynamicNextAction();
-  }
-
-  // ---------- 纯 POST 登录逻辑 ----------
-  async loginByPost() {
-    const actionId = await this._resolveNextAction();
-    if (!actionId) { $.log(' [登录] 未获取到有效的 next-action，放弃登录'); return ''; }
-
-    const loginUrl = `${this._base_url}/login?redirect=/`;
-    const data = JSON.stringify([{ username: this._username, password: this._password }, "/"]);
-    const domain = this._base_url.replace(/^https?:\/\//, '').replace(/\/+$/, '');
-
-    const headers = {
-      'Host': domain,
-      'Connection': 'keep-alive',
-      'sec-ch-ua-platform': '"Windows"',
-      'next-action': actionId,
-      'sec-ch-ua': '"Not:A-Brand";v="99", "Microsoft Edge";v="145", "Chromium";v="145"',
-      'sec-ch-ua-mobile': '?0',
-      'User-Agent': UA,
-      'Accept': 'text/x-component',
-      'Content-Type': 'text/plain;charset=UTF-8',
-      'Origin': this._base_url,
-      'Sec-Fetch-Site': 'same-origin',
-      'Sec-Fetch-Mode': 'cors',
-      'Sec-Fetch-Dest': 'empty',
-      'Referer': loginUrl,
-      'Accept-Encoding': 'gzip, deflate, br, zstd',
-      'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6',
-      'Cookie': this._cookieString(),
-    };
-
-    try {
-      const resp = await this._httpPostRaw(loginUrl, data, headers);
-      this._mergeCookies(resp.cookies);
-      if (resp.status !== 200 && resp.status !== 303) {
-        $.log(` [登录] POST 登录失败，状态码: ${resp.status}`);
-        return '';
-      }
-
-      const token = this._sessionCookies.token;
-      const csrf = this._sessionCookies.csrf_access_token || this._sessionCookies.csrfaccesstoken;
-
-      if (!token) { $.log(' [登录] 响应成功但未拿到 token'); return ''; }
-
-      $.log(' [登录] POST 登录成功，已获取新 Cookie');
-      const newCookie = `token=${token}` + (csrf ? `; csrf_access_token=${csrf}` : '');
-
-      const meta = this.getMeta();
-      meta.cookie = newCookie;
-      this.saveMeta(meta);
-      return newCookie;
-    } catch (e) {
-      $.log(` [登录] POST 登录异常: ${e}`);
-      return '';
-    }
-  }
-
-  // ---------- 签到接口 ----------
-  async _signinApiCall() {
-    if (!this._cookie) return { ok: false, message: '未配置Cookie' };
-
-    const cookies = this._parseCookieDict(this._cookie);
-    const token = cookies.token;
-    const csrfToken = cookies.csrf_access_token || cookies.csrfaccesstoken;
-    if (!token) return { ok: false, message: "Cookie中缺少'token'" };
-
-    let referer = this._site_url;
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      const userId = payload.sub || payload.user_id;
-      if (userId) referer = `${this._base_url}/user/${userId}`;
-    } catch {}
-
-    const headers = {
-      'User-Agent': UA,
-      'Accept': 'application/json, text/plain, */*',
-      'Origin': this._base_url,
-      'Referer': referer,
-      'Authorization': `Bearer ${token}`,
-    };
-    if (csrfToken) headers['x-csrf-token'] = csrfToken;
-
-    // 合并session cookie（登录时的hdh_sa_token等）
-    const mergedCookies = { ...cookies, ...this._sessionCookies };
-
-    let resp;
-    try {
-      resp = await this._httpPost(this._signin_api, '', headers, mergedCookies);
-    } catch (e) {
-      return { ok: false, message: `网络异常: ${e}` };
-    }
-
-    let data;
-    try { data = JSON.parse(resp.body); }
-    catch { return { ok: false, message: `签到API响应格式错误，HTTP ${resp.status}` }; }
-
-    const msg = data.message || '无明确消息';
-    const desc = data.description || '';
-
-    if (data.success) {
-      try { await this._fetchUserInfo(mergedCookies, token); } catch {}
-      return { ok: true, message: msg };
-    }
-
-    if (msg.includes('签到失败') && desc.includes('已经签到')) {
-      try { await this._fetchUserInfo(mergedCookies, token); } catch {}
-      return { ok: true, message: `已签到: ${desc}` };
-    }
-
-    if (msg.includes('已经签到') || msg.includes('签到过')) {
-      try { await this._fetchUserInfo(mergedCookies, token); } catch {}
-      return { ok: true, message: msg };
-    }
-
-    return { ok: false, message: msg };
-  }
-
-  // ---------- 对外：一次完整签到 ----------
-  async signOnce() {
-    $.log(' [流程] 开始签到');
-
-    if (this._isAlreadySignedToday()) {
-      $.log(' [流程] 今日已存在成功记录，跳过本次签到');
-      const history = this.getHistory();
-      const today = new Date().toISOString().slice(0, 10);
-      const todaySucc = history.filter(r =>
-        (r.date || '').startsWith(today) &&
-        ['签到成功', '已签到'].includes(r.status)
-      );
-
-      const signDict = { date: nowStr(), status: '跳过: 今日已签到' };
-      if (todaySucc.length) {
-        const last = todaySucc.reduce((a, b) => (a.date > b.date ? a : b));
-        signDict.message = last.message;
-        signDict.points = last.points;
-        signDict.days = last.days;
-      }
-      this._saveSignHistory(signDict);
-      return signDict;
-    }
-
-    if (!this._cookie || this._cookieLooksExpired()) {
-      $.log(' [流程] Cookie失效或不存在，尝试POST登录获取新CK...');
-      this._cookie = await this.loginByPost() || '';
-    } else {
-      $.log(' [流程] 使用本地缓存的复用 Cookie');
-    }
-
-    if (!this._cookie) {
-      const signDict = { date: nowStr(), status: '签到失败: 无法获取 Cookie', message: 'POST 登录失败' };
-      this._saveSignHistory(signDict);
-      return signDict;
-    }
-
-    let retry = 0;
-    while (true) {
-      const { ok, message } = await this._signinApiCall();
-      if (ok) {
-        const isAlready = message.includes('已经签到') || message.includes('签到过');
-        const status = isAlready ? '已签到' : '签到成功';
-        const days = this._updateConsecutive(true);
-        const pointsMatch = (message || '').match(/获得 (\d+) 积分/);
-        const points = pointsMatch ? parseInt(pointsMatch[1]) : '—';
-
-        const signDict = { date: nowStr(), status, message, points, days };
-        this._saveSignHistory(signDict);
-        return signDict;
-      }
-
-      $.log(` [流程] 签到失败: ${message}`);
-
-      const authKeywords = ['未配置Cookie', "缺少'token'", '未授权', 'Unauthorized', 'token', 'csrf', '登录已过期', '过期', 'expired'];
-      if (authKeywords.some(k => (message || '').includes(k))) {
-        $.log(' [流程] 检测到鉴权问题，尝试重新POST登录获取新 Cookie');
-        this._cookie = await this.loginByPost() || '';
-        if (!this._cookie) {
-          const signDict = { date: nowStr(), status: '签到失败: 鉴权失败且重新登录失败', message };
-          this._saveSignHistory(signDict);
-          return signDict;
-        }
-      }
-
-      if (retry < CONFIG.max_retries) {
-        retry++;
-        $.log(` [流程] ${CONFIG.retry_interval} 秒后进行第 ${retry} 次重试 ...`);
-        await $.wait(CONFIG.retry_interval * 1000);
-        continue;
-      }
-
-      const signDict = { date: nowStr(), status: `签到失败: ${message}`, message };
-      this._saveSignHistory(signDict);
-      return signDict;
-    }
-  }
-
-  // ---------- session cookie 管理（模拟 requests.Session） ----------
-  _mergeCookies(cookies) {
-    if (cookies && typeof cookies === 'object') {
-      for (const k in cookies) this._sessionCookies[k] = cookies[k];
-    }
-  }
-  _cookieString() {
-    return Object.entries(this._sessionCookies).map(([k, v]) => `${k}=${v}`).join('; ');
-  }
-
-  // ---------- HTTP 封装 ----------
-  async _httpGet(url, headers, cookies) {
-    const opts = { url, headers: { 'User-Agent': UA, ...(headers || {}) } };
-    const cookieStr = this._buildCookieStr(cookies);
-    if (cookieStr) opts.headers['Cookie'] = cookieStr;
-    return httpGet(opts);
-  }
-
-  async _httpPost(url, body, headers, cookies) {
-    const opts = { url, headers: { 'User-Agent': UA, ...(headers || {}) }, body: body || '' };
-    const cookieStr = this._buildCookieStr(cookies);
-    if (cookieStr) opts.headers['Cookie'] = cookieStr;
-    return httpPost(opts, 'POST');
-  }
-
-  async _httpPostRaw(url, body, headers) {
-    // allowRedirects=false，不跟随重定向
-    const opts = { url, headers: { 'User-Agent': UA, ...headers }, body: body || '' };
-    return httpPost(opts, 'POST', false);
-  }
-
-  _buildCookieStr(cookies) {
-    if (!cookies) return '';
-    if (typeof cookies === 'string') return cookies;
-    return Object.entries(cookies).map(([k, v]) => `${k}=${v}`).join('; ');
+function mergeSetCookie(map, setCookie) {
+  const list = Array.isArray(setCookie) ? setCookie : (setCookie ? [setCookie] : []);
+  for (const sc of list) {
+    const i = sc.indexOf('='); if (i < 1) continue;
+    const name = sc.slice(0, i).trim();
+    const value = sc.slice(i + 1).split(';')[0].trim();
+    map[name] = value;
   }
 }
+function cookieString(map) { return Object.entries(map).map(([k, v]) => `${k}=${v}`).join('; '); }
 
-// ========== 结果输出（对标 Python print_result_block） ==========
-function printResultBlock(idx, username, result, worker) {
-  const status = result.status || '未知';
-  const msg = result.message || '—';
-  const pts = result.points != null ? result.points : '—';
-  const days = result.days != null ? result.days : '—';
-  const ts = result.date || nowStr();
-
-  const lines = [];
-  lines.push(`${'='.repeat(60)}`);
-  lines.push(`[账号 ${idx}] 用户：${username}`);
-  lines.push(`[时间] ${ts}`);
-  lines.push(`[状态] ${status}`);
-
-  const userInfo = worker._loadJson(worker._user_info_key, {});
-  if (userInfo && userInfo.id) {
-    lines.push(` 用户ID: ${userInfo.id} | 昵称: ${userInfo.nickname || ''}`);
-    lines.push(` 总积分: ${userInfo.points != null ? userInfo.points : '—'} | 登录天数: ${userInfo.signin_days_total != null ? userInfo.signin_days_total : '—'}`);
-  }
-
-  if (status.includes('成功') || status.includes('已签到')) {
-    lines.push(`[详情] ${msg}`);
-    lines.push(`[本次奖励] 积分：${pts} | 连续天数：${days}`);
-  } else if (status.includes('跳过')) {
-    lines.push(`[说明] ${msg}`);
-  } else {
-    lines.push(`[错误] ${msg}`);
-    lines.push(' 请检查：账号密码是否正确 / 站点是否可访问');
-  }
-  lines.push(`${'='.repeat(60)}`);
-
-  const block = lines.join('\n');
-  $.log(block);
-  lines.forEach(l => collectMsg(l));
+function safeName(n) { return (n || 'default').replace(/[^a-zA-Z0-9_.-]/g, '_'); }
+function b64(s) {
+  if (typeof Buffer !== 'undefined') return Buffer.from(s, 'utf8').toString('base64');
+  if (typeof btoa !== 'undefined') return btoa(unescape(encodeURIComponent(s)));
+  return s;
 }
+function fmtErr(e) { return (e && e.message) ? e.message : String(e); }
 
-// ========== 工具函数 ==========
-function nowStr() {
-  const d = new Date();
-  const pad = n => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-}
-
-function atob(str) {
-  if (typeof Buffer !== 'undefined') return Buffer.from(str, 'base64').toString('utf-8');
-  if (typeof globalThis !== 'undefined' && globalThis.atob) return globalThis.atob(str);
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-  let str2 = str.replace(/=+$/, ''), output = '';
-  for (let bc = 0, bs = 0, i = 0; i < str2.length; i++) {
-    const c = chars.indexOf(str2[i]);
-    if (c < 0) continue;
-    bs = bc % 4 ? bs * 64 + c : c;
-    if (bc++ % 4) output += String.fromCharCode(255 & bs >> ((-2 * bc) & 6));
-  }
-  return decodeURIComponent(escape(output));
-}
-
-// ========== HTTP 底层封装（QX/Surge/Loon/Node.js 通用） ==========
-function httpGet(opts) {
+// ============ HTTP 封装（跨平台 + Set-Cookie 维持） ============
+function httpReq(opts, method = 'GET') {
   return new Promise((resolve, reject) => {
-    const handler = (err, resp, body) => {
-      if (err) reject(new Error(err));
-      else resolve({
-        status: resp?.status || resp?.statusCode,
-        body,
-        headers: resp?.headers,
-        cookies: parseRespCookies(resp?.headers),
-      });
+    const done = (err, status, headers, body) => {
+      if (err) return reject(new Error(err));
+      resolve({ status, headers: headers || {}, body });
     };
     if (typeof $task !== 'undefined') {
-      $task.fetch(opts).then(r => resolve({
-        status: r.statusCode, body: r.body, headers: r.headers,
-        cookies: parseRespCookies(r.headers),
-      })).catch(e => reject(e));
+      $task.fetch({ url: opts.url, method, headers: opts.headers || {}, body: opts.body || '', timeout: 30000 })
+        .then(r => done(null, r.statusCode, r.headers, r.body || ''))
+        .catch(e => done(fmtErr(e)));
     } else if (typeof $httpClient !== 'undefined') {
-      $httpClient.get(opts, handler);
+      const cb = (err, resp, body) => done(err, resp ? (resp.status || resp.statusCode) : 0, resp ? resp.headers : {}, body || '');
+      if (method === 'GET') $httpClient.get(opts, cb); else $httpClient.post(opts, cb);
     } else if (typeof module !== 'undefined' && module.exports) {
-      nodeHttp(opts, 'GET').then(resolve).catch(reject);
+      nodeReq(opts, method).then(r => done(null, r.status, r.headers, r.body)).catch(e => done(fmtErr(e)));
     } else reject(new Error('不支持的平台'));
   });
 }
-
-function httpPost(opts, method = 'POST', allowRedirects = true) {
-  return new Promise((resolve, reject) => {
-    const handler = (err, resp, body) => {
-      if (err) reject(new Error(err));
-      else resolve({
-        status: resp?.status || resp?.statusCode,
-        body,
-        headers: resp?.headers,
-        cookies: parseRespCookies(resp?.headers),
-      });
-    };
-    if (typeof $task !== 'undefined') {
-      $task.fetch({ ...opts, method }).then(r => resolve({
-        status: r.statusCode, body: r.body, headers: r.headers,
-        cookies: parseRespCookies(r.headers),
-      })).catch(e => reject(e));
-    } else if (typeof $httpClient !== 'undefined') {
-      $httpClient.post(opts, handler);
-    } else if (typeof module !== 'undefined' && module.exports) {
-      nodeHttp(opts, method, allowRedirects).then(resolve).catch(reject);
-    } else reject(new Error('不支持的平台'));
-  });
-}
-
-function parseRespCookies(headers) {
-  const cookies = {};
-  if (!headers) return cookies;
-  let setCookie = headers['Set-Cookie'] || headers['set-cookie'] || headers['Set-cookie'] || '';
-  if (typeof setCookie === 'string') setCookie = [setCookie];
-  if (Array.isArray(setCookie)) {
-    for (const part of setCookie) {
-      const m = part.match(/(\w+)=([^;]+)/);
-      if (m) cookies[m[1]] = m[2];
-    }
-  }
-  return cookies;
-}
-
-// Node.js http(s) 实现
-function nodeHttp(opts, method, allowRedirects = true) {
-  return new Promise((resolve, reject) => {
+function nodeReq(opts, method) {
+  const attempt = (n) => new Promise((resolve, reject) => {
     const u = new URL(opts.url);
     const mod = u.protocol === 'https:' ? require('https') : require('http');
-    const reqOpts = {
-      hostname: u.hostname,
-      port: u.port || (u.protocol === 'https:' ? 443 : 80),
-      path: u.pathname + u.search,
-      method: method || 'GET',
-      headers: opts.headers || {},
-    };
-    const req = mod.request(reqOpts, resp => {
-      // 不跟随重定向
-      if (resp.statusCode >= 300 && resp.statusCode < 400 && !allowRedirects) {
-        const cookies = {};
-        (resp.headers['set-cookie'] || []).forEach(v => {
-          const m = v.match(/(\w+)=([^;]+)/); if (m) cookies[m[1]] = m[2];
-        });
-        let data = '';
-        resp.on('data', () => {});
-        resp.on('end', () => resolve({
-          status: resp.statusCode, body: data, headers: resp.headers, cookies,
-        }));
-        return;
-      }
-      // 自动跟随重定向
-      if (resp.statusCode >= 300 && resp.statusCode < 400 && resp.headers.location) {
-        const newUrl = new URL(resp.headers.location, opts.url).href;
-        const newOpts = { ...opts, url: newUrl };
-        nodeHttp(newOpts, 'GET', true).then(resolve).catch(reject);
-        return;
-      }
+    const req = mod.request({ hostname: u.hostname, port: u.port || (u.protocol === 'https:' ? 443 : 80), path: u.pathname + u.search, method, headers: opts.headers || {} }, resp => {
       const chunks = [];
-      const cookies = {};
-      (resp.headers['set-cookie'] || []).forEach(v => {
-        const m = v.match(/(\w+)=([^;]+)/); if (m) cookies[m[1]] = m[2];
-      });
-      // gzip/deflate解压
-      const encoding = resp.headers['content-encoding'];
-      let stream = resp;
-      if (encoding === 'gzip') {
-        const zlib = require('zlib');
-        stream = resp.pipe(zlib.createGunzip());
-      } else if (encoding === 'deflate') {
-        const zlib = require('zlib');
-        stream = resp.pipe(zlib.createInflate());
-      } else if (encoding === 'br') {
-        const zlib = require('zlib');
-        stream = resp.pipe(zlib.createBrotliDecompress());
-      }
-      let data = '';
-      stream.on('data', c => data += c);
-      stream.on('end', () => resolve({
-        status: resp.statusCode, body: data, headers: resp.headers, cookies,
-      }));
-      stream.on('error', reject);
+      resp.on('data', c => chunks.push(c));
+      resp.on('end', () => resolve({ status: resp.statusCode, headers: resp.headers, body: Buffer.concat(chunks).toString('utf8') }));
     });
-    req.on('error', reject);
+    req.on('error', e => { if (n > 0) { setTimeout(() => attempt(n - 1).then(resolve, reject), 1500); } else { reject(e); } });
     if (opts.body) req.write(opts.body);
     req.end();
   });
+  return attempt(4);
 }
 
-// ========== Env.js 框架 ==========
-function Env(name, opts) {
-  class _env {
-    constructor(n) { this.name = n; this.data = null; this.startTime = Date.now(); this.logs = []; this.log(`🔔 ${this.name}, 开始!`); }
+// ============ 账号 Worker ============
+class Re0Worker {
+  constructor(base, username, password, cookie, ids) {
+    this.base = base;
+    this.username = username;
+    this.password = password;
+    this.cookie = cookie || '';            // 传入的持久化 Cookie
+    this.jar = parseCookiesToMap(cookie);  // 运行时 cookie 桶
+    this.ids = ids || {};
+    this.tag = safeName(username);
+    this.metaKey = `re0_meta_${this.tag}`;
+    this.historyKey = `re0_history_${this.tag}`;
+  }
+  _load(k, d) { try { const v = $.getdata(k); return v ? JSON.parse(v) : d; } catch { return d; } }
+  _save(k, v) { try { $.setdata(JSON.stringify(v), k); } catch {} }
+  getMeta() { return this._load(this.metaKey, {}); }
+  saveMeta(m) { this._save(this.metaKey, m); }
+  getHistory() { return this._load(this.historyKey, []); }
+
+  async req(method, path, { headers = {}, body = '', accept } = {}) {
+    const h = { 'User-Agent': UA, 'Accept-Language': 'zh-CN,zh;q=0.9', ...headers };
+    if (accept) h['Accept'] = accept;
+    if (Object.keys(this.jar).length) h['Cookie'] = cookieString(this.jar);
+    if (body !== '') h['Content-Type'] = h['Content-Type'] || 'text/plain;charset=UTF-8';
+    const r = await httpReq({ url: this.base + path, headers: h, body }, method);
+    const sc = r.headers['Set-Cookie'] || r.headers['set-cookie'];
+    if (sc) mergeSetCookie(this.jar, sc);
+    return r;
+  }
+  get(path, accept = 'text/html') { return this.req('GET', path, { accept }); }
+  post(path, body, actionId) {
+    return this.req('POST', path, {
+      body,
+      headers: { 'Accept': 'text/x-component', 'Origin': this.base, 'Referer': this.base + path, 'next-action': actionId },
+    });
+  }
+
+  cookieNow() { return cookieString(this.jar); }
+
+  // --- 登录（server action，免 X-HDH） ---
+  async login() {
+    const action = this.ids.login;
+    if (!action) throw new Error('未取得 login action');
+    await this.get('/login?redirect=/');
+    const payload = JSON.stringify([{ username: this.username, password: b64(this.password), password_transport: 'base64' }, '/']);
+    const r = await this.post('/login?redirect=/', payload, action);
+    const hasToken = !!this.jar['token'];
+    const js = tryJson(r.body);
+    if (js && js.code === 'action_token_required') throw new Error(`登录需先绑定（GET /login），code=${js.code}`);
+    if (!hasToken) throw new Error(`登录未返回 token：HTTP ${r.status} ${cut(r.body)}`);
+    const meta = this.getMeta(); meta.cookie = this.cookieNow(); this.saveMeta(meta);
+    return r;
+  }
+
+  // --- 每日签到 ---
+  async checkIn() {
+    const action = this.ids.checkin;
+    if (!action) throw new Error('未取得 checkIn action');
+    const page = await this.get('/manager/account', 'text/x-component');
+    const r = await this.post('/manager/account', '[true]', action);
+    return { http: r.status, body: r.body, page };
+  }
+}
+
+// ============ 结果解析（RSC / JSON） ============
+function tryJson(s) { try { return JSON.parse(s); } catch { return null; } }
+function cut(s, n = 400) { return (s || '').slice(0, n).replace(/\n/g, ' '); }
+function analyzeCheckin(resp) {
+  const body = (resp && resp.body) || '';
+  let j = tryJson(body);
+  if (!j) {
+    const m = body.match(/^1:(\{.*\})$/m);
+    if (m) j = tryJson(m[1]);
+  }
+  const err = (j && j.error) || null;
+  const msg = (j && (j.message || err && err.message)) || (body.match(/"message":"([^"]*)"/) || [])[1] || '';
+  const desc = (j && (j.description || err && err.description)) || (body.match(/"description":"([^"]*)"/) || [])[1] || '';
+  const code = (j && (j.code || err && err.code)) || (body.match(/"code":"([^"]*)"/) || [])[1] || '';
+  const success = j ? !!((j.success === true) || (j.data && j.data.success === true)) : false;
+  const text = (msg + ' ' + desc).trim();
+  const isAlready = /已经签到|签到过|明日再来|明天再来/.test(text);
+  const isOk = success || /签到成功|成功/.test(text) || /^2/.test(String(resp.http));
+  return { ok: isOk || isAlready, isAlready, message: text || ('HTTP ' + resp.http), code };
+}
+
+// ============ Cookie 采集（rewrite 模式） ============
+function handleCookie() {
+  const h = ($request && ($request.headers || {})) || {};
+  const ck = h['Cookie'] || h['cookie'] || '';
+  if (!ck) { $.done(); return; }
+  const m = parseCookiesToMap(ck);
+  if (!m['token']) { $.done(); return; }
+  const old = $.getdata('re0_cookie') || '';
+  if (old !== ck) {
+    $.setdata(ck, 're0_cookie');
+    $.log(`[Cookie] 已保存 RE0 Cookie（含 token）`);
+  }
+  $.done();
+}
+
+// ============ Action id 发现 ============
+const cacheLoginKey = 're0_cache_login_action';
+const cacheCheckinKey = 're0_cache_checkin_action';
+
+function scanActionId(text, name) {
+  const re = new RegExp('createServerReference\\)\\s*\\(\\s*["\']([^"\']+)["\'][^)]*?,\\s*["\']' + name.replace(/[$.*+?^${}()|[\]\\]/g, '\\$&') + '["\']\\s*\\)');
+  const m = text.match(re);
+  return m ? m[1] : '';
+}
+async function fetchText(base, path, { accept, cookie } = {}) {
+  const h = { 'User-Agent': UA, 'Accept': accept || 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' };
+  if (cookie) h['Cookie'] = cookie;
+  const r = await httpReq({ url: base + path, headers: h, body: '' }, 'GET');
+  return r.body || '';
+}
+function chunkUrlFromHtml(html, patternPart) {
+  const re = new RegExp('([^"\']*' + patternPart + '[^"\']*\\.js[^"\']*)');
+  const m = html.match(re);
+  return m ? m[1] : '';
+}
+async function discoverLoginAction(base) {
+  const html = await fetchText(base, '/login');
+  const c = chunkUrlFromHtml(html, '/_next/static/chunks/app/\\(auth\\)/login/page-');
+  if (!c) return '';
+  const js = await fetchText(base, c);
+  return scanActionId(js, 'login');
+}
+async function discoverCheckinAction(base, cookie) {
+  const html = await fetchText(base, '/manager/account', { accept: 'text/html', cookie });
+  const c = chunkUrlFromHtml(html, '/_next/static/chunks/app/manager/layout-');
+  if (!c) return '';
+  const js = await fetchText(base, c);
+  return scanActionId(js, 'checkIn');
+}
+
+// ============ 主流程 ============
+async function main() {
+  if (typeof $request !== 'undefined') { handleCookie(); return; }
+  $.log(`🔔 ${$.name}, 开始!`);
+  $.log(`BASE = ${CONFIG.base_url}`);
+
+  const accounts = [];
+  (CONFIG.accounts || '').split('&').forEach(item => {
+    item = item.trim(); if (!item) return;
+    const p = item.split('#');
+    if (p.length >= 2) accounts.push({ username: p[0].trim(), password: p[1].trim(), cookie: p[2] ? p[2].trim() : '' });
+  });
+  if (!accounts.length && CONFIG.cookie) accounts.push({ username: 'cookie', password: '', cookie: CONFIG.cookie });
+  if (!accounts.length) {
+    $.msg($.name, '', '⚠️ 未配置 re0_accounts\n\n示例：user#pass&user2#pass2\n或抓包后配置 re0_cookie\n\n🎯 失败');
+    $.done(); return;
+  }
+
+  const ids = {
+    login: CONFIG.login_action || $.getdata(cacheLoginKey) || DEF_LOGIN_ACTION,
+    checkin: CONFIG.checkin_action || $.getdata(cacheCheckinKey) || DEF_CHECKIN_ACTION,
+  };
+
+  for (let idx = 0; idx < accounts.length; idx++) {
+    const acc = accounts[idx];
+    $.log(`\n${'─'.repeat(56)}`);
+    $.log(`[账号 ${idx + 1}] ${acc.username}`);
+    try {
+      const w = new Re0Worker(CONFIG.base_url, acc.username, acc.password, acc.cookie || '', ids);
+      if (acc.password) {
+        $.log(' [流程] 自动登录...');
+        try {
+          await w.login();
+        } catch (e) {
+          if (!/action|Action/.test(fmtErr(e))) throw e;
+          const nid = await discoverLoginAction(CONFIG.base_url).catch(() => '');
+          if (!nid) throw e;
+          $.log(` [info] login action 已刷新: ${nid}`);
+          ids.login = nid; $.setdata(nid, cacheLoginKey);
+          w.ids.login = nid;
+          await w.login();
+        }
+      } else if (!w.jar['token']) {
+        throw new Error('无 token：请配置账号密码，或先抓包配置 re0_cookie');
+      } else {
+        $.log(' [流程] 使用已有 Cookie');
+      }
+
+      if (!CONFIG.checkin_action && !$.getdata(cacheCheckinKey)) {
+        try {
+          const id = await discoverCheckinAction(CONFIG.base_url, w.cookieNow());
+          if (id) { ids.checkin = id; $.setdata(id, cacheCheckinKey); }
+        } catch (e) { $.log(` [warn] checkin action 扫描失败: ${fmtErr(e)}`); }
+      }
+
+      $.log(' [流程] 执行每日签到...');
+      let resp = await w.checkIn();
+      let r = analyzeCheckin(resp);
+      if (!r.isAlready && /action|Action|未知/.test(r.message + ' ' + (r.code || '')) && !CONFIG.checkin_action) {
+        try {
+          const id = await discoverCheckinAction(CONFIG.base_url, w.cookieNow());
+          if (id && id !== ids.checkin) {
+            ids.checkin = id; $.setdata(id, cacheCheckinKey); w.ids.checkin = id;
+            resp = await w.checkIn();
+            r = analyzeCheckin(resp);
+          }
+        } catch (e2) { $.log(` [warn] 重扫 checkin 失败: ${fmtErr(e2)}`); }
+      }
+
+      const meta = w.getMeta(); meta.cookie = w.cookieNow(); w.saveMeta(meta);
+
+      const line = `[账号 ${idx + 1}] ${acc.username}`;
+      let sub = '';
+      if (r.isAlready) { sub = `⏭️ 今日已签到：${r.message || ''}`; }
+      else if (r.ok) { sub = `✅ 签到成功：${r.message || ''}`; }
+      else { sub = `❌ 签到失败：${r.message || ''}`; }
+      $.log(line + ' | ' + sub);
+      collect(line); collect(sub);
+    } catch (e) {
+      const msg = fmtErr(e);
+      $.log(`[账号 ${idx + 1}] ${acc.username} ❌ ${msg}`);
+      collect(`[账号 ${idx + 1}] ${acc.username} ❌ ${msg}`);
+    }
+  }
+
+  $.log(`\n${'═'.repeat(56)}`);
+  if (allMsg) { $.msg($.name, '', allMsg); }
+  $.done();
+}
+
+// ============ Env.js 精简框架 ============
+function Env(name) {
+  return new (class {
+    constructor() { this.name = name; this.data = null; this.startTime = Date.now(); }
     getEnv() {
       if (typeof $task !== 'undefined') return 'Quantumult X';
       if (typeof $environment !== 'undefined' && $environment['surge-version']) return 'Surge';
@@ -796,27 +377,25 @@ function Env(name, opts) {
         default: return false;
       }
     }
-    log(...t) { t.length && (this.logs = [...this.logs, ...t]); console.log(t.join('\n')); }
-    logErr(t) { this.log('', `❗️${this.name}, 错误!`, t?.message || t); }
+    log(...t) { console.log(t.join('\n')); }
     wait(ms) { return new Promise(r => setTimeout(r, ms)); }
     msg(s, t, c) {
       switch (this.getEnv()) {
+        case 'Node.js': console.log(`${s}: ${t || ''} - ${c || ''}`); break;
         case 'Quantumult X': $notify(s, t || '', c || ''); break;
         case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket': default: $notification.post(s, t || '', c || ''); break;
-        case 'Node.js': console.log(`${s}: ${t} - ${c}`); break;
       }
     }
     done() {
-      const elapsed = ((Date.now() - this.startTime) / 1000).toFixed(2);
-      this.log(`结束! ${elapsed}s`);
+      const el = ((Date.now() - this.startTime) / 1000).toFixed(2);
+      this.log(`结束! ${el}s`);
       switch (this.getEnv()) {
-        case 'Quantumult X': case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket': default: $done(); break;
         case 'Node.js': process.exit(0); break;
+        default: $done(); break;
       }
     }
-  }
-  return new _env(name, opts);
+  })();
 }
 
-// ========== 启动 ==========
-main().catch(e => { $.logErr(e); $.done(); });
+// ============ 启动 ============
+main().catch(e => { $.log(`❌ ${$.name} 异常: ${fmtErr(e)}`); try { $.done(); } catch (_) {} });
