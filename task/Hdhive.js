@@ -1,6 +1,6 @@
 /*
 RE0(影巢/HDHive) 每日签到 — Next.js Server Action 版
-版本：2.0.1（2026-09-06）— Server Action 协议；$argument 值支持 URL 解码（模块参数多账号用 %26）
+版本：2.0.2（2026-09-06）— Server Action 协议（免 X-HDH）；Set-Cookie 白名单解析 + 响应头大小写兼容 + 登录失败诊断
 
 替代旧的裸 /api/customer/user/checkin 方案（该接口需 X-HDH WASM 签名，脚本无法实现）。
 
@@ -13,7 +13,7 @@ RE0(影巢/HDHive) 每日签到 — Next.js Server Action 版
   纯 Cookie 鉴权，无需 X-HDH 签名。
 - 所有响应都会轮换 hdh_sa_token，脚本逐次解析 Set-Cookie 维持会话。
 
-变量名：re0_accounts       多账号 user#pass&user2#pass2（Surge/Loon 模块参数里多账号用 %26 连接）
+变量名：re0_accounts       多账号 user#pass&user2#pass2
 可选：re0_cookie          手动/Cookie采集得到的完整 Cookie（未配账号时使用）
 可选：re0_base_url        默认 https://re0.me
 可选：re0_login_action    登录 action id（留空自动从 /login 页扫描）
@@ -67,13 +67,16 @@ function parseCookiesToMap(str) {
   (str || '').split(';').forEach(p => { const i = p.indexOf('='); if (i > 0) m[p.slice(0, i).trim()] = p.slice(i + 1).trim(); });
   return m;
 }
+const WANT_COOKIES = ['token', 'refresh_token', 'csrf_access_token', 'csrfaccesstoken', 'hdh_uid', 'hdh_sa_token'];
 function mergeSetCookie(map, setCookie) {
+  // 兼容各引擎：数组 / 单串 / 多行拼接；只收白名单 cookie（忽略 Expires/Path 等属性名）
   const list = Array.isArray(setCookie) ? setCookie : (setCookie ? [setCookie] : []);
+  const re = /([A-Za-z_][A-Za-z0-9_]*)=([^;,\s]*)/g;
   for (const sc of list) {
-    const i = sc.indexOf('='); if (i < 1) continue;
-    const name = sc.slice(0, i).trim();
-    const value = sc.slice(i + 1).split(';')[0].trim();
-    map[name] = value;
+    let m;
+    while ((m = re.exec(sc))) {
+      if (WANT_COOKIES.includes(m[1])) map[m[1]] = m[2];
+    }
   }
 }
 function cookieString(map) { return Object.entries(map).map(([k, v]) => `${k}=${v}`).join('; '); }
@@ -140,14 +143,16 @@ class Re0Worker {
   saveMeta(m) { this._save(this.metaKey, m); }
   getHistory() { return this._load(this.historyKey, []); }
 
+  // --- HTTP helpers with cookie jar auto-update ---
   async req(method, path, { headers = {}, body = '', accept } = {}) {
     const h = { 'User-Agent': UA, 'Accept-Language': 'zh-CN,zh;q=0.9', ...headers };
     if (accept) h['Accept'] = accept;
     if (Object.keys(this.jar).length) h['Cookie'] = cookieString(this.jar);
     if (body !== '') h['Content-Type'] = h['Content-Type'] || 'text/plain;charset=UTF-8';
     const r = await httpReq({ url: this.base + path, headers: h, body }, method);
-    const sc = r.headers['Set-Cookie'] || r.headers['set-cookie'];
-    if (sc) mergeSetCookie(this.jar, sc);
+    // 轮换 cookie：响应 Set-Cookie 头名大小写不一，统一小写扫描并入
+    const hkeys = Object.keys(r.headers || {});
+    for (const k of hkeys) { if (k.toLowerCase() === 'set-cookie') { mergeSetCookie(this.jar, r.headers[k]); break; } }
     return r;
   }
   get(path, accept = 'text/html') { return this.req('GET', path, { accept }); }
@@ -164,13 +169,22 @@ class Re0Worker {
   async login() {
     const action = this.ids.login;
     if (!action) throw new Error('未取得 login action');
+    // 1) GET /login 绑定 hdh_sa_token
     await this.get('/login?redirect=/');
+    // 2) POST login action
     const payload = JSON.stringify([{ username: this.username, password: b64(this.password), password_transport: 'base64' }, '/']);
     const r = await this.post('/login?redirect=/', payload, action);
     const hasToken = !!this.jar['token'];
     const js = tryJson(r.body);
     if (js && js.code === 'action_token_required') throw new Error(`登录需先绑定（GET /login），code=${js.code}`);
-    if (!hasToken) throw new Error(`登录未返回 token：HTTP ${r.status} ${cut(r.body)}`);
+    if (!hasToken) {
+      // 诊断：响应头到底有没有 set-cookie / 含哪些目标 cookie
+      const hkeys = Object.keys(r.headers || {});
+      let raw = '';
+      for (const k of hkeys) { if (k.toLowerCase() === 'set-cookie') raw += String(r.headers[k]); }
+      const got = WANT_COOKIES.filter(n => raw.includes(n + '=')).join(',');
+      throw new Error(`登录未返回 token：HTTP ${r.status} | set-cookie含[${got || '无'}] | 响应头[${hkeys.join(',')}] | ${cut(r.body)}`);
+    }
     const meta = this.getMeta(); meta.cookie = this.cookieNow(); this.saveMeta(meta);
     return r;
   }
@@ -179,9 +193,21 @@ class Re0Worker {
   async checkIn() {
     const action = this.ids.checkin;
     if (!action) throw new Error('未取得 checkIn action');
+    // GET /manager/account 刷新绑定 + 页面
     const page = await this.get('/manager/account', 'text/x-component');
+    // POST action body [true]
     const r = await this.post('/manager/account', '[true]', action);
     return { http: r.status, body: r.body, page };
+  }
+
+  // --- 账号信息（从 account 页 RSC 里抠 积分/昵称） ---
+  parseUserInfo(rsc) {
+    const o = {};
+    let m = rsc.match(/"points"\s*:\s*(\d+)/); if (m) o.points = +m[1];
+    m = rsc.match(/"nickname"\s*:\s*"([^"]+)"/); if (m) o.nickname = m[1];
+    m = rsc.match(/可用积分/g); 
+    m = rsc.match(/"signin_days_total"\s*:\s*(\d+)/); if (m) o.days = +m[1];
+    return o;
   }
 }
 
@@ -192,6 +218,7 @@ function analyzeCheckin(resp) {
   const body = (resp && resp.body) || '';
   let j = tryJson(body);
   if (!j) {
+    // Next.js RSC 流里 action 结果行形如：\n1:{"data":...}\n 或 1:{"error":{...}}
     const m = body.match(/^1:(\{.*\})$/m);
     if (m) j = tryJson(m[1]);
   }
@@ -212,7 +239,7 @@ function handleCookie() {
   const ck = h['Cookie'] || h['cookie'] || '';
   if (!ck) { $.done(); return; }
   const m = parseCookiesToMap(ck);
-  if (!m['token']) { $.done(); return; }
+  if (!m['token']) { $.done(); return; }   // 只要带 token 的完整登录态
   const old = $.getdata('re0_cookie') || '';
   if (old !== ck) {
     $.setdata(ck, 're0_cookie');
@@ -249,6 +276,7 @@ async function discoverLoginAction(base) {
   return scanActionId(js, 'login');
 }
 async function discoverCheckinAction(base, cookie) {
+  // manager 布局 chunk 只在登录态页面出现；cookie 可选
   const html = await fetchText(base, '/manager/account', { accept: 'text/html', cookie });
   const c = chunkUrlFromHtml(html, '/_next/static/chunks/app/manager/layout-');
   if (!c) return '';
@@ -262,6 +290,7 @@ async function main() {
   $.log(`🔔 ${$.name}, 开始!`);
   $.log(`BASE = ${CONFIG.base_url}`);
 
+  // 解析账号
   const accounts = [];
   (CONFIG.accounts || '').split('&').forEach(item => {
     item = item.trim(); if (!item) return;
@@ -274,6 +303,7 @@ async function main() {
     $.done(); return;
   }
 
+  // action ids：优先缓存/手动，失败再发现
   const ids = {
     login: CONFIG.login_action || $.getdata(cacheLoginKey) || DEF_LOGIN_ACTION,
     checkin: CONFIG.checkin_action || $.getdata(cacheCheckinKey) || DEF_CHECKIN_ACTION,
@@ -285,6 +315,7 @@ async function main() {
     $.log(`[账号 ${idx + 1}] ${acc.username}`);
     try {
       const w = new Re0Worker(CONFIG.base_url, acc.username, acc.password, acc.cookie || '', ids);
+      // 保证登录态（密码优先自动登录；action 失效则现场扫描重试一次）
       if (acc.password) {
         $.log(' [流程] 自动登录...');
         try {
@@ -304,6 +335,7 @@ async function main() {
         $.log(' [流程] 使用已有 Cookie');
       }
 
+      // 登录后自动校准 checkin action（未手动配置且未缓存过）
       if (!CONFIG.checkin_action && !$.getdata(cacheCheckinKey)) {
         try {
           const id = await discoverCheckinAction(CONFIG.base_url, w.cookieNow());
@@ -314,6 +346,7 @@ async function main() {
       $.log(' [流程] 执行每日签到...');
       let resp = await w.checkIn();
       let r = analyzeCheckin(resp);
+      // 签到 action 疑似失效 → 重新扫描后重试一次
       if (!r.isAlready && /action|Action|未知/.test(r.message + ' ' + (r.code || '')) && !CONFIG.checkin_action) {
         try {
           const id = await discoverCheckinAction(CONFIG.base_url, w.cookieNow());
@@ -325,6 +358,7 @@ async function main() {
         } catch (e2) { $.log(` [warn] 重扫 checkin 失败: ${fmtErr(e2)}`); }
       }
 
+      // 持久化 Cookie（供下次复用 / 展示）
       const meta = w.getMeta(); meta.cookie = w.cookieNow(); w.saveMeta(meta);
 
       const line = `[账号 ${idx + 1}] ${acc.username}`;
