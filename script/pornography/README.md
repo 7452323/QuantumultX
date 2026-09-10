@@ -1,7 +1,7 @@
-# 黄豆短剧（hdmgdj.com 系）解锁脚本 v2.1.0
+# 黄豆短剧（hdmgdj.com 系）解锁脚本 v3.0.0
 
 > 三平台统一：Quantumult X / Surge / Loon，同一份自包含脚本（零依赖纯 JS）。
-> 最后更新：2026-09-10（真机抓包 + APK 拆包 + dart2js 反编译三重验证）
+> 最后更新：2026-09-10（真机抓包 + APK 拆包 + dart2js 反编译 + 全接口/全域名扫描）
 
 ---
 
@@ -111,6 +111,14 @@ AESKey(32B)   = HMAC-SHA256( key = UTF8(平台KeyHex), msg = hexDecode(requestId
 ---
 
 ## 六、更新日志
+
+### v3.0.0 — 2026-09-10「会员 + 金币」客户端全解锁
+- **会员身份**：`user/doVip` / `user/doRecharge` → 开通/充值一律返回成功（end_time=2099-12-31），不再弹支付；`user/home`（自己）也标为 VIP
+- **无限金币**：`user/accountLog` 追加重额赠送流水（钱包页余额显示）；`user/sign` 30 天全签；`user/doSign` 巨额奖励；`user/orderLog`/`buyLog`/`codeLog` 清空
+- **任务/兑换/抽奖**：`task/list` 注入可领任务；`redeem/list` / `lottery/info` 同样处理
+- **购剧**：`drama/doBuy` 返回 `status:true`，客户端会把剧集标记为已购、剧集列表全部显示已解锁
+- 修正 v2.1.0 的路由冲突（`user/home` 被列表规则截走）
+- 测试：`test_v5.js` **16 PASS / 0 FAIL**
 
 ### v2.1.0 — 2026-09-10
 - **新增 UP 创作者模块处理**（抓包 + dart2js 反编译挖出真实参数）：

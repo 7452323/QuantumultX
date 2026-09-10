@@ -1,6 +1,15 @@
 /*
- * 黄豆短剧（hdmgdj.com 系）解锁脚本 —— 三平台统一版 v2.1.0
+ * 黄豆短剧（hdmgdj.com 系）解锁脚本 —— 三平台统一版 v3.0.0
  * Build 2026-09-10
+ *
+ * ⚠ 本版新增：客户端层面的「会员 + 金币」完整解锁
+ *   - user/info · user/vip · user/recharge → VIP + 999999 金币/积分
+ *   - user/accountLog   → 追加重额赠送流水（钱包页显示余额）
+ *   - user/sign · user/doSign → 30 天全签 + 巨额奖励
+ *   - user/doVip · user/doRecharge → 开通/充值一律成功（本地无需支付）
+ *   - task/list · redeem/list · lottery/info → 任务/兑换/抽奖有奖可领
+ *   - drama/doBuy → status:true（客户端标记已购、剧集列表全解锁）
+ *   - play → 付费集伪造成功 + 试看兜底
  *
  * ── 协议（真机抓包复核，未变） ──────────────────────────────
  *   请求/响应 body = IV(16B) || AES-256-CBC(PKCS7, gzip(JSON))
@@ -744,7 +753,7 @@
   }
 
   /* ---------- 5) 列表类：抹掉付费标记 ---------- */
-  if (/\/(navBlock|navFilter|searchResult|search\/movie|drama\/(list|rank|more|favorite|love|wish|topicList)|movie\/(favorite|love|history)|user\/(favorite|home))/.test(path)) {
+  if (/\/(navBlock|navFilter|searchResult|search\/movie|drama\/(list|rank|more|favorite|love|wish|topicList)|movie\/(favorite|love|history)|user\/favorite)/.test(path)) {
     var ljson = decryptBody(raw, requestId, deviceType);
     if (ljson) {
       var touched2 = false;
@@ -897,6 +906,116 @@
         log('up list cleaned host=' + host);
         return;
       }
+    }
+    passThrough();
+    return;
+  }
+
+  /* ---------- 9) 会员：开通/充值接口一律伪造成功（v3.0.0） ---------- */
+  if (/\/api\/user\/(doVip|doRecharge|doActive|doSign|sign|doCode|doShareReward|doBindInvite|orderLog|buyLog|codeLog|shareLog)/.test(path)) {
+    var mjson = parseBody(raw, requestId, deviceType);
+    if (mjson && mjson.json) {
+      var mj = mjson.json;
+      // 列表类：清空并伪造成功
+      if (/\/(orderLog|buyLog|codeLog|shareLog)/.test(path)) {
+        if (mj.data && typeof mj.data === 'object') {
+          mj.data.items = []; mj.data.data = []; mj.data.total = 0;
+          if (mj.data.has_more !== undefined) mj.data.has_more = false;
+        }
+        emit(mj, mjson.plain, requestId, deviceType);
+        log('log emptied ' + path);
+        return;
+      }
+      mj.status = true;
+      delete mj.error;
+      delete mj.errorCode;
+      var now = ts();
+      if (/\/user\/doVip/.test(path)) {
+        mj.data = { order_sn: 'VIP' + Date.now(), pay_url: '', amount: '0', status: 1, msg: '开通成功', end_time: '2099-12-31 23:59:59' };
+      } else if (/\/user\/doRecharge/.test(path)) {
+        mj.data = { order_sn: 'RCH' + Date.now(), pay_url: '', amount: '0', coin: '999999', status: 1, msg: '充值成功' };
+      } else if (/\/user\/doSign/.test(path)) {
+        mj.data = { continue_days: 30, prize_id: 'day_30', prize_name: '金币 999999', prize_type: 'point', prize_num: 999999, balance: 999999, msg: '签到成功 +999999 金币' };
+      } else if (/\/user\/sign/.test(path)) {
+        if (mj.data && Array.isArray(mj.data.prizes)) {
+          mj.data.prizes.forEach(function (p) { p.signed = 'y'; p.num = 999999; p.name = '金币 999999'; });
+        }
+        if (mj.data) { mj.data.today_signed = 'y'; mj.data.continue_days = 30; mj.data.balance = 999999; }
+      } else if (/\/user\/doActive/.test(path)) {
+        mj.data = { reward: 999999, msg: '完成' };
+      } else {
+        if (mj.data === undefined || mj.data === null) mj.data = {};
+        if (typeof mj.data === 'object' && !Array.isArray(mj.data)) { mj.data.msg = mj.data.msg || '成功'; }
+      }
+      emit(mj, mjson.plain, requestId, deviceType);
+      log('money forge ok ' + path);
+      return;
+    }
+    passThrough();
+    return;
+  }
+
+  /* ---------- 10) 账本：伪造巨额余额（v3.0.0） ---------- */
+  if (/\/api\/user\/accountLog/.test(path)) {
+    var ab = parseBody(raw, requestId, deviceType);
+    if (ab && ab.json) {
+      var aj = ab.json;
+      var fake = {
+        change_value: '999999', created_at: String(Math.floor(Date.now() / 1000)),
+        id: '999999999', label: ts(), new_value: '999999', old_value: '0',
+        order_sn: 'GIFT' + Date.now(), remark: '系统赠送：会员特权金币'
+      };
+      if (!aj.data || typeof aj.data !== 'object') aj.data = {};
+      var items = Array.isArray(aj.data.items) ? aj.data.items : [];
+      aj.data.items = [fake].concat(items).slice(0, 50);
+      aj.data.data = aj.data.items;
+      if (aj.data.total !== undefined) aj.data.total = aj.data.items.length;
+      emit(aj, ab.plain, requestId, deviceType);
+      log('accountLog forged host=' + host);
+      return;
+    }
+    passThrough();
+    return;
+  }
+
+  /* ---------- 11) 积分任务 / 兑换商城 / 抽奖：伪造有奖可领（v3.0.0） ---------- */
+  if (/\/api\/(task\/list|task\/detail|mine\/tasks|redeem\/list|lottery\/info|mine\/pointMall|mine\/coin|mine\/checkin)/.test(path)) {
+    var tb = parseBody(raw, requestId, deviceType);
+    if (tb && tb.json) {
+      var tj = tb.json;
+      if (tj.data === undefined || tj.data === null) tj.data = {};
+      if (!tj.data.score && tj.data.score !== 0) tj.data.score = 999999;
+      tj.data.score = 999999;
+      var st = { key: 'daily', label: '每日任务', type: 2, score: 999999, tabs: [] };
+      var mkTask = function (i) {
+        return { id: 't' + i, task_id: 't' + i, title: '每日任务 ' + i, description: '点击领取', reward_type: 'point',
+                 reward_amount: 999999, num: 999999, progress: 1, target_count: 1, status: 2, claimed: false,
+                 can_claim: true, icon: '', jump: '', jump_url: '', type: 2 };
+      };
+      var tasks = [1, 2, 3].map(mkTask);
+      tj.data.items = tasks;
+      if (tj.data.page && typeof tj.data.page === 'object') tj.data.page.items = tasks;
+      if (!tj.data.tabs || !tj.data.tabs.length) tj.data.tabs = [{ key: 'daily', label: '每日任务', type: 2 }];
+      emit(tj, tb.plain, requestId, deviceType);
+      log('task/redeem forge ' + path);
+      return;
+    }
+    passThrough();
+    return;
+  }
+
+  /* ---------- 12) 我的主页：伪造 VIP 身份（v3.0.0） ---------- */
+  if (/\/api\/user\/home/.test(path)) {
+    var hb = parseBody(raw, requestId, deviceType);
+    if (hb && hb.json && hb.json.data) {
+      var hd = hb.json.data;
+      if (hd.is_my === 'y' || hd.is_my === true) {
+        hd.is_vip = 'y'; hd.vip_level = '99'; hd.group_name = '至尊SVIP';
+        hd.group_end_time = '2099-12-31'; hd.vip_end_time = '2099-12-31';
+      }
+      emit(hb.json, hb.plain, requestId, deviceType);
+      log('user/home forged');
+      return;
     }
     passThrough();
     return;

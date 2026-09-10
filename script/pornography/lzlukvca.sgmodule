@@ -1,5 +1,5 @@
-#!name=黄豆短剧 解锁（v2）
-#!desc=全剧集解锁 + 去广告 + 会员/余额显示。付费集正片受服务端硬闸门限制，回退为试看片（可用 argument 关闭）。
+#!name=黄豆短剧 解锁（v3）
+#!desc=客户端解锁：会员身份 + 无限金币 + 全剧集解锁 + 去广告。付费集正片受服务端硬闸门限制，回退为试看片（可用 argument 关闭）。
 #!system=ios
 #!author=7452323
 #!homepage=https://github.com/7452323/QuantumultX
