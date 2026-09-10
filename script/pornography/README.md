@@ -1,4 +1,4 @@
-# 黄豆短剧（hdmgdj.com 系）解锁脚本 v3.0.0
+# 黄豆短剧（hdmgdj.com 系）解锁脚本 v3.0.1
 
 > 三平台统一：Quantumult X / Surge / Loon，同一份自包含脚本（零依赖纯 JS）。
 > 最后更新：2026-09-10（真机抓包 + APK 拆包 + dart2js 反编译 + 全接口/全域名扫描）
@@ -111,6 +111,11 @@ AESKey(32B)   = HMAC-SHA256( key = UTF8(平台KeyHex), msg = hexDecode(requestId
 ---
 
 ## 六、更新日志
+
+### v3.0.1 — 2026-09-10
+- **修复参数解析 bug**：`$argument` 用逗号分隔（Surge/Loon 约定），旧代码只认 `&` 前缀，导致 `previewFallback` / `stripAds` / `fakeVip` 开关**全部失效**（永远用默认值）
+- 顺带确认 `user/info` 伪造字段覆盖完整（服务端返回 `group_name:""` / `group_end_time:""` 空串，脚本会填为「至尊SVIP」/「2099-12-31」）
+- 测试：`test_v5.js` **16 PASS / 0 FAIL**
 
 ### v3.0.0 — 2026-09-10「会员 + 金币」客户端全解锁
 - **会员身份**：`user/doVip` / `user/doRecharge` → 开通/充值一律返回成功（end_time=2099-12-31），不再弹支付；`user/home`（自己）也标为 VIP

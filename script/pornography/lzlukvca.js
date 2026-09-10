@@ -1,5 +1,5 @@
 /*
- * 黄豆短剧（hdmgdj.com 系）解锁脚本 —— 三平台统一版 v3.0.0
+ * 黄豆短剧（hdmgdj.com 系）解锁脚本 —— 三平台统一版 v3.0.1
  * Build 2026-09-10
  *
  * ⚠ 本版新增：客户端层面的「会员 + 金币」完整解锁
@@ -43,8 +43,9 @@
   var ARG = (typeof $argument !== 'undefined' && $argument) ? String($argument) : '';
   function argVal(k, dflt) {
     try {
-      var m = ARG.match(new RegExp('[?&]' + k + '=([^&]*)'));
-      if (m) return decodeURIComponent(m[1]);
+      // 参数分隔符可能是 , 或 &（Surge/Loon argument 用逗号，用户手写可能用 &）
+      var m = ARG.match(new RegExp('(?:^|[?&,])\\s*' + k + '\\s*=\\s*([^&,]*)'));
+      if (m) { var v = decodeURIComponent(m[1]).trim(); return v === '' ? dflt : v; }
     } catch (e) {}
     return dflt;
   }
