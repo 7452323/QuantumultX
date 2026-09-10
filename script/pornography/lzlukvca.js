@@ -1,5 +1,5 @@
 /*
- * 黄豆短剧（hdmgdj.com 系）解锁脚本 —— 三平台统一版 v2.0.0
+ * 黄豆短剧（hdmgdj.com 系）解锁脚本 —— 三平台统一版 v2.1.0
  * Build 2026-09-10
  *
  * ── 协议（真机抓包复核，未变） ──────────────────────────────
@@ -824,21 +824,79 @@
   }
 
   /* ---------- 7) doBuy / up 解锁类：一律伪造成功 ---------- */
-  if (/\/api\/(drama\/doBuy|up\/(unlock|access|subscribe|episodePreview))/.test(path)) {
+  if (/\/api\/(drama\/doBuy|up\/(unlock|subscribe|episodeDetail))/.test(path)) {
     var bjson = decryptBody(raw, requestId, deviceType);
     if (bjson) {
       bjson.status = true;
       delete bjson.error;
       delete bjson.errorCode;
       if (bjson.data === undefined) bjson.data = {};
-      if (/up\/(unlock|access|subscribe)/.test(path)) {
+      if (/up\/(unlock|subscribe|episodeDetail)/.test(path)) {
         bjson.data.can_view = true;
         bjson.data.is_buy = true;
         bjson.data.unlocked = true;
+        bjson.data.access = 'free';
+        bjson.data.price_coin = 0;
+        bjson.data.sub_enabled = 0;
+        bjson.data.sub_price_coin = 0;
+        bjson.data.is_free = true;
+        bjson.data.price = 0;
       }
       doneWithBytes(encryptBody(bjson, requestId, deviceType));
       log('forge ok ' + path);
       return;
+    }
+    passThrough();
+    return;
+  }
+
+  /* ---------- 8) UP 创作者模块（v2.1.0 新增，抓包+反编译实测） ---------- */
+  // /up/access 是客户端判断「能不能看」的权限查询：can_view/access/price_coin
+  if (/\/api\/up\/access/.test(path)) {
+    var acb = parseBody(raw, requestId, deviceType);
+    if (acb && acb.json && acb.json.data) {
+      var ad = acb.json.data;
+      ad.can_view = true;
+      ad.access = 'free';
+      if (ad.price_coin !== undefined) ad.price_coin = 0;
+      if (ad.sub_enabled !== undefined) ad.sub_enabled = 0;
+      if (ad.sub_price_coin !== undefined) ad.sub_price_coin = 0;
+      if (ad.is_up !== undefined) ad.is_up = true;
+      emit(acb.json, acb.plain, requestId, deviceType);
+      log('up/access unlocked host=' + host);
+      return;
+    }
+    passThrough();
+    return;
+  }
+
+  // UP 内容列表 / 推荐 / 创作者详情 / 剧集列表：清掉付费与访问限制标记
+  if (/\/api\/up\/(contentList|episodeFeed|recommend|detail|bannerList|careList|chargeRank|chargeConfig|recruitConfig|promo|promoTeam|search)/.test(path)) {
+    var ub = parseBody(raw, requestId, deviceType);
+    if (ub && ub.json) {
+      var touched3 = false;
+      var walkUp = function (o, depth) {
+        if (!o || typeof o !== 'object' || depth > 5) return;
+        if (Array.isArray(o)) { for (var i = 0; i < o.length; i++) walkUp(o[i], depth + 1); return; }
+        if (o.can_view !== undefined && o.can_view !== true) { o.can_view = true; touched3 = true; }
+        if (o.access !== undefined && o.access !== 'free' && o.access !== '') { o.access = 'free'; touched3 = true; }
+        if (o.ep_is_free !== undefined && o.ep_is_free !== true) { o.ep_is_free = true; touched3 = true; }
+        if (o.ep_price_coin !== undefined && o.ep_price_coin !== 0) { o.ep_price_coin = 0; touched3 = true; }
+        if (o.episode_min_coin !== undefined && o.episode_min_coin !== 0) { o.episode_min_coin = 0; touched3 = true; }
+        if (o.whole_coin !== undefined && o.whole_coin !== 0) { o.whole_coin = 0; touched3 = true; }
+        if (o.price_coin !== undefined && o.price_coin !== 0) { o.price_coin = 0; touched3 = true; }
+        if (o.money !== undefined && String(o.money) !== '0') { o.money = '0'; touched3 = true; }
+        if (o.pay_type !== undefined && o.pay_type !== '' && o.pay_type !== 'free') { o.pay_type = 'free'; touched3 = true; }
+        if (o.corner !== undefined && o.corner !== '') { o.corner = ''; touched3 = true; }
+        if (o.sub_enabled !== undefined && o.sub_enabled !== 0) { o.sub_enabled = 0; touched3 = true; }
+        for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) walkUp(o[k], depth + 1);
+      };
+      walkUp(ub.json.data !== undefined ? ub.json.data : ub.json, 0);
+      if (touched3) {
+        emit(ub.json, ub.plain, requestId, deviceType);
+        log('up list cleaned host=' + host);
+        return;
+      }
     }
     passThrough();
     return;

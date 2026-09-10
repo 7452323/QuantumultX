@@ -1,7 +1,7 @@
-# 黄豆短剧（hdmgdj.com 系）解锁脚本 v2.0.0
+# 黄豆短剧（hdmgdj.com 系）解锁脚本 v2.1.0
 
 > 三平台统一：Quantumult X / Surge / Loon，同一份自包含脚本（零依赖纯 JS）。
-> 最后更新：2026-09-10（真机抓包复核）
+> 最后更新：2026-09-10（真机抓包 + APK 拆包 + dart2js 反编译三重验证）
 
 ---
 
@@ -76,31 +76,49 @@ AESKey(32B)   = HMAC-SHA256( key = UTF8(平台KeyHex), msg = hexDecode(requestId
 
 ## 五、⚠️ 必须知道：付费集正片目前解不开
 
-这不是脚本写法问题，是**服务端硬闸门**。2026-09-10 实测结论：
+这不是脚本写法问题，是**服务端硬闸门**。2026-09-10 通过「真机抓包 + APK 拆包 + dart2js 反编译 + 84 个付费集抽样」四重验证：
 
-| 环节 | 状态 |
+### 5.1 站点有两套内容体系
+
+| 体系 | ID 形态 | 免费集视频 | 付费集视频 |
+|---|---|---|---|
+| **普通剧**（平台自营） | 裸 hex，如 `6a7f2e88817f7dacc5971d55` | `dedup/{hash}/seg_NNN.ts?auth_key=` 完整 HLS | **403**（`play` 返回 813005/813004，无任何 URL） |
+| **UP 剧**（创作者上传） | `up_xxxx`，如 `up_781a6cd5e8ce4d4a` | 同上，完整 HLS | `play` 返回 `status:"y"` + **`is_preview:true`** + `article-video/uv_xxx/preview.mp4`（**6.00 秒**） |
+
+> 每集都有独立 `uv_` id（免费集也有）。免费集的 `uv_` 目录下也只有 `preview.mp4`，正片走 `dedup`。
+
+### 5.2 为什么解不开（逐条实测）
+
+| 环节 | 结论 |
 |---|---|
-| 服务端播放闸门 | `/api/drama/hls/{id}/{seq}/play.m3u8` 对**付费集一律 403**（`seq > free_episodes`），免费集任意 seq 都 200 |
-| m3u8 签名 `sig` | 64 位十六进制，**服务端私钥 HMAC**，试遍 8 把候选密钥 × 30 种消息模板均不中，无法伪造 |
-| CDN 分片 | 必须带 `auth_key`（CloudFront 签名），去掉即 403 |
-| 分片路径 | `dedup/{内容哈希}/`，哈希不可从剧集信息推导 |
-| 支付 | 第三方网关（支付宝 `hongyanyanbaihuo.online`、USDT `nsybillduxoaus.com`），伪造回调属于诈骗，不做 |
-| 金币 | 每日签到 1 币、任务列表为空、邀请 0 币，无可用漏洞；`doBuy` 服务端校验余额，参数无法绕过 |
-| 其他接口 | `up/*` 需创作者权限（813105）；openapi key 已过期；`up/unlock` 等无越权 |
+| **权限闸门** | 唯一判据是「这一集的 `type`」：`free` 放行，`coin`/`vip` 必须已购/VIP。**与 `free_episodes` 数字无关**（有剧 `free_episodes=0` 但 6 集全能播） |
+| **签名 `sig`** | ★ 关键实验：借免费集的 `sig` 去打**其它免费集** → **200**（同剧 seq2、异剧 seq1 都通）；打**付费集** → **403**。**证明 `sig` 不绑定路径**，服务端唯一判据是用户权益 |
+| **`/up/unlock`** | 参数已挖到（`{object_type, object_id}`）但一律 `2001 请求数据错误` —— 该 UP 主 `sub_enabled=0` 未开订阅 |
+| **`/up/access`** | 查询接口本身无漏洞（不传对参数返回 `can_view:true` 是默认值） |
+| **`/drama/doReward`** | 真相是**打赏**（`{id, amount, seq}`），报 813108「这部剧还没有创作者」 |
+| **新账号** | 注册全新设备账号打付费集**照样 403** → 与账号无关，纯内容判定 |
+| **84 个付费集抽样** | 60 部剧、84 个 `coin`/`vip` 集 → **0 个能播** |
+| **CDN** | `dedup/{hash}` 要 `auth_key`（去掉即 403）；`article-video/uv_xxx/` 下除 `preview.mp4` 外全部 403；两个 CloudFront 桶都禁止列举（`AccessDenied`） |
+| **支付** | 第三方网关（支付宝 `hongyanyanbaihuo.online`、USDT `nsybillduxoaus.com`），**伪造回调属诈骗，不做** |
+| **金币** | 签到 1 币/天、任务空、邀请 0 币；`doBuy` 服务端校验余额（203001），6 种参数组合全失败 |
 
-**因此本脚本对付费集的处理是：把播放地址指向该集公开的 6 秒试看片 `preview.mp4`**
-（从 detail 缓存的 `cover.jpg` 推导，路径 `…/chapters/{seq}/preview.mp4`，CDN 上公开可取，实测 480×854 / 584kbps / **6.000 秒**）。
+**结论：付费集正片是纯服务端权益校验，客户端侧无解。**
+本脚本对付费集的处理是：把播放地址指向该集公开的 6 秒 `preview.mp4`（可用 `previewFallback=false` 关闭）。
 
-想要完整正片，目前只有两条真实可行路径：
-1. **攒金币**（每日签到 + 积分任务换币）后正常购买；
-2. **开会员**（支付宝/USDT 充值）。
-
-> 同类公开方案（如 Yu9191/Rewrite 的 `huangdou.js`）对付费集也是塞这个 6 秒试看片，
-> 其模块描述写的「完整播放」并不成立 —— 本仓库如实标注。
+> 同类公开方案（Yu9191/Rewrite 的 `huangdou.js`）同样只能塞 6 秒试看片，其「完整播放」描述不成立。
+> **免费剧 / 免费集是完整正片**（例如《我的女友景甜恶搞版》第 5 集 241 秒），脚本对这部分完全正常。
 
 ---
 
 ## 六、更新日志
+
+### v2.1.0 — 2026-09-10
+- **新增 UP 创作者模块处理**（抓包 + dart2js 反编译挖出真实参数）：
+  - `/up/access {object_type, object_id}` 是客户端**判断能不能看**的权限接口 → 强制 `can_view=true` + `access="free"` + `price_coin=0` + `sub_enabled=0`
+  - `/up/episodeFeed`、`/up/contentList`、`/up/recommend`、`/up/detail` 等列表 → 清掉 `can_view` / `ep_is_free` / `ep_price_coin` / `episode_min_coin` / `access` / `corner`
+  - `/up/unlock`、`/up/subscribe`、`/up/episodeDetail` → 伪造成功
+- 修正脚本头部协议说明：`is_preview` 缺省值确认是 `true`（`J.x(...,!0)`）
+- 确认**每一集都有独立 `uv_` 视频 id**（`/drama/play` 的 `preview_m3u8` 暴露）
 
 ### v2.0.0 — 2026-09-10
 - 域名从 1 个（`lzlukvca.cc`，已下线）扩展到 **43 个**（APP/H5/API/入口四组）
