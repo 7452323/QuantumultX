@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
 
 const code = (process.argv[2] || '').toUpperCase().trim();
 if (!code) { console.error('❌ 请提供番号'); process.exit(1); }
+if (!/^[A-Z0-9-]+$/.test(code)) { console.error('❌ 番号格式不正确'); process.exit(1); }
 
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
 function curl(url) {
-  return execSync(`curl -sL "${url}" -A "${UA}" --max-time 15`, { encoding: 'utf-8', timeout: 20000 });
+  return execFileSync('curl', ['-sL', url, '-A', UA, '--max-time', '15'], { encoding: 'utf-8', timeout: 20000 });
 }
 
 function extract(html, before, after) {
@@ -21,17 +22,15 @@ function extract(html, before, after) {
 
 function toSimple(t) {
   if (!t) return t;
-  try { return execSync(`python3 -c "from opencc import OpenCC; c=OpenCC('t2s'); print(c.convert('''${t.replace(/'/g,"\\'")}'''),end='')"`, { encoding:'utf-8',timeout:5000 }).trim(); }
-  catch { return t; }
+  try {
+    return execFileSync('python3', ['-c', "import os\nfrom opencc import OpenCC\nc=OpenCC('t2s')\nprint(c.convert(os.environ['LOOKUP_TEXT']),end='')"], { encoding:'utf-8', timeout:5000, env: { ...process.env, LOOKUP_TEXT: t } }).trim();
+  } catch { return t; }
 }
 
 function translate(t) {
   if (!t) return t;
   try {
-    const e = t.replace(/'/g,"\\'").replace(/"/g,'\\"').replace(/\n/g,' ');
-    const r = execSync(`python3 -c "
-from googletrans import Translator; tr=Translator()
-print(tr.translate('''${e}''',src='ja',dest='zh-cn').text,end='')"`, { encoding:'utf-8',timeout:10000 });
+    const r = execFileSync('python3', ['-c', "import os\nfrom googletrans import Translator\ntr=Translator()\nprint(tr.translate(os.environ['LOOKUP_TEXT'],src='ja',dest='zh-cn').text,end='')"], { encoding:'utf-8', timeout:10000, env: { ...process.env, LOOKUP_TEXT: t } });
     return r.trim() || t;
   } catch { return toSimple(t); }
 }
