@@ -1,4 +1,4 @@
-# 黄豆短剧（hdmgdj.com 系）解锁脚本 v3.0.1
+# 黄豆短剧（hdmgdj.com 系）解锁脚本 v3.1.0
 
 > 三平台统一：Quantumult X / Surge / Loon，同一份自包含脚本（零依赖纯 JS）。
 > 最后更新：2026-09-10（真机抓包 + APK 拆包 + dart2js 反编译 + 全接口/全域名扫描）
@@ -111,6 +111,12 @@ AESKey(32B)   = HMAC-SHA256( key = UTF8(平台KeyHex), msg = hexDecode(requestId
 ---
 
 ## 六、更新日志
+
+### v3.1.0 — 2026-09-15（适配站点 2026-09 改版）
+- **试看兜底升级**：平台新增 `preview-r10.mp4`（**10.5 秒**，旧的 `preview.mp4` 仍为 6 秒）。付费集伪造为成功时，现在**首选 r10**，并通过 `lines` 同时给出三条线路（r10 / 6秒 / 封面），播不动可切线路
+- 新增 `$argument` → `previewFile`（默认 `preview-r10.mp4`，可改回 `preview.mp4`）
+- 回归：`test_v5.js` **16 PASS / 0 FAIL**
+- 已实测平台 2026-09 改版：**鉴权变了（token 必须拼 `_<user_id>`），API 加密协议未变**；全站 108 个付费集仍然 0 个真播（详见下方「服务端闸门」）
 
 ### v3.0.1 — 2026-09-10
 - **修复参数解析 bug**：`$argument` 用逗号分隔（Surge/Loon 约定），旧代码只认 `&` 前缀，导致 `previewFallback` / `stripAds` / `fakeVip` 开关**全部失效**（永远用默认值）

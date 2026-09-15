@@ -1,6 +1,6 @@
 /*
- * 黄豆短剧（hdmgdj.com 系）解锁脚本 —— 三平台统一版 v3.0.1
- * Build 2026-09-10
+ * 黄豆短剧（hdmgdj.com 系）解锁脚本 —— 三平台统一版 v3.1.0
+ * Build 2026-09-15
  *
  * ⚠ 本版新增：客户端层面的「会员 + 金币」完整解锁
  *   - user/info · user/vip · user/recharge → VIP + 999999 金币/积分
@@ -9,7 +9,8 @@
  *   - user/doVip · user/doRecharge → 开通/充值一律成功（本地无需支付）
  *   - task/list · redeem/list · lottery/info → 任务/兑换/抽奖有奖可领
  *   - drama/doBuy → status:true（客户端标记已购、剧集列表全解锁）
- *   - play → 付费集伪造成功 + 试看兜底
+ *   - play → 付费集伪造成功 + 试看兜底（★2026-09 改版：平台新增 preview-r10.mp4=10.5 秒，
+ *            旧 preview.mp4=6 秒；三线路分别给 r10 / 6 秒 / 封面，可自行切线路）
  *
  * ── 协议（真机抓包复核，未变） ──────────────────────────────
  *   请求/响应 body = IV(16B) || AES-256-CBC(PKCS7, gzip(JSON))
@@ -50,7 +51,8 @@
     return dflt;
   }
   var CFG = {
-    previewFallback: argVal('previewFallback', 'true') !== 'false', // 付费集退化为 6 秒试看
+    previewFallback: argVal('previewFallback', 'true') !== 'false', // 付费集退化为公开试看片
+    previewFile: argVal('previewFile', 'preview-r10.mp4'),           // 试看文件名（r10=10.5s，preview.mp4=6s）
     stripAds: argVal('stripAds', 'true') !== 'false',               // 去广告/去启动页
     fakeVip: argVal('fakeVip', 'true') !== 'false',                 // 我的页显示会员+余额
     debug: argVal('debug', 'false') === 'true'
@@ -798,23 +800,28 @@
         var covers2 = {};
         try { covers2 = storeRead(ctxKey('covers')) ? JSON.parse(storeRead(ctxKey('covers'))) : {}; } catch (e) { covers2 = {}; }
         var cover = covers2[dramaId + '_' + seq] || covers2['rp_' + dramaId + '_' + seq];
-        var previewUrl = cover ? String(cover).replace(/\/cover\.[a-z]+$/i, '/preview.mp4') : null;
-        if (previewUrl && previewUrl !== cover) {
+        if (cover) {
+          var baseDir = String(cover).replace(/\/cover\.[a-z]+$/i, '/');
+          // 2026-09 改版：平台新增 preview-r10.mp4（10.5 秒）；旧的 preview.mp4 仍是 6 秒
+          var pvLong = baseDir + CFG.previewFile;                 // 默认 preview-r10.mp4
+          var pvShort = baseDir + 'preview.mp4';
           var forged = {
             status: 'y',
             data: {
               drama_id: dramaId, duration: 0, hls_key: '',
               lines: [
-                { id: '0', lid: '0', code: 'free', name: 'free', m3u8_url: previewUrl, url: previewUrl }
+                { id: '0', lid: '0', code: 'free', name: CFG.previewFile, m3u8_url: pvLong, url: pvLong },
+                { id: '1', lid: '1', code: 'line2', name: 'preview.mp4', m3u8_url: pvShort, url: pvShort },
+                { id: '2', lid: '2', code: 'line3', name: 'cover', m3u8_url: cover, url: cover }
               ],
-              m3u8: previewUrl, name: String(seq), preview_m3u8: previewUrl,
+              m3u8: pvLong, name: String(seq), preview_m3u8: pvLong,
               is_preview: false, preview_seconds: 0,
               seq: typeof seq === 'number' ? seq : (parseInt(seq, 10) || seq)
             },
             time: ts()
           };
           doneWithBytes(encryptBody(forged, requestId, deviceType));
-          log('play ' + pjson.errorCode + ' → preview fallback ' + previewUrl.slice(-40));
+          log('play ' + pjson.errorCode + ' → fallback ' + pvLong.slice(-46));
           return;
         }
       }
