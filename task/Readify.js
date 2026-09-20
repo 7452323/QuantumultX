@@ -101,7 +101,7 @@ function sha256Pure(ascii) {
   ascii += '\x80';
   while (ascii[lengthProperty] % 64 - 56) ascii += '\x00';
 
-  for (i = 0; i < ascii[lengthProperty]; i++) {
+  for (let i = 0; i < ascii[lengthProperty]; i++) {
     const j = ascii.charCodeAt(i);
     if (j >> 8) return; // ASCII check
     words[i >> 2] |= j << ((3 - i) % 4) * 8;
