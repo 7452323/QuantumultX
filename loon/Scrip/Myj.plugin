@@ -1,0 +1,10 @@
+#!name=EveryTrace 会员
+#!desc=墨水屏打卡追踪 App 终身会员解锁
+#!author=7452323
+#!icon=https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Myj.png
+
+[Script]
+http-response ^https:\/\/ink\.timerecord\.cn\/apis\/app\/trace\/(getUserInfo|getVisitorUserInfo) script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Myj.js, requires-body=true, timeout=60, tag=EveryTrace
+
+[MITM]
+hostname = ink.timerecord.cn
