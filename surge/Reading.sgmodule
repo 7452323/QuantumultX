@@ -1,0 +1,22 @@
+#!name=微信读书·全功能自动化
+#!desc=微信读书 每日阅读领卡+周二翻牌抽奖+周五限免入架 — 脚本来源:TomCatXue
+#!author=7452323
+#!homepage=https://github.com/7452323/QuantumultX
+#!icon=https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png
+#!tag=微信读书,签到,翻牌,限免
+#!arguments=prefer_coin=2
+#!arguments-desc=prefer_coin: 奖励领取偏好 (1=优先体验卡, 2=优先书币推荐)
+
+[Script]
+# 凭据捕获
+WeReadCookie = type=http-request, pattern=^https?:\/\/(i\.)?weread\.qq\.com\/(flip-card-game|user\/|feature|free\/library|checkfreequalify), script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading/weread_cookie.js, requires-body=false, timeout=10
+WeReadLoginReq = type=http-request, pattern=^https?:\/\/i\.weread\.qq\.com\/login, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading/weread_cookie.js, requires-body=true, timeout=10
+WeReadLoginResp = type=http-response, pattern=^https?:\/\/i\.weread\.qq\.com\/login, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading/weread_cookie.js, requires-body=true, timeout=10
+
+# 定时任务
+WeRead每日领取 = type=cron, cronexp="0 23 * * *", script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading/weread_claim.js, argument=prefer_coin={{{prefer_coin}}}, timeout=60
+WeRead周二翻牌 = type=cron, cronexp="0 20 * * 2", script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading/weread_flip.js, timeout=60
+WeRead周五限免 = type=cron, cronexp="0 10 * * 5", script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading/weread_free.js, timeout=60
+
+[MITM]
+hostname = %APPEND% weread.qq.com, i.weread.qq.com
