@@ -1,0 +1,9 @@
+#!name=黄豆短剧
+#!desc=金币播放破解 - 无限免费看剧
+#!author=7452323
+
+[Script]
+http-response ^https?://[^/]+/api/drama/(play|detail) script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/pornography/lzlukvca.js, requires-body=true, timeout=60, tag=黄豆短剧
+
+[MITM]
+hostname = *.hddj05.com, *.hddj06.com, *.hddj07.com, *.hdmgdj.com, *.fsbd.yskkkkb.me
