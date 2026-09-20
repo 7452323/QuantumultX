@@ -148,6 +148,87 @@
           "desc": "email#password，多账号用 | 分隔，如 a@b.com#pass1|c@d.com#pass2"
         }
       ]
+    },
+    {
+      "id": "weread_claim",
+      "name": "微信读书",
+      "keys": [
+        "weread_auth_v2",
+        "weread_flip_state_v1",
+        "prefer_coin"
+      ],
+      "author": "@TomCatXue",
+      "icon": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png",
+      "icons": [
+        "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png",
+        "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png"
+      ],
+      "repo": "https://github.com/7452323/QuantumultX",
+      "settings": [
+        {
+          "id": "prefer_coin",
+          "name": "奖励领取偏好",
+          "val": "2",
+          "type": "select",
+          "items": [
+            {
+              "key": "1",
+              "label": "优先体验卡"
+            },
+            {
+              "key": "2",
+              "label": "优先书币 (推荐)"
+            }
+          ],
+          "desc": "设置阅读时长达标奖励偏好。设为优先书币时自动转换书币。"
+        },
+        {
+          "id": "weread_auth_v2",
+          "name": "微信读书 App 全量凭据",
+          "val": "",
+          "type": "textarea",
+          "desc": "包含 vid、skey、refreshToken、deviceId 的 JSON 数据，由抓取插件自动捕获保存。"
+        }
+      ],
+      "scripts": [
+        {
+          "name": "领取阅读达标奖励",
+          "script": "https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading/weread_claim.js"
+        },
+        {
+          "name": "周二翻牌抽奖游戏",
+          "script": "https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading/weread_flip.js"
+        },
+        {
+          "name": "每周限免好书一键入架",
+          "script": "https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading/weread_free.js"
+        }
+      ],
+      "tasks": [
+        {
+          "name": "每日阅读达标奖励自动领取",
+          "cron": "0 23 * * *",
+          "script": "https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading/weread_claim.js"
+        },
+        {
+          "name": "每周二翻牌抽奖自动运行",
+          "cron": "0 20 * * 2",
+          "script": "https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading/weread_flip.js"
+        },
+        {
+          "name": "每周限免好书自动入架",
+          "cron": "0 10 * * 5",
+          "script": "https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading/weread_free.js"
+        }
+      ],
+      "descs_html": [
+        "<span><b>架构分离：</b>遵循 Cookie 抓取与签到执行彻底分离模式。Loon 插件仅负责抓取凭据，本 BoxJS 订阅统一管理所有签到任务与手动执行。</span>",
+        "<span><b>自动更新鉴权：</b>任务执行脚本仅读取已存储的 Cookie/凭证。当凭证过期时，内置纯 JS 逆向签名算法自动脱机调用 /login 换票更新鉴权，无需手动干预。</span>",
+        "<span><b>每日签到：</b>每晚 23:00 自动检查阅读时长与天数，达标后自动领取书币或体验卡。</span>",
+        "<span><b>周二翻牌：</b>每周二晚 20:00 自动参与翻牌抽奖，若 Cookie 超时自动同步换票重试。</span>",
+        "<span><b>免费图书馆：</b>每周五 10:00 自动对接免费图书馆书单，精选好书批量入架。</span>",
+        "<span><b>脚本来源：</b>TomCatXue (https://github.com/TomCatXue/MyCookieCenter)</span>"
+      ]
     }
   ]
 }
