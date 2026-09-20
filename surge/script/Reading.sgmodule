@@ -1,13 +1,22 @@
-#!name=微信读书(领取阅读奖励)
-#!desc=打开微信读书APP自动采集凭证，定时领取体验卡/书币
+#!name=微信读书·全功能自动化
+#!desc=微信读书 每日阅读领卡+周二翻牌抽奖+周五限免入架 — 脚本来源:TomCatXue
 #!author=7452323
-#!category=签到羊毛
-#!arguments=choiceType:1,cron:"10 23 * * 7",Cookie:1
-#!arguments-desc=\n1 choiceType\n\n1=体验卡, 2=书币\n默认为体验卡\n\n2 cron\n\n定时运行\n默认10 23 * * 7\n\n3 Cookie\n\n获取ck开关\n0=关闭, 1=打开\n默认为打开\n\n
+#!homepage=https://github.com/7452323/QuantumultX
+#!icon=https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png
+#!tag=微信读书,签到,翻牌,限免
+#!arguments=prefer_coin=2
+#!arguments-desc=prefer_coin: 奖励领取偏好 (1=优先体验卡, 2=优先书币推荐)
 
 [Script]
-微信读书 = type=cron, cronexp="{{{cron}}}", wake-system=1, timeout=60, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading.js, argument="choiceType={{{choiceType}}}&Cookie={{{Cookie}}}"
-微信读书_cookie = type=http-request, pattern=^https?://i\.weread\.qq\.com/, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading.js, requires-body=1, argument="choiceType={{{choiceType}}}&Cookie={{{Cookie}}}"
+# 凭据捕获
+WeReadCookie = type=http-request, pattern=^https?:\/\/(i\.)?weread\.qq\.com\/(flip-card-game|user\/|feature|free\/library|checkfreequalify), script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading/weread_cookie.js, requires-body=false, timeout=10
+WeReadLoginReq = type=http-request, pattern=^https?:\/\/i\.weread\.qq\.com\/login, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading/weread_cookie.js, requires-body=true, timeout=10
+WeReadLoginResp = type=http-response, pattern=^https?:\/\/i\.weread\.qq\.com\/login, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading/weread_cookie.js, requires-body=true, timeout=10
+
+# 定时任务
+WeRead每日领取 = type=cron, cronexp="0 23 * * *", script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading/weread_claim.js, argument=prefer_coin={{{prefer_coin}}}, timeout=60
+WeRead周二翻牌 = type=cron, cronexp="0 20 * * 2", script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading/weread_flip.js, timeout=60
+WeRead周五限免 = type=cron, cronexp="0 10 * * 5", script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading/weread_free.js, timeout=60
 
 [MITM]
-hostname = %APPEND% i.weread.qq.com
+hostname = %APPEND% weread.qq.com, i.weread.qq.com
