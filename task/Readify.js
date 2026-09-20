@@ -461,7 +461,7 @@ async function checkinWithToken(email, tokenData, priorStatus) {
         if (old.userToken !== token) {
           store['_captured'] = { userToken: token, capturedAt: Date.now() };
           saveStoredToken(store);
-          $.log('[Readify] Token采集成功（静默）');
+          $.msg('Readify深读', 'Token采集成功', '');
         }
       }
       if (typeof $done === 'function') $done({});
