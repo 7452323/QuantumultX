@@ -163,16 +163,6 @@ https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Frameworks/box
 
 ---
 
-## 📜 致谢
-
-| 作者 | 贡献 | 仓库 |
-|------|------|------|
-| **TomCatXue** | 微信读书全功能自动化 + 防强更净化 | [MyCookieCenter](https://github.com/TomCatXue/MyCookieCenter) |
-| **Sliverkiss** | Env.js 框架 / 脚本规范参考 | [QuantumultX](https://github.com/Sliverkiss/QuantumultX) |
-| **chavyleung** | Env.js 原始框架 | [chavyleung](https://github.com/chavyleung) |
-
----
-
 ## 📄 License
 
 <details>
