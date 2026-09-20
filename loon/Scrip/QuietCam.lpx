@@ -1,0 +1,10 @@
+#!name=QuietCam Pro Unlock
+#!desc=QuietCam Pro 解锁（RevenueCat）
+#!author=宝宝
+#!homepage=https://github.com/7452323/QuantumultX
+
+[Script]
+http-response ^https:\/\/api\.revenuecat\.com\/v1\/subscribers\/.* script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/QuietCam.js, requires-body=true, tag=QuietCam_Unlock
+
+[MITM]
+hostname = api.revenuecat.com
