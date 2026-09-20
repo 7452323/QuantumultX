@@ -175,6 +175,9 @@ https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Frameworks/box
 
 ## 📄 License
 
+<details>
+<summary>MIT License (点击预览)</summary>
+
 ```
 MIT License
 
@@ -192,6 +195,8 @@ copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
 ```
+
+</details>
 
 ---
 
