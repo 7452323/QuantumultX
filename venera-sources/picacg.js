@@ -11,7 +11,9 @@ class Picacg extends ComicSource {
 
     static defaultApiUrl = "https://picaapi.picacomic.com"
 
-    apiKey = "C69BAF41DA5ABD1FFEDC6D2FEA56B";
+    static defaultApiKey = "C69BAF41DA5ABD1FFEDC6D2FEA56B"
+
+    apiKey = this.loadSetting('apiKey') ?? Picacg.defaultApiKey;
 
     createSignature(path, nonce, time, method) {
         let data = path + time + nonce + method + this.apiKey
@@ -27,7 +29,7 @@ class Picacg extends ComicSource {
         let time = (new Date().getTime() / 1000).toFixed(0)
         let signature = this.createSignature(path, nonce, time, method.toUpperCase())
         return {
-            "api-key": "C69BAF41DA5ABD1FFEDC6D2FEA56B",
+            "api-key": this.apiKey,
             "accept": "application/vnd.picacomic.com.v1+json",
             "app-channel": this.loadSetting('appChannel'),
             "authorization": token ?? "",
