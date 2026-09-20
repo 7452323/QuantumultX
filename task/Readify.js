@@ -6,6 +6,23 @@
 @Update: 2026.09.20
 ------------------------------------------
 
+# Surge
+[Script]
+http-request ^https:\/\/readifyapp\.voiceclub\.cn\/api script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Readify.js, requires-body=true, timeout=10, tag=Readify深读
+cron 0 8 * * * script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Readify.js, timeout=60, tag=Readify深读
+
+[MITM]
+hostname = readifyapp.voiceclub.cn
+
+# Loon
+[Script]
+http-request ^https:\/\/readifyapp\.voiceclub\.cn\/api script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Readify.js, requires-body=true, timeout=10, tag=Readify深读
+cron 0 8 * * * script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Readify.js, timeout=60, tag=Readify深读
+
+[MITM]
+hostname = readifyapp.voiceclub.cn
+
+# QuantumultX
 [task_local]
 0 8 * * ? https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Readify.js, tag=Readify深读, enabled=true
 
@@ -257,7 +274,7 @@ async function captureToken() {
       const streakInfo = status.data || {};
       
       if (streakInfo.streakedToday) {
-        notifyMsg.push(`「${nickname}」签到成功 连续${streakInfo.currentDay || 1}天`);
+        notifyMsg.push(`「${nickname}」今日已签到 连续${streakInfo.currentDay || 1}天`);
         continue;
       }
       
