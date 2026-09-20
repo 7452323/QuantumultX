@@ -406,7 +406,7 @@ async function checkin(email, password) {
 
   // 2. 如果今天已签到
   if (streakInfo.streakedToday) {
-    allMsg.push(`「${nickname}」今日已签到 Day${streakInfo.currentDay || 0}`);
+    allMsg.push(`「${nickname}」签到成功 连续${streakInfo.currentDay || 1}天`);
     return;
   }
 
@@ -435,12 +435,10 @@ async function checkinWithToken(email, tokenData, priorStatus) {
 
   if (data.code === 0 && data.data) {
     const d = data.data;
-    if (d.checkInResult === 'CHECKED_IN') {
-      allMsg.push(`「${nickname}」签到成功 Day${d.currentDay || 1}`);
-    } else if (d.checkInResult === 'ALREADY_CHECKED_IN') {
-      allMsg.push(`「${nickname}」今日已签到 Day${d.currentDay || 0}`);
+    if (d.checkInResult === 'CHECKED_IN' || d.checkInResult === 'ALREADY_CHECKED_IN') {
+      allMsg.push(`「${nickname}」签到成功 连续${d.currentDay || 1}天`);
     } else {
-      allMsg.push(`「${nickname}」签到结果: ${d.checkInResult || 'unknown'} Day${d.currentDay || 0}`);
+      allMsg.push(`「${nickname}」签到结果: ${d.checkInResult || 'unknown'} 连续${d.currentDay || 0}天`);
     }
   } else {
     allMsg.push(`「${nickname}」签到失败: ${data.message || 'unknown'}`);
@@ -450,7 +448,7 @@ async function checkinWithToken(email, tokenData, priorStatus) {
 // ============ 主流程 ============
 (async () => {
   try {
-    // 凭证采集模式（MITM重写）
+    // 凭证采集模式（MITM重写）—— 仅采集 x-token，不弹通知
     if (typeof $request !== 'undefined') {
       const h = $request.headers || {};
       let token;
@@ -459,10 +457,12 @@ async function checkinWithToken(email, tokenData, priorStatus) {
       }
       if (token) {
         const store = loadStoredToken() || {};
-        const emailKey = '_captured';
-        store[emailKey] = { userToken: token, capturedAt: Date.now() };
-        saveStoredToken(store);
-        $.msg('Readify深读', 'Token采集成功', '请在BoxJS填入email#password');
+        const old = store['_captured'] || {};
+        if (old.userToken !== token) {
+          store['_captured'] = { userToken: token, capturedAt: Date.now() };
+          saveStoredToken(store);
+          $.log('[Readify] Token采集成功（静默）');
+        }
       }
       if (typeof $done === 'function') $done({});
       return;
