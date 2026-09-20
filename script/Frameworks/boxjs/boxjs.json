@@ -1,129 +1,153 @@
 {
-    "id": "com.7452323.checkin",
-    "name": "7452323 签到脚本订阅",
-    "author": "@7452323",
-    "icon": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/7452323.png",
-    "repo": "https://github.com/7452323/QuantumultX",
-    "apps": [
+  "id": "com.7452323.checkin",
+  "name": "7452323 签到脚本订阅",
+  "author": "@7452323",
+  "icon": "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/7452323.png",
+  "repo": "https://github.com/7452323/QuantumultX",
+  "apps": [
+    {
+      "id": "7452323_weread",
+      "name": "微信读书",
+      "author": "@7452323",
+      "repo": "https://github.com/7452323/QuantumultX",
+      "icons": [
+        "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png",
+        "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png"
+      ],
+      "keys": [
+        "weread_auth"
+      ],
+      "settings": [
         {
-            "id": "7452323_weread",
-            "name": "微信读书",
-            "author": "@7452323",
-            "repo": "https://github.com/7452323/QuantumultX",
-            "icons": [
-                "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png",
-                "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png"
-            ],
-            "keys": [
-                "weread_auth"
-            ],
-            "settings": [
-                {
-                    "id": "weread_auth",
-                    "name": "微信读书凭证",
-                    "val": "",
-                    "type": "textarea",
-                    "autoGrow": true,
-                    "rows": 5,
-                    "desc": "JSON: {vid, skey, basever, channelid, ua, refreshToken}，多账号 JSON 用 | 分隔"
-                }
-            ]
-        },
-        {
-            "id": "7452323_kuwoczz",
-            "name": "酷我音乐每日任务",
-            "author": "@7452323",
-            "repo": "https://github.com/7452323/QuantumultX",
-            "icons": [
-                "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png",
-                "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png"
-            ],
-            "keys": [
-                "kuwo_data"
-            ],
-            "settings": [
-                {
-                    "id": "kuwo_data",
-                    "name": "酷我 Cookie",
-                    "val": "",
-                    "type": "textarea",
-                    "autoGrow": true,
-                    "rows": 5,
-                    "desc": "多账号用 & 分隔"
-                }
-            ]
-        },
-        {
-            "id": "7452323_sehuatang",
-            "name": "色花堂签到",
-            "author": "@7452323",
-            "repo": "https://github.com/7452323/QuantumultX",
-            "icons": [
-                "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png",
-                "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png"
-            ],
-            "keys": [
-                "SEHUATANG_COOKIE"
-            ],
-            "settings": [
-                {
-                    "id": "SEHUATANG_COOKIE",
-                    "name": "色花堂 Cookie",
-                    "val": "",
-                    "type": "textarea",
-                    "autoGrow": true,
-                    "rows": 5,
-                    "desc": "验证码需人工完成，脚本仅保存 Cookie 并定时调签到接口"
-                }
-            ]
-        },
-        {
-            "id": "7452323_sxmd",
-            "name": "书香门第签到",
-            "author": "@7452323",
-            "repo": "https://github.com/7452323/QuantumultX",
-            "icons": [
-                "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png",
-                "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png"
-            ],
-            "keys": [
-                "sxmd_data"
-            ],
-            "settings": [
-                {
-                    "id": "sxmd_data",
-                    "name": "书香门第 Cookie",
-                    "val": "",
-                    "type": "textarea",
-                    "autoGrow": true,
-                    "rows": 5,
-                    "desc": "www.txtnovel.vip，单账号"
-                }
-            ]
-        },
-        {
-            "id": "7452323_hdhive",
-            "name": "HDHive影巢签到",
-            "author": "@7452323",
-            "repo": "https://github.com/7452323/QuantumultX",
-            "icons": [
-                "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png",
-                "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png"
-            ],
-            "keys": [
-                "HDHIVE_ACCOUNTS"
-            ],
-            "settings": [
-                {
-                    "id": "HDHIVE_ACCOUNTS",
-                    "name": "影巢账号密码",
-                    "val": "",
-                    "type": "textarea",
-                    "autoGrow": true,
-                    "rows": 5,
-                    "desc": "账号#密码，多账号用;分隔，如 user1#pass1;user2#pass2"
-                }
-            ]
+          "id": "weread_auth",
+          "name": "微信读书凭证",
+          "val": "",
+          "type": "textarea",
+          "autoGrow": true,
+          "rows": 5,
+          "desc": "JSON: {vid, skey, basever, channelid, ua, refreshToken}，多账号 JSON 用 | 分隔"
         }
-    ]
+      ]
+    },
+    {
+      "id": "7452323_kuwoczz",
+      "name": "酷我音乐每日任务",
+      "author": "@7452323",
+      "repo": "https://github.com/7452323/QuantumultX",
+      "icons": [
+        "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png",
+        "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png"
+      ],
+      "keys": [
+        "kuwo_data"
+      ],
+      "settings": [
+        {
+          "id": "kuwo_data",
+          "name": "酷我 Cookie",
+          "val": "",
+          "type": "textarea",
+          "autoGrow": true,
+          "rows": 5,
+          "desc": "多账号用 & 分隔"
+        }
+      ]
+    },
+    {
+      "id": "7452323_sehuatang",
+      "name": "色花堂签到",
+      "author": "@7452323",
+      "repo": "https://github.com/7452323/QuantumultX",
+      "icons": [
+        "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png",
+        "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png"
+      ],
+      "keys": [
+        "SEHUATANG_COOKIE"
+      ],
+      "settings": [
+        {
+          "id": "SEHUATANG_COOKIE",
+          "name": "色花堂 Cookie",
+          "val": "",
+          "type": "textarea",
+          "autoGrow": true,
+          "rows": 5,
+          "desc": "验证码需人工完成，脚本仅保存 Cookie 并定时调签到接口"
+        }
+      ]
+    },
+    {
+      "id": "7452323_sxmd",
+      "name": "书香门第签到",
+      "author": "@7452323",
+      "repo": "https://github.com/7452323/QuantumultX",
+      "icons": [
+        "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png",
+        "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png"
+      ],
+      "keys": [
+        "sxmd_data"
+      ],
+      "settings": [
+        {
+          "id": "sxmd_data",
+          "name": "书香门第 Cookie",
+          "val": "",
+          "type": "textarea",
+          "autoGrow": true,
+          "rows": 5,
+          "desc": "www.txtnovel.vip，单账号"
+        }
+      ]
+    },
+    {
+      "id": "7452323_hdhive",
+      "name": "HDHive影巢签到",
+      "author": "@7452323",
+      "repo": "https://github.com/7452323/QuantumultX",
+      "icons": [
+        "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png",
+        "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png"
+      ],
+      "keys": [
+        "HDHIVE_ACCOUNTS"
+      ],
+      "settings": [
+        {
+          "id": "HDHIVE_ACCOUNTS",
+          "name": "影巢账号密码",
+          "val": "",
+          "type": "textarea",
+          "autoGrow": true,
+          "rows": 5,
+          "desc": "账号#密码，多账号用;分隔，如 user1#pass1;user2#pass2"
+        }
+      ]
+    },
+    {
+      "id": "7452323_readify",
+      "name": "Readify深读签到",
+      "author": "@7452323",
+      "repo": "https://github.com/7452323/QuantumultX",
+      "icons": [
+        "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png",
+        "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png"
+      ],
+      "keys": [
+        "readify_accounts"
+      ],
+      "settings": [
+        {
+          "id": "readify_accounts",
+          "name": "深读账号密码",
+          "val": "",
+          "type": "textarea",
+          "autoGrow": true,
+          "rows": 3,
+          "desc": "email#password，多账号用 | 分隔，如 a@b.com#pass1|c@d.com#pass2"
+        }
+      ]
+    }
+  ]
 }
