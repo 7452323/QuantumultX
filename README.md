@@ -4,11 +4,12 @@
 
 <br>
 
-<img src="https://img.shields.io/github/stars/7452323/QuantumultX?style=flat-square&color=ffcc00&label=⭐%20Stars" alt="stars">
+<img src="https://img.shields.io/github/stars/7452323/QuantumultX?style=flat-square&color=ffcc00" alt="stars">
 <img src="https://img.shields.io/github/forks/7452323/QuantumultX?style=flat-square&color=5865F2" alt="forks">
-<img src="https://img.shields.io/github/last-commit/7452323/QuantumultX?style=flat-square&color=2EA043&label=🔄%20Last%20Update" alt="last commit">
-<img src="https://img.shields.io/github/commit-activity/m/7452323/QuantumultX?style=flat-square&color=8957e5&label=📝%20Commits" alt="commits">
-<img src="https://img.shields.io/github/repo-size/7452323/QuantumultX?style=flat-square&color=f0883e&label=📦%20Size" alt="repo size">
+<img src="https://img.shields.io/github/last-commit/7452323/QuantumultX?style=flat-square&color=2EA043" alt="last commit">
+<img src="https://img.shields.io/github/commit-activity/m/7452323/QuantumultX?style=flat-square&color=8957e5" alt="commits">
+<img src="https://img.shields.io/github/repo-size/7452323/QuantumultX?style=flat-square&color=f0883e" alt="repo size">
+<img src="https://img.shields.io/github/languages/top/7452323/QuantumultX?style=flat-square&color=da3633" alt="top language">
 
 ### 个人配置 · 签到脚本 · Surge模块 · Loon插件 · BoxJS订阅
 
