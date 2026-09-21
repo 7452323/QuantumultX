@@ -33,7 +33,7 @@ QuantumultX/
 
 ## 📄 License
 
-[MIT License](LICENSE)
+[MIT](LICENSE)
 
 ---
 
