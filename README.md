@@ -4,15 +4,6 @@
 
 <br>
 
-<img src="https://img.shields.io/github/stars/7452323/QuantumultX?style=flat-square&color=ffcc00" alt="stars">
-<img src="https://img.shields.io/github/forks/7452323/QuantumultX?style=flat-square&color=5865F2" alt="forks">
-<img src="https://img.shields.io/github/last-commit/7452323/QuantumultX?style=flat-square&color=2EA043" alt="last commit">
-<img src="https://img.shields.io/github/commit-activity/m/7452323/QuantumultX?style=flat-square&color=8957e5" alt="commits">
-<img src="https://img.shields.io/github/repo-size/7452323/QuantumultX?style=flat-square&color=f0883e" alt="repo size">
-<img src="https://img.shields.io/github/languages/top/7452323/QuantumultX?style=flat-square&color=da3633" alt="top language">
-
-<br><br>
-
 ### 🌐 QX · ⚡ Surge · 🦆 Loon — 三平台同步
 
 </div>
@@ -59,25 +50,21 @@ Surge 模块 · Loon 插件<br>QX 脚本 · BoxJS 订阅
 
 ---
 
-## 📊 统计
+## 📊 仓库数据
 
 <div align="center">
 
-<img src="https://gh-card.dev/repos/7452323/QuantumultX.svg?theme=dark" alt="repo card">
-
-<br><br>
-
-<img src="https://img.shields.io/github/stars/7452323/QuantumultX?style=flat-square&color=ffcc00" alt="stars">
-<img src="https://img.shields.io/github/forks/7452323/QuantumultX?style=flat-square&color=5865F2" alt="forks">
-<img src="https://img.shields.io/github/watchers/7452323/QuantumultX?style=flat-square&color=da3633" alt="watchers">
-<img src="https://img.shields.io/github/contributors/7452323/QuantumultX?style=flat-square&color=blue" alt="contributors">
-<br>
-<img src="https://img.shields.io/github/issues/7452323/QuantumultX?style=flat-square&color=2EA043" alt="issues">
-<img src="https://img.shields.io/github/issues-pr/7452323/QuantumultX?style=flat-square&color=f0883e" alt="prs">
-<img src="https://img.shields.io/github/commit-activity/y/7452323/QuantumultX?style=flat-square&color=8957e5" alt="yearly commits">
-<img src="https://img.shields.io/github/release-date/7452323/QuantumultX?style=flat-square&color=1f6feb" alt="release date">
+<img src="https://gh-card.dev/repos/7452323/QuantumultX.svg?theme=dark" alt="repo card" width="480">
 
 </div>
+
+| 指标 | 值 | 指标 | 值 |
+|:---:|:---:|:---:|:---:|
+| ⭐ Stars | ![GitHub stars](https://img.shields.io/github/stars/7452323/QuantumultX?style=flat-square&color=ffcc00) | 🍴 Forks | ![GitHub forks](https://img.shields.io/github/forks/7452323/QuantumultX?style=flat-square&color=5865F2) |
+| 👀 Watchers | ![GitHub watchers](https://img.shields.io/github/watchers/7452323/QuantumultX?style=flat-square&color=da3633) | 👥 Contributors | ![GitHub contributors](https://img.shields.io/github/contributors/7452323/QuantumultX?style=flat-square&color=blue) |
+| 📝 Issues | ![GitHub issues](https://img.shields.io/github/issues/7452323/QuantumultX?style=flat-square&color=2EA043) | 🔀 PRs | ![GitHub PRs](https://img.shields.io/github/issues-pr/7452323/QuantumultX?style=flat-square&color=f0883e) |
+| 📅 创建于 | 2025-07-22 | 💻 主语言 | ![GitHub language](https://img.shields.io/github/languages/top/7452323/QuantumultX?style=flat-square&color=da3633) |
+| 📦 仓库大小 | ![GitHub repo size](https://img.shields.io/github/repo-size/7452323/QuantumultX?style=flat-square&color=f0883e) | 🔄 最近提交 | ![GitHub last commit](https://img.shields.io/github/last-commit/7452323/QuantumultX?style=flat-square&color=2EA043) |
 
 ---
 
