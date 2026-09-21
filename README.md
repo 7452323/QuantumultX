@@ -63,7 +63,19 @@ Surge 模块 · Loon 插件<br>QX 脚本 · BoxJS 订阅
 
 <div align="center">
 
-<img src="https://github-profile-summary.vercel.app/api/7452323" alt="profile summary">
+<img src="https://gh-card.dev/repos/7452323/QuantumultX.svg?theme=dark" alt="repo card">
+
+<br><br>
+
+<img src="https://img.shields.io/github/stars/7452323/QuantumultX?style=flat-square&color=ffcc00" alt="stars">
+<img src="https://img.shields.io/github/forks/7452323/QuantumultX?style=flat-square&color=5865F2" alt="forks">
+<img src="https://img.shields.io/github/watchers/7452323/QuantumultX?style=flat-square&color=da3633" alt="watchers">
+<img src="https://img.shields.io/github/contributors/7452323/QuantumultX?style=flat-square&color=blue" alt="contributors">
+<br>
+<img src="https://img.shields.io/github/issues/7452323/QuantumultX?style=flat-square&color=2EA043" alt="issues">
+<img src="https://img.shields.io/github/issues-pr/7452323/QuantumultX?style=flat-square&color=f0883e" alt="prs">
+<img src="https://img.shields.io/github/commit-activity/y/7452323/QuantumultX?style=flat-square&color=8957e5" alt="yearly commits">
+<img src="https://img.shields.io/github/release-date/7452323/QuantumultX?style=flat-square&color=1f6feb" alt="release date">
 
 </div>
 
