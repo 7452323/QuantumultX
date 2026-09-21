@@ -13,27 +13,9 @@
 
 ---
 
-## 📁 仓库结构
-
-```
-QuantumultX/
-├── task/              # 签到脚本 (QX task_local)
-│   └── Reading/       #   微信读书全功能自动化 (来源:TomCatXue)
-├── script/            # 功能脚本 (QX rewrite_local)
-│   └── ReadingAd/     #   微信读书防强更净化 (来源:TomCatXue)
-├── surge/script/      # Surge 签到模块
-├── loon/Scrip/        # Loon 签到插件
-├── venera-sources/    # Venera 漫画源
-├── Javdb/             # JavDB 番号查询工具
-├── icon/              # 图标资源
-└── script/Frameworks/boxjs/boxjs.json  # BoxJS 订阅
-```
-
----
-
 ## 📄 License
 
-[MIT](LICENSE)
+[MIT License](LICENSE)
 
 ---
 
