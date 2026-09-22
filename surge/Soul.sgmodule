@@ -36,8 +36,8 @@ IP-CIDR,3.0.163.78/32,DIRECT
 ^https:\/\/post\.soulapp\.cn\/v\d\/post\/homepage\/guide\/card _ reject
 # 青少年弹窗
 ^https:\/\/api-account\.soulapp\.cn\/teenager\/config _ reject
-# 谁看过我横幅广告
-^https:\/\/api-a\.soulapp\.cn\/official\/scene\/module _ reject
+# 首页/会员页场景模块（横幅广告位）；MHomeMyTrack_Main 是我的足迹/谁看过我，必须放行
+^https:\/\/api-a\.soulapp\.cn\/official\/scene\/module\?.*pageId=(HomePage_Main|MSoulMember_PayNew) _ reject
 # 我的页面右下角悬浮广告
 ^https:\/\/api-user\.soulapp\.cn\/furion\/position\/content _ reject
 # 通讯录右下角机器人图标
