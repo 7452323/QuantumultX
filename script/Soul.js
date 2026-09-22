@@ -102,6 +102,12 @@ function httpGet(u, headers) {
     } catch (e) { reject(e); }
   });
 }
+function notify(title, sub, content) {
+  try {
+    if (typeof $notify !== "undefined" && $notify) { $notify(title, sub, content); return; }
+    if (typeof $notification !== "undefined" && $notification.post) { $notification.post(title, sub, content); return; }
+  } catch (e) { }
+}
 function fillViewers(obj, list) {
   if (!obj || !obj.data || !Array.isArray(list) || !list.length) return;
   obj.data.list = list;
@@ -282,7 +288,10 @@ try {
     if (obj && obj.data) {
       obj.data.superUser = true;
       const real = Array.isArray(obj.data.userList) ? obj.data.userList.filter((x) => x && x.user) : [];
-      if (real.length) saveViewerCache(real, obj.data.meSeeMetricResp);
+      if (real.length) {
+        saveViewerCache(real, obj.data.meSeeMetricResp);
+        if (NOTIFY) notify("Soul 谁看过我", "✅ 已抓取 " + real.length + " 条真人", "现在去「我的足迹」就能看到");
+      }
     }
     body = JSON.stringify(obj);
   }
@@ -298,8 +307,12 @@ try {
       const c = readViewerCache();
       if (c) {
         fillViewers(obj, c.list);
-      } else if (typeof $task !== "undefined" || typeof $httpClient !== "undefined") {
-        pending = fetchViewers(obj);
+        if (NOTIFY) notify("Soul 谁看过我", "✅ 已回填 " + c.list.length + " 条", "缓存 " + new Date(c.t).toLocaleString());
+      } else {
+        if (NOTIFY) notify("Soul 谁看过我", "⚠️ 本地没缓存", "先去会员页(我的→超星/会员)刷一次，再回来");
+        if (typeof $task !== "undefined" || typeof $httpClient !== "undefined") {
+          pending = fetchViewers(obj);
+        }
       }
     }
     body = JSON.stringify(obj);
