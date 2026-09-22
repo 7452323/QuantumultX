@@ -75,6 +75,21 @@ https://raw.githubusercontent.com/7452323/QuantumultX/main/loon/Scrip/Reading.pl
 https://raw.githubusercontent.com/7452323/QuantumultX/main/loon/ReadingAd.plugin
 ```
 
+### Soul 去广告 + 私聊净化
+
+```text
+# Quantumult X 远程重写
+https://raw.githubusercontent.com/7452323/QuantumultX/main/script/SoulAds.conf
+
+# Surge 模块
+https://raw.githubusercontent.com/7452323/QuantumultX/main/surge/SoulAds.sgmodule
+
+# Loon 插件
+https://raw.githubusercontent.com/7452323/QuantumultX/main/loon/SoulAds.plugin
+```
+
+来源：[ishowshu/qx](https://github.com/ishowshu/qx)（树先生 / 怎么肥事 / 奶思），本仓库做了三平台统一与容错处理。
+
 ---
 
 ## 致谢
@@ -82,6 +97,7 @@ https://raw.githubusercontent.com/7452323/QuantumultX/main/loon/ReadingAd.plugin
 - [TomCatXue](https://github.com/TomCatXue/MyCookieCenter) — 微信读书全功能自动化与防强更净化脚本
 - [chavyleung](https://github.com/chavyleung/Scripts) — Env.js 跨平台框架
 - [Sliverkiss](https://github.com/Sliverkiss/QuantumultX) — 脚本规范参考
+- [ishowshu](https://github.com/ishowshu/qx) — Soul 去广告 · 私聊限制解除 · 阅后即焚脚本原始作者
 
 ---
 

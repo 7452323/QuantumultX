@@ -1,0 +1,99 @@
+#!name=Soul 去广告 + 私聊净化
+#!desc=移除官方/第三方广告与各类推荐入口，解除私聊送礼限制，阅后即焚图片可留存
+#!author=7452323
+#!homepage=https://github.com/7452323/QuantumultX
+#
+# ── 来源 ──────────────────────────────────────────────
+# 抄自 ishowshu/qx（作者：树先生 / 怎么肥事 / 奶思）
+#   https://github.com/ishowshu/qx
+#   · rewrite/soul.snippet  2026-09-19  QX 重写规则
+#   · script/soul_qx.js     2026-08-29  私聊限制解除 · 阅后即焚
+#   · script/soul.js        2026-05-27  去广告分支
+# Loon 无 jsonjq 语法，上游 jq 规则已统一由 script/SoulAds.js 处理。
+# 生效需卸载重装 Soul；规则里的 IP 走直连别删，否则可能影响功能使用。
+
+[Argument]
+notify = true
+planetKeep = 
+roomTagKeep = 
+
+[Rule]
+DOMAIN,ssp.soulapp.cn,REJECT
+DOMAIN,soul-ad.soulapp.cn,REJECT
+DOMAIN,ad-r.soulapp.cn,REJECT
+DOMAIN,ssp.1rtb.com,REJECT
+DOMAIN,impdsp.meituan.com,REJECT
+DOMAIN,s3plus.meituan.net,REJECT
+DOMAIN,ssp.maplehaze.cn,REJECT
+IP-CIDR,13.127.149.196/32,DIRECT,no-resolve
+IP-CIDR,52.194.158.59/32,DIRECT,no-resolve
+IP-CIDR,47.56.131.76/32,DIRECT,no-resolve
+IP-CIDR,47.75.72.47/32,DIRECT,no-resolve
+IP-CIDR,3.0.163.78/32,DIRECT,no-resolve
+
+[Rewrite]
+# 广告下发（ip 映射请求）
+^https:\/\/ssp\.soulapp\.cn\/api reject
+^https:\/\/47\.110\.187\.87\/winterfell\/(?:v2\/)?getIpByDomain reject
+# 我的页面瞬间指导
+^https:\/\/post\.soulapp\.cn\/v\d\/post\/homepage\/guide\/card reject
+# 青少年弹窗
+^https:\/\/api-account\.soulapp\.cn\/teenager\/config reject
+# 谁看过我横幅广告
+^https:\/\/api-a\.soulapp\.cn\/official\/scene\/module reject
+# 我的页面右下角悬浮广告
+^https:\/\/api-user\.soulapp\.cn\/furion\/position\/content reject
+# 通讯录右下角机器人图标
+^https:\/\/api-chat\.soulapp\.cn\/addressBook\/showBubblingEnter reject
+# 表情推荐
+^https:\/\/api-chat\.soulapp\.cn\/chat\/interact\/getEmojiList reject
+# 我的页面 soul 币活动推荐
+^https:\/\/increase-openapi\.soulapp\.cn\/increase\/fission\/getHomePageRedIcon reject
+# 首次私聊打开星球交汇小卡片
+^https:\/\/api-chat\.soulapp\.cn\/similar\/post\/intersect\/trigger reject
+# 首次打开私聊界面底部瞬间表情推荐
+^https:\/\/api-chat\.soulapp\.cn\/chat\/guide\/defaultWord reject
+# 聊天输入文字时的 gif 表情推荐
+^https:\/\/api-chat\.soulapp\.cn\/chat\/emoji\/recommend reject
+# 私聊瞬间小横幅
+^https:\/\/api-a\.soulapp\.cn\/shara\/app\/url reject
+# 私聊快捷菜单
+^https:\/\/api-chat\.soulapp\.cn\/chat\/quick\/menu reject
+# 私聊用户匹配推荐
+^https:\/\/api-chat\.soulapp\.cn\/chat\/session\/quickButtonCheck reject
+# 派对体验反馈
+^https:\/\/chat-live\.soulapp\.cn\/live\/config\/rec-feedback reject
+# 广场关注 tab 用户派对推荐
+^https:\/\/post\.soulapp\.cn\/post\/relationUser\/chatRooms reject
+# 聊天页通讯录 tab 邀请好友回归横幅
+^https:\/\/increase-openapi\.soulapp\.cn\/increase\/dusting\/getAddressBookDustings reject
+# 派对的关注 tab 隐藏猜我喜欢的派对
+^https:\/\/chat-live\.soulapp\.cn\/live\/queryRelevantList reject
+# 主页 ai 描述推荐
+^https:\/\/api-user\.soulapp\.cn\/user\/desc\/getUserPersonalDesc reject
+# 我的页面瞬间得分向导
+^https:\/\/post\.soulapp\.cn\/v1\/post\/homepage\/ai\/assistant\/guide reject
+# 聊天列表页面顶部头像推荐横幅
+^https:\/\/api-chat\.soulapp\.cn\/chatList\/limitAvatar\/entrance reject
+# 聊天列表页面顶部用户推荐
+^https:\/\/api-chat\.soulapp\.cn\/chatList\/top\/recommendList reject
+# 派对左、右上角广告图标
+^https:\/\/activity\.soulapp\.cn\/commercial\/room\/resources reject
+^https:\/\/chat-live\.soulapp\.cn\/official\/scene\/module reject
+# 星球页面派对的游戏栏
+^https:\/\/chat-live\.soulapp\.cn\/live\/planet\/match\/game\/configList reject
+# 派对的创建按钮广告提示
+^https:\/\/chat-live\.soulapp\.cn\/square\/getSkinConfig reject
+
+[Script]
+# 私聊限制解除 + 阅后即焚抓图
+http-response ^https?:\/\/api-chat\.soulapp\.cn\/(chat\/limitInfo|snapchat\/url) script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/SoulAds.js, requires-body=true, timeout=30, tag=SoulAds-chat
+# 星球页精简
+http-response ^https?:\/\/api-user\.soulapp\.cn\/v6\/planet\/config script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/SoulAds.js, requires-body=true, timeout=30, tag=SoulAds-planet
+# 派对 / 广场推荐位
+http-response ^https?:\/\/chat-live\.soulapp\.cn\/(chatroom\/chatClassifyRoomList|chatroom\/getRoomTagInfo|live\/queryFollowRoomList|square\/relation\/guideUserList) script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/SoulAds.js, requires-body=true, timeout=30, tag=SoulAds-live
+# 我的页面 tab
+http-response ^https?:\/\/post\.soulapp\.cn\/homepage\/tabs\/v2 script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/SoulAds.js, requires-body=true, timeout=30, tag=SoulAds-tabs
+
+[MITM]
+hostname = ssp.soulapp.cn, soul-ad.soulapp.cn, ad-r.soulapp.cn, ssp.1rtb.com, impdsp.meituan.com, s3plus.meituan.net, ssp.maplehaze.cn, increase-openapi.soulapp.cn, post.soulapp.cn, api-account.soulapp.cn, api-a.soulapp.cn, gateway-mobile-gray.soulapp.cn, api-user.soulapp.cn, chat-live.soulapp.cn, api-chat.soulapp.cn, activity.soulapp.cn, 47.110.187.87, 47.96.7.91, 47.96.11.46, 47.96.20.45, 47.97.215.55, 47.98.54.106, 47.98.137.249, 47.99.42.29, 114.215.255.94, 116.62.28.7, 116.62.47.28, 118.31.7.235, 118.31.112.221, 120.27.235.201, 120.55.55.115, 120.55.62.124, 121.196.197.147, 121.196.203.183
