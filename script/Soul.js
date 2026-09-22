@@ -293,6 +293,7 @@ try {
     const obj = JSON.parse(body);
     if (obj && obj.data) {
       obj.data.superUser = true;
+      if (obj.data.meSeeMetricResp) obj.data.meSeeMetricResp.invisibleCount = 9999;
       const real = Array.isArray(obj.data.userList) ? obj.data.userList.filter((x) => x && x.user) : [];
       if (real.length) {
         saveViewerCache(real, obj.data.meSeeMetricResp);
@@ -326,6 +327,13 @@ try {
     body = JSON.stringify(obj);
   }
 
+  /* ── 11b. 缘分匹配列表 ────────────────────────────── */
+  else if (has("/meet/match/list")) {
+    const obj = JSON.parse(body);
+    if (obj && obj.data) obj.data.superUser = true;
+    body = JSON.stringify(obj);
+  }
+
   /* ── 12. 超级会员状态（我的相遇 / 谁看过我 权益位） ── */
   else if (has("/privilege/supervip/status")) {
     const obj = JSON.parse(body);
@@ -333,6 +341,8 @@ try {
       obj.data.superVIP = true;
       obj.data.showSuperVIP = true;
       obj.data.hasMyMeet = true;
+      obj.data.hasFlyPackage = true;
+      obj.data.hasAiSocialVip = true;
       if (!(obj.data.remainDay > 0)) obj.data.remainDay = 9999;
       if (obj.data.leftDay == null) obj.data.leftDay = 9999;
     }
@@ -351,6 +361,11 @@ try {
       s0.validTime = 4102415999000;
       s0.lastVipExpireTime = 4102415999000;
     }
+    const d0 = obj && obj.data;
+    if (d0 && d0.flyPackageDTO) d0.flyPackageDTO.hasFlyPackage = true;
+    if (d0 && d0.flyPackageShowDTO) d0.flyPackageShowDTO.result = true;
+    if (d0 && d0.aiSocialDto) d0.aiSocialDto.hasAiSocial = true;
+    if (d0 && d0.aiSocialShowDTO) d0.aiSocialShowDTO.result = true;
     body = JSON.stringify(obj);
   }
 
@@ -360,6 +375,7 @@ try {
     if (obj && obj.data) {
       obj.data.superVIP = true;
       obj.data.superUser = true;
+      obj.data.wasVip = true;
       if (obj.data.leftDay == null) obj.data.leftDay = 9999;
       if (obj.data.validTime == null) obj.data.validTime = 4102415999000;
     }
