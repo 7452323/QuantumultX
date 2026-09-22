@@ -25,11 +25,29 @@
  * hostname = api-chat.soulapp.cn
  */
 
-/* Surge / Loon argument，QX 无 $argument，全部走默认值 */
-const ARG = (typeof $argument !== "undefined" && $argument) ? $argument : {};
+/* ── 参数 ──────────────────────────────────────────────
+ * Loon   : [Argument] 对象参数 → $argument 为 Object
+ * Surge  : #!arguments 占位符替换 → $argument 为 String "k=v,k=v"
+ * QX     : 不支持参数 → $argument 不存在，全部走默认值
+ * 三种形态都在这里统一成对象。 */
+function parseArgs(raw) {
+  if (!raw) return {};
+  if (typeof raw === "object") return raw;
+  const out = {};
+  String(raw).split(",").forEach((p) => {
+    const i = p.indexOf("=");
+    if (i < 0) return;
+    const k = p.slice(0, i).trim();
+    const v = p.slice(i + 1).trim();
+    if (k) out[k] = v;
+  });
+  return out;
+}
+const ARG = parseArgs(typeof $argument !== "undefined" ? $argument : null);
 const flag = (k, dft) => {
-  if (ARG[k] === undefined || ARG[k] === null) return dft;
-  return ARG[k] === true || ARG[k] === "true" || ARG[k] === 1;
+  const v = ARG[k];
+  if (v === undefined || v === null || v === "") return dft;
+  return v === true || v === "true" || v === 1 || v === "1";
 };
 const NOTIFY = flag("notify", true);        // 阅后即焚抓到图片时弹通知
 const PLANET_KEEP = ARG.planetKeep || "";   // 星球页保留入口，逗号分隔: soulMatch,voiceMatch,partyMatch,masked,maskedMatch,planet

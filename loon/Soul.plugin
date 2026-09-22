@@ -13,9 +13,9 @@
 # 生效需卸载重装 Soul；规则里的 IP 走直连别删，否则可能影响功能使用。
 
 [Argument]
-notify = true
-planetKeep = 
-roomTagKeep = 
+notify = switch,true,tag=阅后即焚通知,desc=抓到阅后即焚图片时弹通知，可点击查看或保存
+planetKeep = input,tag=星球页保留入口,desc=逗号分隔：soulMatch,voiceMatch,partyMatch,masked,maskedMatch,planet。留空则隐藏全部入口
+roomTagKeep = input,tag=派对频道保留,desc=逗号分隔：hot,all,emotion,personal,play,interest,argue,story,chat,heart。留空则隐藏全部频道
 
 [Rule]
 DOMAIN,ssp.soulapp.cn,REJECT
@@ -87,13 +87,13 @@ IP-CIDR,3.0.163.78/32,DIRECT,no-resolve
 
 [Script]
 # 私聊限制解除 + 阅后即焚抓图
-http-response ^https?:\/\/api-chat\.soulapp\.cn\/(chat\/limitInfo|snapchat\/url) script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js, requires-body=true, timeout=30, tag=Soul-chat
+response if ${url} ~= /^https?:\/\/api-chat\.soulapp\.cn\/(chat\/limitInfo|snapchat\/url)/i then script("https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js", {${notify}}) with tag="Soul·私聊限制+阅后即焚", requires_body=true, timeout=30
 # 星球页精简
-http-response ^https?:\/\/api-user\.soulapp\.cn\/v6\/planet\/config script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js, requires-body=true, timeout=30, tag=Soul-planet
+response if ${url} ~= /^https?:\/\/api-user\.soulapp\.cn\/v6\/planet\/config/i then script("https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js", {${planetKeep}}) with tag="Soul·星球页精简", requires_body=true, timeout=30
 # 派对 / 广场推荐位
-http-response ^https?:\/\/chat-live\.soulapp\.cn\/(chatroom\/chatClassifyRoomList|chatroom\/getRoomTagInfo|live\/queryFollowRoomList|square\/relation\/guideUserList) script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js, requires-body=true, timeout=30, tag=Soul-live
+response if ${url} ~= /^https?:\/\/chat-live\.soulapp\.cn\/(chatroom\/chatClassifyRoomList|chatroom\/getRoomTagInfo|live\/queryFollowRoomList|square\/relation\/guideUserList)/i then script("https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js", {${roomTagKeep}}) with tag="Soul·派对广场净化", requires_body=true, timeout=30
 # 我的页面 tab
-http-response ^https?:\/\/post\.soulapp\.cn\/homepage\/tabs\/v2 script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js, requires-body=true, timeout=30, tag=Soul-tabs
+response if ${url} ~= /^https?:\/\/post\.soulapp\.cn\/homepage\/tabs\/v2/i then script("https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js") with tag="Soul·我的页面tab", requires_body=true, timeout=30
 
 [MITM]
 hostname = ssp.soulapp.cn, soul-ad.soulapp.cn, ad-r.soulapp.cn, ssp.1rtb.com, impdsp.meituan.com, s3plus.meituan.net, ssp.maplehaze.cn, increase-openapi.soulapp.cn, post.soulapp.cn, api-account.soulapp.cn, api-a.soulapp.cn, gateway-mobile-gray.soulapp.cn, api-user.soulapp.cn, chat-live.soulapp.cn, api-chat.soulapp.cn, activity.soulapp.cn, 47.110.187.87, 47.96.7.91, 47.96.11.46, 47.96.20.45, 47.97.215.55, 47.98.54.106, 47.98.137.249, 47.99.42.29, 114.215.255.94, 116.62.28.7, 116.62.47.28, 118.31.7.235, 118.31.112.221, 120.27.235.201, 120.55.55.115, 120.55.62.124, 121.196.197.147, 121.196.203.183
