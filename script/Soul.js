@@ -59,20 +59,6 @@ const NOTIFY = flag("notify", true);        // 阅后即焚抓到图片时弹通
 const PLANET_KEEP = ARG.planetKeep || "";   // 星球页保留入口，逗号分隔: soulMatch,voiceMatch,partyMatch,masked,maskedMatch,planet
 const ROOMTAG_KEEP = ARG.roomTagKeep || ""; // 派对频道保留，逗号分隔: hot,all,emotion,personal,play,interest,argue,story,chat,heart
 
-/* ── 阶段 0：请求改写（我的足迹 → 借会员页 pageId）───────
- * 实测：pageId=MSoulMember_PayNew（会员页）那条 /meet/mine/see 服务端不设防、返真人；
- * 而我的足迹页 pageId=MHomeMyTrack_Main 的 /meet/see/me/v2 它把 list[].user 全置 null。
- * 试着把 pageId 换过去，让服务端直接给真人，省掉缓存那一步。
- * 若客户端 cs 签名绑了 URL，服务端会拒 —— 那时删掉这条 http-request 脚本即可回退。 */
-const __isRequest = typeof $response === "undefined";
-if (__isRequest) {
-  const ru = ($request && $request.url) || "";
-  if (ru.indexOf("/meet/see/me/v2") !== -1 && ru.indexOf("pageId=MHomeMyTrack_Main") !== -1) {
-    $done({ url: ru.replace("pageId=MHomeMyTrack_Main", "pageId=MSoulMember_PayNew") });
-  } else {
-    $done({});
-  }
-} else {
 const url = ($request && $request.url) || "";
 let body = ($response && $response.body) || "";
 
@@ -413,5 +399,4 @@ if (pending) {
   $done({});
 } else {
   $done({ body });
-}
 }
