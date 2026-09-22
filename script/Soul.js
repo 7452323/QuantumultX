@@ -5,21 +5,21 @@
  * ── 来源 ──────────────────────────────────────────────
  * 抄自 ishowshu/qx（作者：树先生 / 怎么肥事 / 奶思）
  *   https://github.com/ishowshu/qx
- *   · rewrite/soul.snippet   2026-09-19  QX 重写规则（本仓库转成 SoulAds.conf）
+ *   · rewrite/soul.snippet   2026-09-19  QX 重写规则（本仓库转成 Soul.conf）
  *   · script/soul_qx.js      2026-08-29  私聊限制解除 · 阅后即焚抓图
  *   · script/soul.js         2026-05-27  去广告 · 星球/派对/广场入口精简
  * 本仓库版本做了三平台统一 + 容错兜底，未识别 URL 一律原样放行。
  *
  * ── 平台差异 ──────────────────────────────────────────
- * QX    : 建议直接用 script/SoulAds.conf（reject + jsonjq 原生处理，更省电），
+ * QX    : 建议直接用 script/Soul.conf（reject + jsonjq 原生处理，更省电），
  *         本脚本在 QX 只需挂 /chat/limitInfo 与 /snapchat/url 两条。
  * Surge : 无 jq 语法，[URL Rewrite] 之外的所有 body 类接口都走本脚本。
  * Loon  : 同 Surge。
  *
  * ── QX 引用 ───────────────────────────────────────────
  * [rewrite_local]
- * ^https:\/\/api-chat\.soulapp\.cn\/chat\/limitInfo url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/SoulAds.js
- * ^https:\/\/api-chat\.soulapp\.cn\/snapchat\/url url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/SoulAds.js
+ * ^https:\/\/api-chat\.soulapp\.cn\/chat\/limitInfo url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js
+ * ^https:\/\/api-chat\.soulapp\.cn\/snapchat\/url url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js
  *
  * [mitm]
  * hostname = api-chat.soulapp.cn
@@ -170,7 +170,7 @@ try {
     body = null;
   }
 } catch (e) {
-  console.log("SoulAds error: " + e);
+  console.log("Soul error: " + e);
   body = null;
 }
 

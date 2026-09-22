@@ -79,13 +79,13 @@ https://raw.githubusercontent.com/7452323/QuantumultX/main/loon/ReadingAd.plugin
 
 ```text
 # Quantumult X 远程重写
-https://raw.githubusercontent.com/7452323/QuantumultX/main/script/SoulAds.conf
+https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.conf
 
 # Surge 模块
-https://raw.githubusercontent.com/7452323/QuantumultX/main/surge/SoulAds.sgmodule
+https://raw.githubusercontent.com/7452323/QuantumultX/main/surge/Soul.sgmodule
 
 # Loon 插件
-https://raw.githubusercontent.com/7452323/QuantumultX/main/loon/SoulAds.plugin
+https://raw.githubusercontent.com/7452323/QuantumultX/main/loon/Soul.plugin
 ```
 
 来源：[ishowshu/qx](https://github.com/ishowshu/qx)（树先生 / 怎么肥事 / 奶思），本仓库做了三平台统一与容错处理。
