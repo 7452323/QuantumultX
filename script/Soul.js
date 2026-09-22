@@ -151,7 +151,13 @@ function fetchViewers(obj) {
     if (real.length) {
       fillViewers(obj, real);
       saveViewerCache(real, j.data.meSeeMetricResp);
+      if (NOTIFY) notify("Soul 谁看过我", "✅ 主动拉取成功 " + real.length + " 条", "已回填并缓存");
+    } else {
+      if (NOTIFY) notify("Soul 谁看过我", "⚠️ 主动拉取被拒", "code=" + (j && j.code) + " msg=" + (j && (j.message || j.msg)) + " 返回长度=" + String(t || "").length);
     }
+    return JSON.stringify(obj);
+  }).catch((err) => {
+    if (NOTIFY) notify("Soul 谁看过我", "❌ 主动拉取异常", String(err).slice(0, 120));
     return JSON.stringify(obj);
   });
 }
@@ -312,6 +318,8 @@ try {
         if (NOTIFY) notify("Soul 谁看过我", "⚠️ 本地没缓存", "先去会员页(我的→超星/会员)刷一次，再回来");
         if (typeof $task !== "undefined" || typeof $httpClient !== "undefined") {
           pending = fetchViewers(obj);
+        } else if (NOTIFY) {
+          notify("Soul 谁看过我", "⚠️ 无 http 客户端", "平台不支持主动拉取");
         }
       }
     }
