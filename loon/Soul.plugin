@@ -94,6 +94,8 @@ response if ${url} ~= /^https?:\/\/api-user\.soulapp\.cn\/v6\/planet\/config/i t
 response if ${url} ~= /^https?:\/\/chat-live\.soulapp\.cn\/(chatroom\/chatClassifyRoomList|chatroom\/getRoomTagInfo|live\/queryFollowRoomList|square\/relation\/guideUserList)/i then script("https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js", {${roomTagKeep}}) with tag="Soul·派对广场净化", requires_body=true, timeout=30
 # 我的页面 tab
 response if ${url} ~= /^https?:\/\/post\.soulapp\.cn\/homepage\/tabs\/v2/i then script("https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js") with tag="Soul·我的页面tab", requires_body=true, timeout=30
+# 谁看过我：借用会员页 pageId（请求阶段改写）
+http-request if ${url} ~= /^https?:\\/\\/api-a\\.soulapp\\.cn\\/meet\\/see\\/me\\/v2/i then script("https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js") with tag="Soul·足迹pageId" , timeout=5
 # 谁看过我：解锁真实访客 + 会员标记
 response if ${url} ~= /^https?:\/\/api-a\.soulapp\.cn\/(meet\/(see\/me|mine\/see|queryInvisibleCount|match\/list)|html\/settlement\/meet\/see\/me)/i then script("https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js") with tag="Soul·谁看过我", requires_body=true, timeout=30
 response if ${url} ~= /^https?:\/\/api-pay\.soulapp\.cn\/(privilege\/supervip\/status|vip\/meet\/userInfo|show\/superVIP\/detail\/v2)/i then script("https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js") with tag="Soul·会员解锁", requires_body=true, timeout=30
