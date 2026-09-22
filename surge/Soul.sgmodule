@@ -2,8 +2,8 @@
 #!desc=移除官方/第三方广告与各类推荐入口，解除私聊送礼限制，阅后即焚图片可留存
 #!author=7452323
 #!homepage=https://github.com/7452323/QuantumultX
-#!arguments=notify:true,planetKeep:,roomTagKeep:
-#!arguments-desc=notify 阅后即焚抓到图片时弹通知 / planetKeep 星球页保留入口(逗号分隔: soulMatch,voiceMatch,partyMatch,masked,maskedMatch,planet) / roomTagKeep 派对频道保留(hot,all,emotion,personal,play,interest,argue,story,chat,heart)
+#!arguments=notify=true,planetKeep=,roomTagKeep=
+#!arguments-desc=notify: 抓到阅后即焚图片时弹通知，点击可查看/保存；planetKeep: 星球页保留入口，逗号分隔（soulMatch,voiceMatch,partyMatch,masked,maskedMatch,planet），留空隐藏全部；roomTagKeep: 派对频道保留，逗号分隔（hot,all,emotion,personal,play,interest,argue,story,chat,heart），留空隐藏全部
 #
 # ── 来源 ──────────────────────────────────────────────
 # 抄自 ishowshu/qx（作者：树先生 / 怎么肥事 / 奶思）
