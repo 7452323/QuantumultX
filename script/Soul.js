@@ -1,6 +1,8 @@
 /*
- * Soul 去广告 + 私聊限制解除 + 阅后即焚抓图 + 谁看过我/会员解锁 —— 三平台统一版 v1.1.0
- * Build 2026-09-23  (v1.1.0 新增：谁看过我 superUser 解锁 + 超星会员标记;
+ * Soul 去广告 + 私聊限制解除 + 阅后即焚抓图 + 谁看过我/会员解锁 —— 三平台统一版 v1.2.0
+ * Build 2026-09-23  (v1.2.0 谁看过我：服务端把 user/uid/userIdEcpt 全置 null，改标记只能拆提示拆不出数据，
+ *                    改为缓存「会员页那条不设防的 /meet/mine/see」再回填我的足迹页;
+ *                    v1.1.0 新增：谁看过我 superUser 解锁 + 超星会员标记;
  *                    v1.0.1 修复 official/scene/module 全量拦截打死 MHomeMyTrack_Main)
  * 字段依据 2026-09-23 真机抓包 (iPhone16 / iOS27 / Soul 27.0) 校准。
  *
@@ -62,6 +64,81 @@ let body = ($response && $response.body) || "";
 
 const has = (s) => url.indexOf(s) !== -1;
 const keepList = (s) => s.split(",").map((x) => x.trim()).filter(Boolean);
+
+/* ── 三平台存储 / HTTP 适配 ───────────────────────────
+ * 谁看过我：服务端按账号真实会员态过滤 user/uid/userIdEcpt（全 null），
+ * 客户端改标记只能拆掉「需会员」提示，拆不出服务端没下发的数据。
+ * 唯一不设防的是「会员购买页」那条 /meet/mine/see（真机抓包返 100 条真人），
+ * 所以：见到它就缓存，进我的足迹页时回填。 */
+const VKEY = "soul_viewer_cache";
+const store = {
+  get(k) {
+    try {
+      if (typeof $prefs !== "undefined" && $prefs.valueForKey) return $prefs.valueForKey(k);
+      if (typeof $persistentStore !== "undefined" && $persistentStore.read) return $persistentStore.read(k);
+    } catch (e) { }
+    return null;
+  },
+  set(k, v) {
+    try {
+      if (typeof $prefs !== "undefined" && $prefs.setValueForKey) return $prefs.setValueForKey(v, k);
+      if (typeof $persistentStore !== "undefined" && $persistentStore.write) return $persistentStore.write(v, k);
+    } catch (e) { }
+    return null;
+  },
+};
+const qs = (k) => {
+  const m = url.match(new RegExp("[?&]" + k + "=([^&]*)"));
+  return m ? m[1] : "";
+};
+function httpGet(u, headers) {
+  return new Promise((resolve, reject) => {
+    try {
+      if (typeof $task !== "undefined" && $task.fetch) {
+        $task.fetch({ url: u, headers }).then((r) => resolve(r.body)).catch(reject);
+      } else if (typeof $httpClient !== "undefined") {
+        $httpClient.get({ url: u, headers }, (err, resp, data) => (err ? reject(err) : resolve(data)));
+      } else reject(new Error("no http client"));
+    } catch (e) { reject(e); }
+  });
+}
+function readViewerCache() {
+  const raw = store.get(VKEY);
+  if (!raw) return null;
+  try {
+    const c = typeof raw === "string" ? JSON.parse(raw) : raw;
+    if (!c || !Array.isArray(c.list) || !c.list.length) return null;
+    if (Date.now() - (c.t || 0) > 12 * 3600 * 1000) return null;
+    return c;
+  } catch (e) { return null; }
+}
+function saveViewerCache(list, metric) {
+  try { store.set(VKEY, JSON.stringify({ t: Date.now(), list: list, metric: metric || null })); } catch (e) { }
+}
+/* 缓存为空时的兜底：带客户端原始请求头主动拉一次会员页那条接口。
+ * 注意 S 的 cs/at 可能与 URL 绑定，失败就原样放行，不影响客户端。 */
+function fetchViewers(obj) {
+  const src = ($request && $request.headers) || {};
+  const hdr = {};
+  ["tk", "slb", "sdi", "di", "aid", "av", "avc", "os", "srs", "cs",
+    "user-agent", "User-Agent", "accept-language", "Accept-Language"].forEach((k) => {
+      if (src[k] != null) hdr[k] = src[k];
+    });
+  const u = "https://api-a.soulapp.cn/meet/mine/see?bi=" + qs("bi") + "&bik=" + (qs("bik") || "32243") +
+    "&limit=100&pageId=MSoulMember_PayNew&sortType=1";
+  return httpGet(u, hdr).then((t) => {
+    const j = JSON.parse(t);
+    const real = (j && j.data && Array.isArray(j.data.userList)) ? j.data.userList.filter((x) => x && x.user) : [];
+    if (real.length) {
+      obj.data.list = real;
+      if (!(obj.data.allViewerCount > 0)) obj.data.allViewerCount = real.length;
+      saveViewerCache(real, j.data.meSeeMetricResp);
+    }
+    return JSON.stringify(obj);
+  });
+}
+let pending = null;
+
 
 try {
   /* ── 1. 私聊限制解除（核心）──────────────────────────
@@ -187,21 +264,33 @@ try {
     body = JSON.stringify(obj);
   }
 
-  /* ── 10. 谁看过我：解锁真实访客 ───────────────────── */
-  else if (has("see/me") || has("/meet/mine/see")) {
+  /* ── 10. 谁看过我：会员页预览（服务端不设防）→ 顺手存缓存 ── */
+  else if (has("/meet/mine/see")) {
     const obj = JSON.parse(body);
     if (obj && obj.data) {
       obj.data.superUser = true;
-      obj.data.uncoverSecretCount = 999;
+      const real = Array.isArray(obj.data.userList) ? obj.data.userList.filter((x) => x && x.user) : [];
+      if (real.length) saveViewerCache(real, obj.data.meSeeMetricResp);
     }
     body = JSON.stringify(obj);
   }
 
-  /* ── 11. 隐身访问次数 ─────────────────────────────── */
-  else if (has("/meet/queryInvisibleCount")) {
-    let obj = JSON.parse(body);
-    if (!obj) obj = {};
-    obj.data = 9999;
+  /* ── 10b. 我的足迹 / 谁看过我：回填真人 ───────────────
+   * 服务端把 list[].user / uid / userIdEcpt 全置 null，只留「访问16次/摩羯座」烟雾弹。
+   * 有缓存就回填，没缓存就主动拉一次，失败原样放行。 */
+  else if (has("see/me")) {
+    const obj = JSON.parse(body);
+    if (obj && obj.data) {
+      obj.data.superUser = true;
+      obj.data.uncoverSecretCount = 999;
+      const c = readViewerCache();
+      if (c) {
+        obj.data.list = c.list;
+        if (!(obj.data.allViewerCount > 0)) obj.data.allViewerCount = c.list.length;
+      } else if (typeof $task !== "undefined" || typeof $httpClient !== "undefined") {
+        pending = fetchViewers(obj);
+      }
+    }
     body = JSON.stringify(obj);
   }
 
@@ -254,7 +343,9 @@ try {
   body = null;
 }
 
-if (body === null || body === undefined) {
+if (pending) {
+  pending.then((b) => $done({ body: b })).catch(() => $done(body === null || body === undefined ? {} : { body }));
+} else if (body === null || body === undefined) {
   $done({});
 } else {
   $done({ body });
