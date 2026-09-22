@@ -102,6 +102,19 @@ function httpGet(u, headers) {
     } catch (e) { reject(e); }
   });
 }
+function fillViewers(obj, list) {
+  if (!obj || !obj.data || !Array.isArray(list) || !list.length) return;
+  obj.data.list = list;
+  if (!(obj.data.allViewerCount > 0)) obj.data.allViewerCount = list.length;
+  /* 服务端把 uncoverSecretUserList 给成 null，客户端就把整个列表当「未揭秘」
+   * 渲染成模糊头像；把已回填的人塞进去，让它认为这些人已揭秘。 */
+  if (!Array.isArray(obj.data.uncoverSecretUserList) || !obj.data.uncoverSecretUserList.length) {
+    obj.data.uncoverSecretUserList = list;
+  }
+  if (obj.data.uncoverSecretCount == null || obj.data.uncoverSecretCount <= 0) {
+    obj.data.uncoverSecretCount = 999;
+  }
+}
 function readViewerCache() {
   const raw = store.get(VKEY);
   if (!raw) return null;
@@ -130,8 +143,7 @@ function fetchViewers(obj) {
     const j = JSON.parse(t);
     const real = (j && j.data && Array.isArray(j.data.userList)) ? j.data.userList.filter((x) => x && x.user) : [];
     if (real.length) {
-      obj.data.list = real;
-      if (!(obj.data.allViewerCount > 0)) obj.data.allViewerCount = real.length;
+      fillViewers(obj, real);
       saveViewerCache(real, j.data.meSeeMetricResp);
     }
     return JSON.stringify(obj);
@@ -285,8 +297,7 @@ try {
       obj.data.uncoverSecretCount = 999;
       const c = readViewerCache();
       if (c) {
-        obj.data.list = c.list;
-        if (!(obj.data.allViewerCount > 0)) obj.data.allViewerCount = c.list.length;
+        fillViewers(obj, c.list);
       } else if (typeof $task !== "undefined" || typeof $httpClient !== "undefined") {
         pending = fetchViewers(obj);
       }
