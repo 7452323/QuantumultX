@@ -1,6 +1,8 @@
 /*
- * Soul 去广告 + 私聊限制解除 + 阅后即焚抓图 —— 三平台统一版 v1.0.0
- * Build 2026-09-22
+ * Soul 去广告 + 私聊限制解除 + 阅后即焚抓图 + 谁看过我/会员解锁 —— 三平台统一版 v1.1.0
+ * Build 2026-09-23  (v1.1.0 新增：谁看过我 superUser 解锁 + 超星会员标记;
+ *                    v1.0.1 修复 official/scene/module 全量拦截打死 MHomeMyTrack_Main)
+ * 字段依据 2026-09-23 真机抓包 (iPhone16 / iOS27 / Soul 27.0) 校准。
  *
  * ── 来源 ──────────────────────────────────────────────
  * 抄自 ishowshu/qx（作者：树先生 / 怎么肥事 / 奶思）
@@ -20,9 +22,11 @@
  * [rewrite_local]
  * ^https:\/\/api-chat\.soulapp\.cn\/chat\/limitInfo url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js
  * ^https:\/\/api-chat\.soulapp\.cn\/snapchat\/url url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js
+ * ^https:\/\/api-a\.soulapp\.cn\/(html\/settlement\/)?meet\/(see\/me|mine\/see|queryInvisibleCount) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js
+ * ^https:\/\/api-pay\.soulapp\.cn\/(privilege\/supervip\/status|vip\/meet\/userInfo|show\/superVIP\/detail\/v2) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js
  *
  * [mitm]
- * hostname = api-chat.soulapp.cn
+ * hostname = api-chat.soulapp.cn, api-a.soulapp.cn, api-pay.soulapp.cn
  */
 
 /* ── 参数 ──────────────────────────────────────────────
@@ -179,6 +183,64 @@ try {
     if (obj && obj.data && Array.isArray(obj.data.res)) {
       obj.data.res = obj.data.res.filter((t) => keep.includes(t.id));
       obj.data.res.forEach((c) => { if (c.iconConfig != null) c.iconConfig = null; });
+    }
+    body = JSON.stringify(obj);
+  }
+
+  /* ── 10. 谁看过我：解锁真实访客 ───────────────────── */
+  else if (has("see/me") || has("/meet/mine/see")) {
+    const obj = JSON.parse(body);
+    if (obj && obj.data) {
+      obj.data.superUser = true;
+      obj.data.uncoverSecretCount = 999;
+    }
+    body = JSON.stringify(obj);
+  }
+
+  /* ── 11. 隐身访问次数 ─────────────────────────────── */
+  else if (has("/meet/queryInvisibleCount")) {
+    let obj = JSON.parse(body);
+    if (!obj) obj = {};
+    obj.data = 9999;
+    body = JSON.stringify(obj);
+  }
+
+  /* ── 12. 超级会员状态（我的相遇 / 谁看过我 权益位） ── */
+  else if (has("/privilege/supervip/status")) {
+    const obj = JSON.parse(body);
+    if (obj && obj.data) {
+      obj.data.superVIP = true;
+      obj.data.showSuperVIP = true;
+      obj.data.hasMyMeet = true;
+      if (!(obj.data.remainDay > 0)) obj.data.remainDay = 9999;
+      if (obj.data.leftDay == null) obj.data.leftDay = 9999;
+    }
+    body = JSON.stringify(obj);
+  }
+
+  /* ── 13. 会员信息卡 ───────────────────────────────── */
+  else if (has("/vip/meet/userInfo")) {
+    const obj = JSON.parse(body);
+    const s0 = obj && obj.data && obj.data.superStarDTO;
+    if (s0) {
+      s0.superVIP = true;
+      s0.showSuperVIP = true;
+      s0.wasVip = true;
+      s0.leftDay = 9999;
+      s0.validTime = 4102415999000;
+      s0.lastVipExpireTime = 4102415999000;
+    }
+    body = JSON.stringify(obj);
+  }
+
+  /* ── 14. 超星详情页 ───────────────────────────────── */
+  else if (has("/show/superVIP/detail/v2")) {
+    const obj = JSON.parse(body);
+    if (obj && obj.data) {
+      obj.data.superVIP = true;
+      obj.data.superUser = true;
+      if (obj.data.leftDay == null) obj.data.leftDay = 9999;
+      if (obj.data.validTime == null) obj.data.validTime = 4102415999000;
     }
     body = JSON.stringify(obj);
   }
