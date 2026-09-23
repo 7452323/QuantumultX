@@ -289,6 +289,99 @@ try {
   }
 
   /* ── 10. 谁看过我：会员页预览（服务端不设防）→ 顺手存缓存 ── */
+  /* ── 第二轮抓包新增：服务端下发「非会员值」的权益位 ─────────
+   * 这些接口都返回真实结构，但值是未开通态，客户端据此隐藏功能。 */
+  /* 「谁看过我」计数上限：非会员 viewUserCountConfigLimit=200，放开 */
+  else if (has("/meet/my/count")) {
+    const obj = JSON.parse(body);
+    if (obj && obj.data) {
+      obj.data.viewUserCountConfigLimit = 99999;
+      obj.data.oneUserViewCount = Math.max(obj.data.oneUserViewCount || 0, 99999);
+    }
+    body = JSON.stringify(obj);
+  }
+  /* 免费换头像次数：非会员 avatarFreeTimes=0 */
+  else if (has("qryMyAvatarRights")) {
+    const obj = JSON.parse(body);
+    if (obj && obj.data) {
+      obj.data.avatarFreeTimes = 999;
+      obj.data.inPhoton = true;
+    }
+    body = JSON.stringify(obj);
+  }
+  /* 会员展示信息：非会员 vipShowModel=null */
+  else if (has("/vip/show/info")) {
+    const obj = JSON.parse(body);
+    if (obj && obj.data && !obj.data.vipShowModel) {
+      obj.data.vipShowModel = {
+        superVIP: true,
+        wasVip: true,
+        vipLevel: 9,
+        expireTime: "2099-12-31 23:59:59",
+        remainDay: 9999,
+      };
+    }
+    body = JSON.stringify(obj);
+  }
+  /* 聊天气泡权益：非会员 has=false */
+  else if (has("privilege/bubble/status/simple")) {
+    const obj = JSON.parse(body);
+    if (obj && obj.data) {
+      obj.data.has = true;
+      obj.data.isDynamicBubble = true;
+      obj.data.aggPictureCount = Math.max(obj.data.aggPictureCount || 0, 9);
+    }
+    body = JSON.stringify(obj);
+  }
+  /* 缘分匹配加速：非会员 currentSpeed=30 */
+  else if (has("queryMatchSpeedupConf")) {
+    const obj = JSON.parse(body);
+    if (obj && obj.data) {
+      obj.data.currentSpeed = 9999;
+      obj.data.speedupCount = 9999;
+      obj.data.isSpeedup = true;
+    }
+    body = JSON.stringify(obj);
+  }
+  /* 「谁喜欢我」计数：非会员不给历史 */
+  else if (has("homepage/liked/metric")) {
+    const obj = JSON.parse(body);
+    if (obj && obj.data) {
+      obj.data.hasShowHistoryDynamic = true;
+      if (!obj.data.likedTotalNum) obj.data.likedTotalNum = 0;
+    }
+    body = JSON.stringify(obj);
+  }
+  /* ── 第三轮抓包新增 ─────────────────────────────────
+   * 隐身设置：非会员直接返回 {"superVip":false}，这是隐身功能的开关。 */
+  else if (has("queryInvisibleSetting")) {
+    const obj = JSON.parse(body);
+    if (obj && obj.data) obj.data.superVip = true;
+    body = JSON.stringify(obj);
+  }
+  /* 机器人陪伴匹配次数：非会员 sumTimes/remainTimes/freeRemains=3、加速卡=0 */
+  else if (has("remainTimesAndSpeedCards")) {
+    const obj = JSON.parse(body);
+    if (obj && obj.data) {
+      obj.data.sumTimes = 9999;
+      obj.data.remainTimes = 9999;
+      obj.data.freeRemains = 9999;
+      obj.data.todayTimes = Math.max(obj.data.todayTimes || 0, 9999);
+      obj.data.packetTimes = Math.max(obj.data.packetTimes || 0, 9999);
+      obj.data.remainSpeedCards = 9999;
+      obj.data.benefitStatus = 1;
+    }
+    body = JSON.stringify(obj);
+  }
+  /* 头像位 / 头像博物馆：非会员 avatarCount=1 */
+  else if (has("avatar/user/popover")) {
+    const obj = JSON.parse(body);
+    if (obj && obj.data) {
+      obj.data.avatarCount = Math.max(obj.data.avatarCount || 0, 99);
+      obj.data.hasMuseum = true;
+    }
+    body = JSON.stringify(obj);
+  }
   else if (has("/meet/mine/see")) {
     const obj = JSON.parse(body);
     if (obj && obj.data) {
