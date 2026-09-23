@@ -210,17 +210,22 @@ function soulCs(path, pairs, headers, atHex) {
 
 /* 三平台 GET */
 function csHttpGet(u, headers, cb) {
+  let fired = false;
+  const once = (e, d) => { if (!fired) { fired = true; cb(e, d); } };
+  /* 自签请求挂住会让整页空白，必须限时兜底 */
+  const timer = typeof setTimeout === "function" ? setTimeout(() => once(new Error("timeout")), CS_TIMEOUT) : null;
+  const fin = (e, d) => { if (timer) clearTimeout(timer); once(e, d); };
   try {
     if (typeof $task !== "undefined" && $task.fetch) {
-      $task.fetch({ url: u, method: "GET", headers: headers }).then((r) => cb(null, r.body), (e) => cb(e));
+      $task.fetch({ url: u, method: "GET", headers: headers }).then((r) => fin(null, r.body), (e) => fin(e));
       return;
     }
     if (typeof $httpClient !== "undefined" && $httpClient.get) {
-      $httpClient.get({ url: u, headers: headers }, (err, resp, data) => cb(err, data));
+      $httpClient.get({ url: u, headers: headers }, (err, resp, data) => fin(err, data));
       return;
     }
-  } catch (e) { cb(e); return; }
-  cb(new Error("no http client"));
+  } catch (e) { fin(e); return; }
+  fin(new Error("no http client"));
 }
 
 /*
@@ -254,10 +259,16 @@ function pullViewers(obj, done) {
     let fresh = null;
     try { fresh = JSON.parse(data); } catch (e) { }
     if (!fresh || !fresh.data) { done(null); return; }
+    /*
+    服务端这次可能只给匿名暗卡(buttonType:4，没有 userIdEcpt，点不进人)。
+    这种「成功但没用」的响应绝不能拿去覆盖调用方已经填好的缓存真名单，
+    否则列表会退化成匿名行 —— 点进头像就是空白。
+    */
+    const ppl = harvestUsers(fresh.data).filter((x) => x.user);
+    if (!ppl.length) { done(null); return; }
     fresh.data.superUser = true;
     fresh.data.uncoverSecretCount = 999;
-    const ppl = harvestUsers(fresh.data).filter((x) => x.user);
-    if (ppl.length) saveViewerCache(ppl, null);
+    saveViewerCache(ppl, null);
     done(fresh);
   });
 }
@@ -322,6 +333,7 @@ function saveViewerCache(list, metric) {
 }
 
 let ASYNC = false;   /* 自签拉取挂起中，$done 交给回调 */
+const CS_TIMEOUT = 4000;   /* 自签请求超时(ms)，超时就放行原响应，绝不让页面卡白 */
 
 try {
   /*
@@ -684,7 +696,8 @@ try {
           out = JSON.stringify(fresh);
           if (NOTIFY) notify("Soul 谁看过我列表", "✅最新 " + fmtTime(Date.now()), "");
         } else if (NOTIFY) {
-          notify("Soul 谁看过我列表", cached ? "⚠️自签失败，用缓存 " + fmtTime(cached.t) : "⚠️自签失败", "");
+          /* 自签失败、超时、或只拿到匿名暗卡 —— 一律保留原响应/缓存真名单 */
+          notify("Soul 谁看过我列表", cached ? "⚠️未拿到真人，用缓存 " + fmtTime(cached.t) : "⚠️未拿到真人", "");
         }
         $done(out === null ? {} : { body: out });
       });

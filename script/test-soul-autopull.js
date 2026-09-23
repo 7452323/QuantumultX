@@ -26,6 +26,8 @@ const HEADERS = {
 };
 const EMPTY = { code: 10001, message: "success", data: { superUser: false, allViewerCount: 483, list: [{ buttonType: 4, viewCount: 1 }, { buttonType: 4, viewCount: 2 }] } };
 const FULL = { code: 10001, message: "success", data: { superUser: false, allViewerCount: 483, list: [{ userIdEcpt: "AAA", user: { signature: "夜怀山海" }, avatarName: "n" }] } };
+/* 服务端「成功但没用」的匿名暗卡：有 list 但一条 userIdEcpt 都没有 —— 点进头像必空白 */
+const STUB = { code: 10001, message: "success", data: { superUser: true, allViewerCount: 100, list: [{ buttonType: 4, viewCount: 1, user: null }, { buttonType: 4, viewCount: 2, user: null }] } };
 
 let pass = 0, fail = 0;
 const chk = (ok, msg) => { ok ? pass++ : fail++; console.log((ok ? "  ✓ " : "  ✗ ") + msg); };
@@ -47,10 +49,12 @@ function run(responseBody, opts) {
       fetch: (o) => {
         got.fetch = o;
         if (opts.fetchFail) return Promise.reject(new Error("net"));
-        return Promise.resolve({ body: JSON.stringify(FULL) });
+        if (opts.fetchHang) return new Promise(() => { });
+        return Promise.resolve({ body: JSON.stringify(opts.pullBody || FULL) });
       },
     },
   };
+  if (opts.setTimeout) sandbox.setTimeout = opts.setTimeout;
   if (opts.argument !== undefined) sandbox.$argument = opts.argument;
   vm.createContext(sandbox);
   vm.runInContext(SRC, sandbox);
@@ -136,7 +140,35 @@ p2.then(() => {
       chk(h[1] === false && h[2] === "" && h[3] === "hot,chat", "Loon 位置参数里的哨兵也认");
     }
 
-    console.log("\n" + pass + " passed, " + fail + " failed");
-    process.exit(fail ? 1 : 0);
+    console.log("[6] 自签只拿到匿名暗卡 → 不许覆盖缓存真名单（点头像空白的根因）");
+    const cached2 = JSON.stringify({ v: 2, t: FIXED_MS, list: [{ userIdEcpt: "BBB", user: { signature: "x" } }] });
+    const g6 = run(EMPTY, { cache: cached2, pullBody: STUB });
+    setTimeout(() => {
+      let d = null;
+      try { d = JSON.parse(g6.done.body); } catch (e) { }
+      chk(d && d.data.list[0] && d.data.list[0].userIdEcpt === "BBB", "缓存真名单没被暗卡顶掉");
+      chk(g6.notes.some((n) => n.indexOf("未拿到真人") >= 0), "通知说明未拿到真人");
+      chk(!g6.notes.some((n) => n.indexOf("✅最新") >= 0), "不谎报最新");
+
+      console.log("[7] 只拿到暗卡且没缓存 → 放行原响应");
+      const g7 = run(EMPTY, { pullBody: STUB });
+      setTimeout(() => {
+        let d = null;
+        try { d = JSON.parse(g7.done.body); } catch (e) { }
+        chk(d && d.data.list.length === 2 && !d.data.list[0].userIdEcpt, "保留服务端原响应，没有伪造身份");
+
+        console.log("[8] 自签请求挂住 → 超时兜底，绝不能不出 $done");
+        const g8 = run(EMPTY, { cache: cached2, fetchHang: true, setTimeout: (fn) => { fn(); return 0; } });
+        setTimeout(() => {
+          chk(!!g8.done, "超时后仍调用了 $done（否则页面白屏）");
+          let d = null;
+          try { d = JSON.parse((g8.done || {}).body); } catch (e) { }
+          chk(d && d.data.list[0] && d.data.list[0].userIdEcpt === "BBB", "超时也保住了缓存真名单");
+
+          console.log("\n" + pass + " passed, " + fail + " failed");
+          process.exit(fail ? 1 : 0);
+        }, 30);
+      }, 30);
+    }, 30);
   }, 30);
 });
