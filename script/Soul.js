@@ -4,8 +4,9 @@
 ^https:\/\/api-chat\.soulapp\.cn\/snapchat\/url url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js
 ^https:\/\/api-a\.soulapp\.cn\/(html\/settlement\/)?meet\/(see\/me|mine\/see|queryInvisibleCount) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js
 ^https:\/\/api-pay\.soulapp\.cn\/(privilege\/supervip\/status|vip\/meet\/userInfo|show\/superVIP\/detail\/v2) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js
+^https:\/\/api-a\.soulapp\.cn\/meet\/mine\/see url script-request-header https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js
 [mitm]
-hostname = api-chat.soulapp.cn, api-a.soulapp.cn, api-pay.soulapp.cn
+hostname = api-chat.soulapp.cn, api-a.soulapp.cn, api-pay.soulapp.cn, api-user.soulapp.cn, post.soulapp.cn
 */
 
 function parseArgs(raw) {
