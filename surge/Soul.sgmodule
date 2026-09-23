@@ -93,7 +93,7 @@ Soul-live = type=http-response,pattern=^https?:\/\/chat-live\.soulapp\.cn\/(chat
 Soul-tabs = type=http-response,pattern=^https?:\/\/post\.soulapp\.cn\/homepage\/tabs\/v2,script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js,requires-body=true,max-size=-1,timeout=30
 # 谁看过我：借用会员页 pageId（请求阶段改写，让服务端直出真人）
 # 谁看过我：解锁真实访客 + 会员标记
-Soul-view = type=http-response,pattern=^https?:\/\/api-a\.soulapp\.cn\/(meet\/(see\/me|mine\/see|queryInvisibleCount|match\/list)|html\/settlement\/meet\/see\/me),script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js,requires-body=true,max-size=-1,timeout=30
+Soul-view = type=http-response,pattern=^https?:\/\/api-a\.soulapp\.cn\/(meet\/(see\/me|mine\/see|queryInvisibleCount|match\/list|uncover\/list)|html\/settlement\/meet\/see\/me),script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js,requires-body=true,max-size=-1,timeout=30
 Soul-vip = type=http-response,pattern=^https?:\/\/api-pay\.soulapp\.cn\/(privilege\/supervip\/status|vip\/meet\/userInfo|show\/superVIP\/detail\/v2),script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js,requires-body=true,max-size=-1,timeout=30
 
 [MITM]

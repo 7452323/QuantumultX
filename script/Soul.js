@@ -86,6 +86,23 @@ function notify(title, sub, content) {
     if (typeof $notification !== "undefined" && $notification.post) { $notification.post(title, sub, content); return; }
   } catch (e) { }
 }
+/* 递归捞出响应里所有"像用户"的节点(揭晓/访客接口结构不固定，靠这个兜住) */
+function harvestUsers(node, out) {
+  out = out || [];
+  if (!node) return out;
+  if (Array.isArray(node)) {
+    node.forEach((x) => harvestUsers(x, out));
+    return out;
+  }
+  if (typeof node !== "object") return out;
+  const hit = node.userIdEcpt && (node.user || node.signature || node.avatarName);
+  if (hit && !out.some((x) => x.userIdEcpt === node.userIdEcpt)) out.push(node);
+  Object.keys(node).forEach((k) => {
+    if (node[k] && typeof node[k] === "object") harvestUsers(node[k], out);
+  });
+  return out;
+}
+
 function fillViewers(obj, list) {
   if (!obj || !obj.data || !Array.isArray(list) || !list.length) return;
   obj.data.list = list;
@@ -476,6 +493,21 @@ try {
       }
     }
 
+    body = JSON.stringify(obj);
+  }
+
+  /*
+  10c. 揭晓缘分（/meet/uncover/list）
+  列表里每张访客卡都是 buttonType:4「揭晓缘分」，服务端此时只给标签不给身份。
+  用户点揭晓时 App 才带正确签名请求这条接口，响应里才有真人 —— 抓到就存下来喂列表。
+*/
+  else if (has("/meet/uncover/list")) {
+    const obj = JSON.parse(body);
+    if (obj && obj.data) {
+      obj.data.superUser = true;
+      const ppl = harvestUsers(obj.data).filter((x) => x.user);
+      if (ppl.length) saveViewerCache(ppl, null);
+    }
     body = JSON.stringify(obj);
   }
 
