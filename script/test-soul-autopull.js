@@ -51,9 +51,17 @@ function run(responseBody, opts) {
       },
     },
   };
+  if (opts.argument !== undefined) sandbox.$argument = opts.argument;
   vm.createContext(sandbox);
   vm.runInContext(SRC, sandbox);
+  got.sandbox = sandbox;
   return got;
+}
+
+/* 读回脚本里的参数解析结果：[ARG键, NOTIFY, 星球页保留, 派对频道保留] */
+function argState(argument) {
+  const s = run(FULL, { argument });
+  return JSON.parse(vm.runInContext("JSON.stringify([Object.keys(ARG),NOTIFY,PLANET_KEEP,ROOMTAG_KEEP])", s.sandbox));
 }
 
 console.log("[1] 服务端挖空 → 自动自签重放");
@@ -98,6 +106,30 @@ p2.then(() => {
     try { d = JSON.parse(g4.done.body); } catch (e) { }
     chk(d && d.data && d.data.list && d.data.list[0] && d.data.list[0].userIdEcpt === "BBB", "回落缓存成功");
     chk(g4.notes.some((n) => n.indexOf("⚠️") >= 0), "通知提示失败");
+
+    console.log("[5] 参数解析（Surge 具名 / Loon 位置 / 旧英文名 / 占位符未替换）");
+    {
+      const a = argState("通知=true,星球页保留=soulMatch,voiceMatch,partyMatch");
+      chk(JSON.stringify(a[0]) === '["通知","星球页保留"]', "Surge 具名中文键解出 " + JSON.stringify(a[0]));
+      chk(a[1] === true, "通知=true → NOTIFY true");
+      chk(a[2] === "soulMatch,voiceMatch,partyMatch", "值里的逗号没被切断（" + a[2] + "）");
+
+      const b = argState("通知:false,星球页保留:soulMatch");
+      chk(b[1] === false, "冒号分隔 + false → NOTIFY false");
+
+      const c = argState("notify=false,planetKeep=hot,all");
+      chk(c[1] === false && c[2] === "hot,all", "旧英文名仍兼容（" + c[2] + "）");
+
+      const d = argState(["true", "masked,planet", "hot,chat"]);
+      chk(d[1] === true && d[2] === "masked,planet" && d[3] === "hot,chat", "Loon 位置参数按 0/1/2 对上");
+
+      const e = argState("通知={{{通知}}}");
+      chk(e[1] === true, "占位符没被替换时回落默认值");
+
+      const f = argState(undefined);
+      chk(f[1] === true && f[2] === "" && f[3] === "", "完全不给参数走默认（QX）");
+    }
+
     console.log("\n" + pass + " passed, " + fail + " failed");
     process.exit(fail ? 1 : 0);
   }, 30);

@@ -13,9 +13,10 @@
 # 生效需卸载重装 Soul；规则里的 IP 走直连别删，否则可能影响功能使用。
 
 [Argument]
-notify = switch,true,tag=阅后即焚通知,desc=抓到阅后即焚图片时弹通知，可点击查看或保存
-planetKeep = input,tag=星球页保留入口,desc=逗号分隔：soulMatch,voiceMatch,partyMatch,masked,maskedMatch,planet。留空则隐藏全部入口
-roomTagKeep = input,tag=派对频道保留,desc=逗号分隔：hot,all,emotion,personal,play,interest,argue,story,chat,heart。留空则隐藏全部频道
+# 顺序即传给脚本的位置参数顺序，勿调换：0 通知 / 1 星球页保留 / 2 派对频道保留
+notify = switch, true, tag = 阅后即焚通知, desc = 抓到阅后即焚图片时弹通知，可点击查看或保存
+planetKeep = input, "", tag = 星球页保留入口, desc = 要保留的入口，逗号或竖线分隔：soulMatch,voiceMatch,partyMatch,masked,maskedMatch,planet。留空则隐藏全部入口
+roomTagKeep = input, "", tag = 派对频道保留, desc = 要保留的频道，逗号或竖线分隔：hot,all,emotion,personal,play,interest,argue,story,chat,heart。留空则隐藏全部频道
 
 [Rule]
 DOMAIN,ssp.soulapp.cn,REJECT
@@ -87,17 +88,17 @@ IP-CIDR,3.0.163.78/32,DIRECT,no-resolve
 
 [Script]
 # 私聊限制解除 + 阅后即焚抓图 + 聊天气泡权益 + AIGC 聊天预检
-response if ${url} ~= /^https?:\/\/api-chat\.soulapp\.cn\/(chat\/limitInfo|snapchat\/url|privilege\/bubble\/status\/simple|chat\/aigc\/preCheckConfig)/i then script("https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js", {${notify}}) with tag="Soul·私聊与AIGC净化", requires_body=true, timeout=30
+response if ${url} ~= /^https?:\/\/api-chat\.soulapp\.cn\/(chat\/limitInfo|snapchat\/url|privilege\/bubble\/status\/simple|chat\/aigc\/preCheckConfig)/i then script("https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js", {${notify}, ${planetKeep}, ${roomTagKeep}}) with tag="Soul·私聊与AIGC净化", requires_body=true, timeout=30
 # 星球页精简 + 我的页面数据 + 谁喜欢我计数 + 隐身设置 + 机器人陪伴次数 + 头像位
-response if ${url} ~= /^https?:\/\/api-user\.soulapp\.cn\/(v6\/planet\/config|user\/homepage\/metrics|user\/homepage\/liked\/metric|user\/queryInvisibleSetting|robot\/call\/remainTimesAndSpeedCards|avatar\/user\/popover)/i then script("https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js", {${planetKeep}}) with tag="Soul·星球与我的页面", requires_body=true, timeout=30
+response if ${url} ~= /^https?:\/\/api-user\.soulapp\.cn\/(v6\/planet\/config|user\/homepage\/metrics|user\/homepage\/liked\/metric|user\/queryInvisibleSetting|robot\/call\/remainTimesAndSpeedCards|avatar\/user\/popover)/i then script("https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js", {${notify}, ${planetKeep}, ${roomTagKeep}}) with tag="Soul·星球与我的页面", requires_body=true, timeout=30
 # 派对列表横幅 + 派对频道列表 + 关注 tab 推荐
-response if ${url} ~= /^https?:\/\/chat-live\.soulapp\.cn\/(chatroom\/(chatClassifyRoomList|getRoomTagInfo)|live\/queryFollowRoomList|square\/relation\/guideUserList)/i then script("https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js", {${roomTagKeep}}) with tag="Soul·派对广场净化", requires_body=true, timeout=30
+response if ${url} ~= /^https?:\/\/chat-live\.soulapp\.cn\/(chatroom\/(chatClassifyRoomList|getRoomTagInfo)|live\/queryFollowRoomList|square\/relation\/guideUserList)/i then script("https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js", {${notify}, ${planetKeep}, ${roomTagKeep}}) with tag="Soul·派对广场净化", requires_body=true, timeout=30
 # 广场头部 tab + 我的页面 tab + 高亮推荐配额 + 瞬间列表会员标
-response if ${url} ~= /^https?:\/\/post\.soulapp\.cn\/(v\d\/rec\/square\/header\/tabs|homepage\/tabs\/v2|v1\/post\/highLight\/recommend\/quota|v\d\/post\/(homepage|recommended)(\?|$))/i then script("https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js", {${notify}}) with tag="Soul·广场与瞬间", requires_body=true, timeout=30
+response if ${url} ~= /^https?:\/\/post\.soulapp\.cn\/(v\d\/rec\/square\/header\/tabs|homepage\/tabs\/v2|v1\/post\/highLight\/recommend\/quota|v\d\/post\/(homepage|recommended)(\?|$))/i then script("https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js", {${notify}, ${planetKeep}, ${roomTagKeep}}) with tag="Soul·广场与瞬间", requires_body=true, timeout=30
 # 谁看过我 / 我看过谁 / 揭晓缘分 + 缘分加速 + 视频匹配 + 高亮配额
-response if ${url} ~= /^https?:\/\/api-a\.soulapp\.cn\/(html\/settlement\/meet\/see\/me|meet\/(see\/me|mine\/see|match\/list|uncover\/list)|loveBell\/queryMatchSpeedupConf|videoMatch\/getConfig|soulreal\/post\/highlight\/quota)/i then script("https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js", {${notify}}) with tag="Soul·谁看过我", requires_body=true, timeout=30
+response if ${url} ~= /^https?:\/\/api-a\.soulapp\.cn\/(html\/settlement\/meet\/see\/me|meet\/(see\/me|mine\/see|match\/list|uncover\/list)|loveBell\/queryMatchSpeedupConf|videoMatch\/getConfig|soulreal\/post\/highlight\/quota)/i then script("https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js", {${notify}, ${planetKeep}, ${roomTagKeep}}) with tag="Soul·谁看过我", requires_body=true, timeout=30
 # 超级会员状态 + 会员信息卡 + 超星详情 + 头像权益 + 会员展示 + 访客上限
-response if ${url} ~= /^https?:\/\/api-pay\.soulapp\.cn\/(privilege\/supervip\/status|vip\/(meet\/userInfo|show\/info|rights\/avatar\/qryMyAvatarRights)|show\/superVIP\/detail\/v2|meet\/my\/count)/i then script("https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js", {${notify}}) with tag="Soul·会员解锁", requires_body=true, timeout=30
+response if ${url} ~= /^https?:\/\/api-pay\.soulapp\.cn\/(privilege\/supervip\/status|vip\/(meet\/userInfo|show\/info|rights\/avatar\/qryMyAvatarRights)|show\/superVIP\/detail\/v2|meet\/my\/count)/i then script("https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js", {${notify}, ${planetKeep}, ${roomTagKeep}}) with tag="Soul·会员解锁", requires_body=true, timeout=30
 
 [MITM]
 hostname = api-pay.soulapp.cn, ssp.soulapp.cn, soul-ad.soulapp.cn, ad-r.soulapp.cn, ssp.1rtb.com, impdsp.meituan.com, s3plus.meituan.net, ssp.maplehaze.cn, increase-openapi.soulapp.cn, post.soulapp.cn, api-account.soulapp.cn, api-a.soulapp.cn, gateway-mobile-gray.soulapp.cn, api-user.soulapp.cn, chat-live.soulapp.cn, api-chat.soulapp.cn, activity.soulapp.cn, 47.110.187.87, 47.96.7.91, 47.96.11.46, 47.96.20.45, 47.97.215.55, 47.98.54.106, 47.98.137.249, 47.99.42.29, 114.215.255.94, 116.62.28.7, 116.62.47.28, 118.31.7.235, 118.31.112.221, 120.27.235.201, 120.55.55.115, 120.55.62.124, 121.196.197.147, 121.196.203.183

@@ -10,38 +10,72 @@
 hostname = api-chat.soulapp.cn, api-user.soulapp.cn, api-a.soulapp.cn, api-pay.soulapp.cn, post.soulapp.cn, chat-live.soulapp.cn
 */
 
+/*
+  参数解析
+  Surge: argument="通知={{{通知}}},星球页保留={{{星球页保留}}}"
+  Loon : {通知=${notify},星球页保留=${planetKeep}}  数组形态也要吃下
+  中文名优先，旧英文名继续兼容；未替换的 {{{占位符}}} 当没填，走默认值。
+*/
 function parseArgs(raw) {
-  /* Surge 用 "k:v,k:v"、Loon/QX 用 "k=v,k=v"，两种都要吃下 */
-  if (!raw) return {};
+  if (raw === undefined || raw === null || raw === "") return {};
+  if (Array.isArray(raw)) return parseArgs(raw.join(","));
   if (typeof raw === "object") return raw;
   const out = {};
-  String(raw).split(/[,\n]/).forEach((p) => {
-    const s = p.trim();
-    if (!s) return;
-    let i = s.indexOf("=");
-    if (i < 0) i = s.indexOf(":");
-    if (i < 0) return;
-    const k = s.slice(0, i).trim();
-    const v = s.slice(i + 1).trim();
+  const s = String(raw).replace(/\n/g, ",");
+  /* 只在「逗号 + 下一个参数名」处切分，值里的逗号（入口清单）留给值自己 */
+  s.split(/,(?=\s*[A-Za-z_\u4e00-\u9fa5][\w\u4e00-\u9fa5]*\s*[=:])/).forEach((p) => {
+    const t = p.trim();
+    if (!t) return;
+    let i = t.indexOf("=");
+    if (i < 0) i = t.indexOf(":");
+    if (i <= 0) return;
+    const k = t.slice(0, i).trim();
+    const v = t.slice(i + 1).trim();
     if (k) out[k] = v;
   });
   return out;
 }
-const ARG = parseArgs(typeof $argument !== "undefined" ? $argument : null);
-const flag = (k, dft) => {
-  const v = ARG[k];
-  if (v === undefined || v === null || v === "") return dft;
-  return v === true || v === "true" || v === 1 || v === "1";
-};
-const NOTIFY = flag("notify", true);        // 阅后即焚抓到图片时弹通知
-const PLANET_KEEP = ARG.planetKeep || "";   // 星球页保留入口，逗号分隔: soulMatch,voiceMatch,partyMatch,masked,maskedMatch,planet
-const ROOMTAG_KEEP = ARG.roomTagKeep || ""; // 派对频道保留，逗号分隔: hot,all,emotion,personal,play,interest,argue,story,chat,heart
+const RAW_ARG = typeof $argument !== "undefined" ? $argument : null;
+const ARG = parseArgs(RAW_ARG);
+const ARG_NAMED = Object.keys(ARG).length > 0;
+
+/*
+  Loon 插件只支持位置传参，约定固定顺序：0 通知 / 1 星球页保留 / 2 派对频道保留。
+  有具名参数（Surge 的 {{{通知}}}）时优先用具名，位置参数只在没有具名时才兜底。
+*/
+function argOf(names, pos) {
+  for (let i = 0; i < names.length; i++) {
+    const v = ARG[names[i]];
+    if (v === undefined || v === null) continue;
+    const s = String(v).trim();
+    if (!s || /^\{+.*\}+$/.test(s)) continue;
+    return s;
+  }
+  if (!ARG_NAMED && Array.isArray(RAW_ARG) && pos !== undefined) {
+    const v = RAW_ARG[pos];
+    if (v !== undefined && v !== null) {
+      const s = String(v).trim();
+      if (s) return s;
+    }
+  }
+  return "";
+}
+function flagOf(names, pos, dft) {
+  const s = argOf(names, pos).toLowerCase();
+  if (!s) return dft;
+  if (["true", "1", "on", "yes", "是", "开", "开启"].indexOf(s) >= 0) return true;
+  if (["false", "0", "off", "no", "否", "关", "关闭"].indexOf(s) >= 0) return false;
+  return dft;
+}
+const NOTIFY = flagOf(["通知", "notify"], 0, true);                 /* 抓到阅后即焚图片时弹通知 */
+const PLANET_KEEP = argOf(["星球页保留", "planetKeep"], 1);          /* 星球页要保留的入口 */
+const ROOMTAG_KEEP = argOf(["派对频道保留", "roomTagKeep"], 2);      /* 派对频道要保留的频道 */
 
 const url = ($request && $request.url) || "";
 let body = ($response && $response.body) || "";
 
 const has = (s) => url.indexOf(s) !== -1;
-const keepList = (s) => s.split(",").map((x) => x.trim()).filter(Boolean);
+const keepList = (s) => String(s || "").split(/[,\s|、;；]+/).map((x) => x.trim()).filter(Boolean);
 
 /*
   三平台存储 / HTTP 适配
