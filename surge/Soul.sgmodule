@@ -2,7 +2,7 @@
 #!desc=移除官方/第三方广告与各类推荐入口，解除私聊送礼限制，阅后即焚图片可留存
 #!author=7452323
 #!homepage=https://github.com/7452323/QuantumultX
-#!arguments=通知:true,星球页保留:,派对频道保留:
+#!arguments=通知:true,星球页保留,派对频道保留
 #!arguments-desc=通知\n- true: 抓到阅后即焚图片时弹通知（默认）\n- false: 不弹通知\n\n星球页保留\n- 星球页要保留的入口，逗号或竖线分隔\n- 可选：soulMatch,voiceMatch,partyMatch,masked,maskedMatch,planet\n- 留空则隐藏全部入口\n\n派对频道保留\n- 派对广场要保留的频道，逗号或竖线分隔\n- 可选：hot,all,emotion,personal,play,interest,argue,story,chat,heart\n- 留空则隐藏全部频道
 #
 # 来源

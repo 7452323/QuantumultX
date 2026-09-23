@@ -22,6 +22,12 @@ console.log("[Surge] surge/Soul.sgmodule");
   const names = declLine.split(",").map((s) => s.split(":")[0].trim()).filter(Boolean);
   chk(names.length > 0, "声明参数：" + names.join(" / "));
   names.forEach((n) => chk(/^[\w\u4e00-\u9fa5]+$/.test(n), "参数名合法 " + n));
+  /* 冒号后必须跟默认值；没默认值要写裸名字，写成「名字:」Surge 会报「参数声明格式错误」 */
+  declLine.split(",").map((s) => s.trim()).filter(Boolean).forEach((item) => {
+    const i = item.indexOf(":");
+    if (i < 0) return;
+    chk(item.slice(i + 1).trim().length > 0, "参数 " + item.slice(0, i) + " 的默认值非空");
+  });
   const used = [...new Set([...t.matchAll(/\{\{\{([^}]+)\}\}\}/g)].map((m) => m[1].trim()))];
   used.forEach((u) => chk(names.indexOf(u) >= 0, "占位符 {{{" + u + "}}} 有声明"));
   names.forEach((n) => chk(used.indexOf(n) >= 0, "参数 " + n + " 有被引用"));
