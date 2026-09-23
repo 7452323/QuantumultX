@@ -615,10 +615,11 @@ async function runClaimWithAuth(auth, cachedBody) {
     let count = 0;
     let details = [];
 
-    // 读取奖励偏好：Loon 把 [Argument] 段参数值存在 persistentStore（key = 参数名），
-    // 直接用 $.getdata("prefer_coin") 读取用户在插件界面选择的值。
-    // 注意：$argument 只对应 argument="..." 里的静态字符串，无法读取 [Argument] 段参数。
-    let prefer = resolvePreferCoin($.getdata("prefer_coin"));
+    // 读取奖励偏好：模块 argument=prefer_coin={{{奖励偏好}}} 的值走 $argument；
+    // Loon 也会把 [Argument] 段的值写进 persistentStore，两条路都要试。
+    let argCoin = parseArgument(typeof $argument === "string" ? $argument : "").prefer_coin;
+    if (argCoin != null && ["--", "-", "none", "null", "无", "空"].indexOf(String(argCoin).trim().toLowerCase()) >= 0) argCoin = "";
+    let prefer = resolvePreferCoin(argCoin || $.getdata("prefer_coin"));
     let firstType = Number(prefer.firstType);
     let secondType = Number(prefer.secondType);
     let preferDesc = prefer.preferCoin ? "优先书币" : "优先体验卡";

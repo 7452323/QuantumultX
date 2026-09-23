@@ -27,13 +27,17 @@ let $ = new Env('RE0每日签到');
 let allMsg = '';
 
 // ============ 配置读取 ============
+/* 空值哨兵：Surge 参数不能留空默认值，「不填」用 -- 表示 */
+const BLANK = ['--', '-', 'none', 'null', '无', '空'];
+const isBlank = v => v === undefined || v === null || !String(v).trim() || BLANK.indexOf(String(v).trim().toLowerCase()) >= 0;
 const CONFIG = (() => {
   const args = {};
   if (typeof $argument === 'string' && $argument) {
-    $argument.split('&').forEach(p => { const i = p.indexOf('='); if (i > 0) args[p.slice(0, i).trim()] = p.slice(i + 1).trim(); });
+    // 只在 & 后面跟着新参数名时才断开，值里带 & (多账号) 不会被切碎
+    $argument.split(/&(?=[A-Za-z_][A-Za-z0-9_]*=)/).forEach(p => { const i = p.indexOf('='); if (i > 0) args[p.slice(0, i).trim()] = p.slice(i + 1).trim(); });
   }
   const get = (k, f) => {
-    if (args[k] != null) { try { return decodeURIComponent(args[k]); } catch { return args[k]; } }
+    if (!isBlank(args[k])) { try { const d = decodeURIComponent(args[k]); if (!isBlank(d)) return d; } catch (e) { return args[k]; } }
     if ($.isNode() && process.env[k.toUpperCase()]) return process.env[k.toUpperCase()];
     return $.getdata(k) || f;
   };
