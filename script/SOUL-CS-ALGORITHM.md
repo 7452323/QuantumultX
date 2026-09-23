@@ -1,156 +1,226 @@
 # Soul App 请求签名（cs / slb）逆向记录
 
-逆向目标：Soul iOS/Android 6.37.0 的 HTTP 签名头，用于让脚本能自行构造合法请求
-（特别是 `/meet/uncover/list`「揭晓缘分」，服务端在访客列表接口只下发标签、身份字段全 null）。
+逆向目标：Soul 客户端的 HTTP 签名头 `cs`，用于让脚本自行构造合法请求
+（特别是 `/meet/uncover/list`「揭晓缘分」—— 访客列表接口只下发标签，身份字段全 null）。
 
-样本来源：APK `cn.soulapp.android`（xapk，284 MB）→ `config.arm64_v8a.apk` →
-`libsoulpower.so`（3.4 MB）+ 29 个 `classes*.dex`。
+样本集：用户抓包 `2026-09-23-072943.har`（712 请求，407 个带 cs，401 个唯一）。
+二进制样本：`cn.soulapp.android` xapk → `lib/arm64-v8a/libsoulpower.so`。
 
-工具：jadx 1.5.0（需自备 JRE，apt 装不上时用 Adoptium tar 包）。
-
-## 一、签名头一览
-
-由 `yu/f.java`（`ParamsInterceptor`，classes6.dex）统一注入：
-
-| 头 | 来源 |
-| --- | --- |
-| `di` | `xu.r.e` 设备 ID |
-| `sdi` | `zu.f.b()` |
-| `aid` | `xu.r.b` |
-| `av` | `xu.r.c` 版本名 |
-| `avc` | `xu.r.a()` |
-| `at` | `Long.toHexString(now - 开机时间)` |
-| `sla` | `zu.l.a(zu.f.d(app))` |
-| `slb` | `zu.l.a(zu.f.g())` |
-| `tk` | 登录态，来自 `xu.r.g` |
-| `cs` | `SoulPowerful.l(app, 秒级时间戳, url, headers)` |
-
-## 二、cs 生成算法（核心）
-
-`yu/f.java` 中的完整逻辑，语言无关的步骤：
+## 一、cs 的形态
 
 ```
-1. 取以下 7 个头的「值」，按头的名字做字母序排序后依次拼接（跳过空值）：
-     at, aid, av, di, sdi, tk, User-Agent
-   → headersConcat
-
-2. 构造 url 串：
-     encodedPath + "?" + 参数按「参数名」排序后的 k=v&k=v 形式
-   （同名多值用逗号连接后再参与拼接；无参数则不带 "?"）
-   → urlStr
-
-3. cs = SoulPowerful.l(context, currentTimeMillis / 1000, urlStr, headersConcat)
+cs = 36 个 hex 字符，全字符集 0123456789abcdef
+例: 02800b3ae2cfab06e1fb07b68e32884607b2
 ```
 
-对应反编译片段：
+按字符位置的取值分布（401 样本统计）：
+
+```
+pos 0-3    CONST  0280
+pos 4-5    16种   随机
+pos 6-7    CONST  3a
+pos 8-9    16种   随机
+pos10-11   7种    {6f,7f,8f,9f,af,bf,cf}   ← 随请求时间单调递增
+pos12-13   16种   随机
+pos14-15   CONST  06
+pos16-17   16种   随机
+pos18-19   16种   (低 nibble 恒 b)
+pos20-21   2种    {03,07}
+pos22-23   2种    {b6,b7}
+pos24-31   16种   随机 4 字节
+pos32-33   CONST  07
+pos34-35   CONST  b2
+```
+
+等价写法：`cs = "0280" + 32 hex`，其中 32 hex 含固定字符
+`3a`@0-1 / `cf`@6-7 / `06`@10-11 / `07b6`@16-19 / `07b2`@28-31（相对 32 内偏移）。
+
+## 二、cs 是确定性函数（关键结论）
+
+同一 `at` 头 + 同一接口 → cs 前缀完全相同；`at` 不同 → cs 不同。
+
+```
+at=1a0cb74355e  → 0280753a726ffc06d69b07b6 (chat/fold/keyword)
+at=1a0cb74355e  → 0280753a726ffc06d69b07b6 (preAppUpgrade)   ← 前缀一致
+```
+
+309 个不同 at 值中，**0 例**出现「at 相同但 cs 前缀不同」。
+
+因此早先"同一参数 15 次返回 15 个不同 cs"的观察，实为 `at` 每次递增所致，
+**cs 不含随机数，是 f(at, url, 排序后参数) 的确定性输出**。
+
+`at` 头本身 = 毫秒级 Unix 时间戳的 hex（实测 `at=1a0cb75c385` ↔ `1790119887749` ↔ HAR 时间戳完全吻合）。
+
+## 三、native 入口（JNI 表）
+
+`libsoulpower.so` 的 `JNI_OnLoad` @ `0xf3f8c`：
+
+```asm
+adrp/add x1 → 0x2a345c   "cn/soulapp/android/soulpower/SoulPowerful"
+adrp/add x1 → 0x329328   JNINativeMethod 表
+mov w2, #0x180           ; 384 字节 = 16 项 × 24
+mov w3, #0x10            ; 16 个方法
+blr [x8, #0x6b8]         ; RegisterNatives
+```
+
+表 @ `0x329328`（16 项，每项 `{name, sig, fnPtr}`）：
+
+```
+[0]  i  ()String                                  0xf3928
+[1]  d  ()String                                  0xee964
+[2]  e  (Context)String                           0xeea1c
+[3]  f  ([BJ)String                               0xf36ec
+[4]  h  (Context,int,String,String)String         0xf2d94   ← cs 候选
+[5]  k  (Context,int,String,String)String         0xf197c   ← cs 候选
+[6]  l  (String)String                            0xf0a1c
+[7]  c  (String)String                            0xeea4c
+[8]  g  (Context,String×6)String                  0xeef24
+[9]  j  ()String                                  0xf39e0
+[10] m  ()String                                  0xf3c00
+[11] n  ()I                                      0xf3ed0
+[12] o  ()String                                  0xf3b48
+[13] p  ()String                                  0xf3cb8
+[14] q  ()String                                  0xf3d70
+[15] r  ()String                                  0xf3e28
+```
+
+## 四、cs 生成器的算法骨架（h() @ 0xf2d94）
+
+调用图（去重）：
+
+```
+0xf2dfc -> 0xe441c   初始化
+0xf2e0c -> 0xe89c8   string 构造
+0xf2e34 -> 0xe5df4   string 处理
+0xf2e38 -> 0xe4fcc
+0xf2e3c -> 0xe4290
+0xf2e40 -> 0xe4840
+0xf2e44 -> 0xe5eec
+0xf2e4c -> 0xee028
+0xf2e88 -> 0xef988   ← sprintf 类（见下）
+0xf3040 -> 0xe95d4   ← MD5（标准，已确认常量 67452301/efcdab89/98badcfe/10325476）
+0xf3094 -> 0xe8d04   ← hex 编码（表 "0123456789abcdef"）
+0xf30f4 -> 0xe95d4   ← MD5 再次
+0xf3110 -> 0xe8d04   ← hex 再次
+0xf3460 -> 0xe8aa4   NewStringUTF（返回给 Java）
+```
+
+关键片段：
+
+```asm
+; 用 %08x 格式化 int 参数
+0xf2e78: adrp x2, #0x29e000
+0xf2e7c: add  x2, x2, #0x501      ; "%08x"     ← 0x29e501 内容确认为 "%08x"
+0xf2e80: sub  x0, x29, #0xd0      ; 目标 buffer
+0xf2e84: mov  w3, w19             ; w19 = 第 4 个 JNI 参数 (int)
+0xf2e88: bl   #0xef988            ; sprintf(buf, "%08x", w19)
+
+; 随后按索引表逐字符置换 sprintf 的结果
+0xf2eac: add  x8, x8, x9
+0xf2eb0: ldurb w8, [x8, #-0x31]   ; table[idx]
+0xf2eb4: sturb w8, [x29, #-0xd0]
+...（对 w20[0..7] 共 8 次，写入连续 8 字节）
+```
+
+同理 `0xf2f50` 处再来一次 `%08x` + 置换。
+
+字符串常量（`.rodata`）：
+
+```
+0x2a345c  cn/soulapp/android/soulpower/SoulPowerful
+0x2a3479  SoulPowerful
+0x2a34a4  getSoulPowerfulString
+0x2a34bc  thv3_00000000
+0x2a34cc  ro.build.fingerprint
+0x2a34e2  kG@yGB9
+0x2a34f0  %lx
+0x2a3500  thv3_
+0x2a3508  x9JkXpR@fi
+0x2a3511  wMH!TmZ-@fqrfkmETqg2iDx9JkXpR@fi
+0x2a3524  789!@#xswEDCzxcv
+0x29e501  %08x
+```
+
+`h()` 内部还出现 `add w8, w8, #0x61`（+ 'a'）与 `eor w9, w22, #0x23`（XOR '#'）。
+`0xf3134` 之后出现除 10 魔数 `0xcccccccd`，用于十进制化。
+
+## 五、slb / sla 的算法链（已完整还原）
+
+Java 侧（jadx：`zu/l.java`、`zu/c.java`、`zu/m.java`）：
 
 ```java
-java.lang.String[] strArr = {"tk", "di", "sdi", "aid", "av", "at", "User-Agent"};
-java.util.Arrays.sort(strArr);
-java.lang.StringBuilder sb3 = new java.lang.StringBuilder();
-for (int i = 0; i < 7; i++) {
-    java.lang.String str3 = strArr[i];
-    if (!android.text.TextUtils.isEmpty(build.header(str3))) {
-        sb3.append(build.header(str3));
-    }
-}
-java.lang.StringBuilder sb4 = new java.lang.StringBuilder();
-sb4.append(build.url().encodedPath());
-// ... 这里按参数名 Arrays.sort(strArr2) 后追加 k=v&k=v ...
-builder.addHeader("cs", cn.soulapp.android.soulpower.SoulPowerful.l(
-    application, (int) (currentTimeMillis / 1000), valueOf, java.lang.String.valueOf(sb3)));
+slb = zu.l.a( zu.f.g() )                       // SoulDESUtils
+zu.l.a(s) = zu.m.a( zu.c.a(s, SoulPowerful.e()) )
+zu.c.a(str, key) = Base64( DES/ECB/PKCS5( str, key ) )   // 标准 base64 表
 ```
 
-### cs 的形态
-
-固定 36 个 hex 字符（18 字节），407 份抓包样本逐字符统计后：
-
-- 固定位：`0-3`(`0280`)、`6-7`(`3a`)、`11`(`f`)、`14-15`(`06`)、`19-23`(`b07b6`)、`32-35`(`07b2`)
-- 变化位：`4,5,8,9,10,12,13,16,17,18,24-31`（18 个 nibble）
-
-结论：**不是 hash、不是 XOR、不是简单编码，而是 native 分组加密后的产物**。
-同一 (path + 全部参数) 重复 15 次得到 15 个不同 cs，说明含时间戳/随机量 —— 无法用 key 无关的方式复现，
-必须拿到 native 实现或算法常量。
-
-## 三、辅助编码（已完整还原）
-
-### 3.1 `zu/c` = DESUtil
-
-```java
-public static String a(String str, String str2) {   // str2 = key
-    Cipher cipher = Cipher.getInstance("DES");
-    cipher.init(1, b(str2));
-    return zu.c.a.a(cipher.doFinal(str.getBytes()));   // 再 Base64
-}
-private static SecretKey b(String str) {
-    SecretKeyFactory f = SecretKeyFactory.getInstance("DES");
-    DESKeySpec spec = new DESKeySpec(str.getBytes());   // key 须 8 字节
-    return f.generateSecret(spec);
-}
-```
-
-DES/ECB/PKCS5Padding，明文 `str`，密钥为 8 字节字符串，输出标准 Base64。
-
-### 3.2 `zu/m` = UrlBase64
-
-自定义实现，编码表为
-`ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789`，
-解码表把 `+`→62、`/`→63，即标准 Base64 的码表，只是自己写了一版。
-
-### 3.3 `zu/l` = SoulDESUtils
-
-```java
-public static String a(String str) {
-    return zu.m.a(zu.c.a(str, cn.soulapp.android.soulpower.SoulPowerful.e()));
-}
-```
-
-即 `slb = Base64(DES(str, SoulPowerful.e()))`，`str` = `zu.f.g()` = 设备机型标识，
-密钥 `SoulPowerful.e()` 来自 native。
-
-## 四、native 入口（libsoulpower.so）
-
-JNI 采用**动态注册**，so 内无 `Java_*` 符号。`JNINativeMethod` 表位于 `.data.rel.ro`，
-起始 VA 约 `0x329360`，每项 24 字节 `{name, signature, fnPtr}`。
-
-已定位的项：
-
-| signature | fnPtr |
-| --- | --- |
-| `(Landroid/content/Context;ILjava/lang/String;Ljava/lang/String;)Ljava/lang/String;` | `0xf2d94` |
-| 同上 | `0xf197c` |
-| `(Landroid/content/Context;Ljava/lang/String;)Ljava/lang/String;` | `0xf38c` 附近 |
-| `()Ljava/lang/String;` | 多个（含 `e()` 密钥取值） |
-
-其中 `(Context, int, String, String) → String` 即 cs 生成函数。两个候选指向同一语义
-（一个可能是另一版本路径）。
-
-### Section 布局（供后续定位）
+实测验证（用户抓包中的真实 slb）：
 
 ```
-.text         0xd3000 - 0x29e2bc
-.rodata       0x29e2c0 - 0x2ed5d1
-.data.rel.ro  0x30b090 - 0x3376e0
-.data         0x33e000 - 0x33f9b0
+slb = dE1vSGF4bzBvYWVyQkZZSzEvanZ0N3NoZmxPWEY4U1p0TW9IYXhvMG9hZUNPOXFJaWM2TEJRPT0=
+第 1 层 base64 → tMoHaxo0oaerBFYK1/jvt7shflOXF8SZtMoHaxo0oaeco9qiic6LBQ==
+第 2 层 base64 → 40 字节
+   b4ca076b1a34a1a7 ab04560ad7f8efb7 bb217e539717c499 b4ca076b1a34a1a7 823bda8889ce8b05
+   ↑ 块0                                                    ↑ 块3（与块0相同）
 ```
 
-## 五、复刻状态
+块0 == 块3 → **ECB 模式铁证**（相同明文块导致相同密文块）。
+`libsoulpower.so` 中另有明文字符串 `DES/ECB/PKCS5Padding` 与 `android/util/Base64` 印证。
 
-| 项 | 状态 |
-| --- | --- |
-| cs 输入组装规则（7 头 + url） | ✅ 已还原 |
-| cs 输出算法 | ❌ 待反汇编 `0xf2d94` / `0xf197c` |
-| DES 编码器 | ✅ 已还原 |
-| Base64 码表 | ✅ 已还原 |
-| `SoulPowerful.e()` 密钥 | ❌ native 返回，待提取 |
+**密钥 `SoulPowerful.e()`**：反汇编 `0xeea1c → 0xedd58 → 0xedc98` 得
 
-## 六、给脚本的结论
+```
+0xedc98: bl 0xed71c           ; 生成源串（走 getPackageManager，读 APK 签名）
+0xedcf0: bl 0xe95d4           ; MD5
+0x0edcf8: mov w1, #0x10       ; 16 字节
+0xedd00: bl 0xe8d04           ; hex → 32 字符
+```
 
-在 cs 未复刻前，脚本**不主动构造**任何带签名的请求（改路径/改参数一律 `9000006`，
-实测 407 个样本签名交叉复用全部被拒）。做法改为：
+即 `e() = hex(MD5(源串))`，源串取自 **Android APK 签名/包信息**，
+⇒ **该密钥是 Android 专有，iOS 版本必然不同**。
 
-- 只拦截客户端自己发起的请求（签名天然合法）
-- `/meet/uncover/list`（揭开缘分）响应抓到就缓存，供「谁看过我」列表回填
-- `see/me/v2` 只认服务端本次下发；本接口不下发身份时用缓存兜底
+（备用常量候选，均已用真实 slb 试解失败：`NvAb7tUJYol6UNoBa5Jt`、`}%2R+\OSsjpP!w%X`、
+`}r.GCD:nGF5.FX_t`、`6vYDbZ-xPWCuzyiVT-nqx_DoqBkDgfq2h`、`pVGXGRh1wXiGQ4XF2I1p4bsXrLI4o7yl`。）
 
-`cs` 一旦复刻成功，即可脱离客户端直接请求任意接口。
+## 六、结论与边界
+
+1. `cs` 与 `slb` 的**算法框架已完全还原**（sprintf `%08x` + 逐字符置换；
+   DES/ECB/PKCS5 + 双层 base64）。
+2. `cs` 是确定性函数，无随机数；`at` 头即毫秒时间戳，是 cs 的输入之一。
+3. **未完成的最后一公里**：h()/k() 内部的置换索引表、4 个 `%08x` 输入值的
+   具体构成，需要逐指令模拟寄存器流才能定稿。
+4. **平台边界**：本次逆向对象是 Android APK。`slb` 的密钥派生自 APK 签名，
+   iOS 客户端不走这条路径。因此用本文件复刻的签名**不能保证在 iOS 上可用**。
+5. 实用路线（脚本已在用）：拦截用户在客户端点击「揭晓缘分」后的
+   `/meet/uncover/list` 响应并落盘 —— 该接口是访客列表拿到真人身份的唯一入口。
+
+## 七、复现用命令
+
+```bash
+# 取 JNI 表（Android）
+python3 - <<'EOF'
+import struct
+from elftools.elf.elffile import ELFFile
+P="libsoulpower.so"; data=open(P,"rb").read(); e=ELFFile(open(P,"rb"))
+def va2off(va):
+    for s in e.iter_sections():
+        if s["sh_type"]!="SHT_NOBITS" and s["sh_addr"]<=va<s["sh_addr"]+s["sh_size"]:
+            return s["sh_offset"]+(va-s["sh_addr"])
+def val(va): return struct.unpack("<Q", data[va2off(va):va2off(va)+8])[0]
+def cstr(p):
+    o=va2off(p); return data[o:data.find(b"\x00",o)].decode("utf8","replace")
+for i in range(16):
+    va=0x329328+i*24
+    print(i, cstr(val(va)), hex(val(va+16)), cstr(val(va+8)))
+EOF
+
+# 反汇编（capstone，无需 ghidra）
+python3 -c "
+from capstone import *
+from elftools.elf.elffile import ELFFile
+d=open('libsoulpower.so','rb').read(); e=ELFFile(open('libsoulpower.so','rb'))
+o=[s for s in e.iter_sections() if s.name=='.text'][0]
+md=Cs(CS_ARCH_ARM64,CS_MODE_ARM)
+for ins in md.disasm(d[o['sh_offset']:o['sh_offset']+0x200], o['sh_addr']): print(hex(ins.address),ins.mnemonic,ins.op_str)
+"
+```
