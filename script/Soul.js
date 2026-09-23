@@ -65,6 +65,168 @@ const store = {
     return null;
   },
 };
+/*
+  cs 签名 —— 逆向 cn.soulapp.android.soulpower.SoulPowerful.l() → libsoulpower.so h()@0xf2d94
+  sec = at/1000；两段置换表取 ASCII 数字串，out[i]=src[digit-1]
+  buf = 0280 | MD5(头名升序拼接+"SoulPowerful") 与 perm("%08x"(sec)) 交错 | 07b6 | MD5(url+perm2+"kG@yGB9") | 07b2
+*/
+const CS_TA = "42765183", CS_TB = "25387164";
+const CS_HDR = ["user-agent", "aid", "at", "av", "di", "sdi", "tk"];
+const CS_T10 = 0x07, CS_T11 = 0xb6, CS_T16 = 0x07, CS_T17 = 0xb2;
+
+function csBytes(s) {
+  const b = [];
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    if (c < 0x80) b.push(c);
+    else if (c < 0x800) b.push(0xc0 | (c >> 6), 0x80 | (c & 63));
+    else b.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63));
+  }
+  return b;
+}
+function csMd5(str) {
+  const rl = (n, c) => (n << c) | (n >>> (32 - c));
+  const au = (x, y) => { const l = (x & 0xffff) + (y & 0xffff); return (((x >> 16) + (y >> 16) + (l >> 16)) << 16) | (l & 0xffff); };
+  const cmn = (q, a, b, x, s, t) => au(rl(au(au(a, q), au(x, t)), s), b);
+  const ff = (a, b, c, d, x, s, t) => cmn((b & c) | (~b & d), a, b, x, s, t);
+  const gg = (a, b, c, d, x, s, t) => cmn((b & d) | (c & ~d), a, b, x, s, t);
+  const hh = (a, b, c, d, x, s, t) => cmn(b ^ c ^ d, a, b, x, s, t);
+  const ii = (a, b, c, d, x, s, t) => cmn(c ^ (b | ~d), a, b, x, s, t);
+  const by = csBytes(str), n = by.length, bl = n * 8;
+  by.push(0x80);
+  while (by.length % 64 !== 56) by.push(0);
+  const lo = bl >>> 0, hi = Math.floor(n / 536870912) >>> 0;
+  for (let i = 0; i < 4; i++) by.push((lo >>> (i * 8)) & 255);
+  for (let i = 0; i < 4; i++) by.push((hi >>> (i * 8)) & 255);
+  let a = 1732584193, b = -271733879, c = -1732584194, d = 271733878;
+  const x = new Array(16);
+  for (let i = 0; i < by.length; i += 64) {
+    for (let j = 0; j < 16; j++) x[j] = by[i + j * 4] | (by[i + j * 4 + 1] << 8) | (by[i + j * 4 + 2] << 16) | (by[i + j * 4 + 3] << 24);
+    const oa = a, ob = b, oc = c, od = d;
+    a = ff(a, b, c, d, x[0], 7, -680876936); d = ff(d, a, b, c, x[1], 12, -389564586);
+    c = ff(c, d, a, b, x[2], 17, 606105819); b = ff(b, c, d, a, x[3], 22, -1044525330);
+    a = ff(a, b, c, d, x[4], 7, -176418897); d = ff(d, a, b, c, x[5], 12, 1200080426);
+    c = ff(c, d, a, b, x[6], 17, -1473231341); b = ff(b, c, d, a, x[7], 22, -45705983);
+    a = ff(a, b, c, d, x[8], 7, 1770035416); d = ff(d, a, b, c, x[9], 12, -1958414417);
+    c = ff(c, d, a, b, x[10], 17, -42063); b = ff(b, c, d, a, x[11], 22, -1990404162);
+    a = ff(a, b, c, d, x[12], 7, 1804603682); d = ff(d, a, b, c, x[13], 12, -40341101);
+    c = ff(c, d, a, b, x[14], 17, -1502002290); b = ff(b, c, d, a, x[15], 22, 1236535329);
+    a = gg(a, b, c, d, x[1], 5, -165796510); d = gg(d, a, b, c, x[6], 9, -1069501632);
+    c = gg(c, d, a, b, x[11], 14, 643717713); b = gg(b, c, d, a, x[0], 20, -373897302);
+    a = gg(a, b, c, d, x[5], 5, -701558691); d = gg(d, a, b, c, x[10], 9, 38016083);
+    c = gg(c, d, a, b, x[15], 14, -660478335); b = gg(b, c, d, a, x[4], 20, -405537848);
+    a = gg(a, b, c, d, x[9], 5, 568446438); d = gg(d, a, b, c, x[14], 9, -1019803690);
+    c = gg(c, d, a, b, x[3], 14, -187363961); b = gg(b, c, d, a, x[8], 20, 1163531501);
+    a = gg(a, b, c, d, x[13], 5, -1444681467); d = gg(d, a, b, c, x[2], 9, -51403784);
+    c = gg(c, d, a, b, x[7], 14, 1735328473); b = gg(b, c, d, a, x[12], 20, -1926607734);
+    a = hh(a, b, c, d, x[5], 4, -378558); d = hh(d, a, b, c, x[8], 11, -2022574463);
+    c = hh(c, d, a, b, x[11], 16, 1839030562); b = hh(b, c, d, a, x[14], 23, -35309556);
+    a = hh(a, b, c, d, x[1], 4, -1530992060); d = hh(d, a, b, c, x[4], 11, 1272893353);
+    c = hh(c, d, a, b, x[7], 16, -155497632); b = hh(b, c, d, a, x[10], 23, -1094730640);
+    a = hh(a, b, c, d, x[13], 4, 681279174); d = hh(d, a, b, c, x[0], 11, -358537222);
+    c = hh(c, d, a, b, x[3], 16, -722521979); b = hh(b, c, d, a, x[6], 23, 76029189);
+    a = hh(a, b, c, d, x[9], 4, -640364487); d = hh(d, a, b, c, x[12], 11, -421815835);
+    c = hh(c, d, a, b, x[15], 16, 530742520); b = hh(b, c, d, a, x[2], 23, -995338651);
+    a = ii(a, b, c, d, x[0], 6, -198630844); d = ii(d, a, b, c, x[7], 10, 1126891415);
+    c = ii(c, d, a, b, x[14], 15, -1416354905); b = ii(b, c, d, a, x[5], 21, -57434055);
+    a = ii(a, b, c, d, x[12], 6, 1700485571); d = ii(d, a, b, c, x[3], 10, -1894986606);
+    c = ii(c, d, a, b, x[10], 15, -1051523); b = ii(b, c, d, a, x[1], 21, -2054922799);
+    a = ii(a, b, c, d, x[8], 6, 1873313359); d = ii(d, a, b, c, x[15], 10, -30611744);
+    c = ii(c, d, a, b, x[6], 15, -1560198380); b = ii(b, c, d, a, x[13], 21, 1309151649);
+    a = ii(a, b, c, d, x[4], 6, -145523070); d = ii(d, a, b, c, x[11], 10, -1120210379);
+    c = ii(c, d, a, b, x[2], 15, 718787259); b = ii(b, c, d, a, x[9], 21, -343485551);
+    a = au(a, oa); b = au(b, ob); c = au(c, oc); d = au(d, od);
+  }
+  const out = [];
+  [a, b, c, d].forEach((v) => { for (let k = 0; k < 4; k++) out.push((v >>> (k * 8)) & 255); });
+  return out;
+}
+function csPerm(s, table) {
+  let o = "";
+  for (let i = 0; i < table.length; i++) o += s.charAt(table.charCodeAt(i) - 0x31);
+  return o;
+}
+function csDec(s) {
+  try { return decodeURIComponent(String(s).replace(/\+/g, " ")); } catch (e) { return String(s); }
+}
+/* pairs: [[k,v],...] 已解码；返回 36 字符 cs */
+function soulCs(path, pairs, headers, atHex) {
+  const ms = parseInt(atHex, 16);
+  const sec = Math.floor(ms / 1000) >>> 0;
+  const s1 = ("0000000" + sec.toString(16)).slice(-8);
+  const ha = csPerm(s1, CS_TA), hb = csPerm(s1, CS_TB);
+  let hdr = "";
+  for (let i = 0; i < CS_HDR.length; i++) {
+    const k = CS_HDR[i];
+    if (headers[k] !== undefined && headers[k] !== null) hdr += String(headers[k]);
+  }
+  const m = csMd5(hdr + "SoulPowerful");
+  const ps = pairs.slice().sort((p, q) => (p[0] < q[0] ? -1 : p[0] > q[0] ? 1 : 0));
+  const qs = ps.map((p) => p[0] + "=" + p[1]).join("&");
+  const hbHex = ("0000000" + parseInt(hb, 16).toString(16)).slice(-8);
+  const b = csMd5(path + (qs ? "?" + qs : "") + hbHex + "kG@yGB9");
+  const buf = [
+    0x02, 0x80, m[0], parseInt(ha.substr(0, 2), 16), m[1], parseInt(ha.substr(2, 2), 16),
+    m[2], parseInt(ha.substr(4, 2), 16), m[3], parseInt(ha.substr(6, 2), 16),
+    CS_T10, CS_T11, b[0], b[1], b[2], b[3], CS_T16, CS_T17,
+  ];
+  return buf.map((v) => { const t = (v & 255).toString(16); return t.length < 2 ? "0" + t : t; }).join("");
+}
+
+/* 三平台 GET */
+function csHttpGet(u, headers, cb) {
+  try {
+    if (typeof $task !== "undefined" && $task.fetch) {
+      $task.fetch({ url: u, method: "GET", headers: headers }).then((r) => cb(null, r.body), (e) => cb(e));
+      return;
+    }
+    if (typeof $httpClient !== "undefined" && $httpClient.get) {
+      $httpClient.get({ url: u, headers: headers }, (err, resp, data) => cb(err, data));
+      return;
+    }
+  } catch (e) { cb(e); return; }
+  cb(new Error("no http client"));
+}
+
+/*
+  全自动拉「谁看过我」：服务端这次没给真身份时，脚本自己用正确 cs 重新签一次请求，
+  拿到真人列表后直接替换响应，用户不用再点「揭晓缘分」。
+*/
+function pullViewers(obj, done) {
+  const src = ($request && $request.headers) || {};
+  const hdrs = {};
+  Object.keys(src).forEach((k) => { hdrs[String(k).toLowerCase()] = src[k]; });
+  const atHex = Date.now().toString(16);
+  let biJson = null;
+  try {
+    const mm = url.match(/[?&]bi=([^&]*)/);
+    if (mm) {
+      const arr = JSON.parse(csDec(mm[1]));
+      if (Array.isArray(arr) && arr.length) {
+        arr[0] = atHex;          // bi[0] 与 at 同步刷新
+        biJson = JSON.stringify(arr);
+      }
+    }
+  } catch (e) { }
+  if (!biJson) { done(null); return; }
+  const pairs = [["bi", biJson], ["bik", "32243"], ["limit", "20"], ["pageId", "MHomeMyTrack_Main"], ["sortType", "1"]];
+  hdrs["at"] = atHex;
+  hdrs["cs"] = soulCs("/meet/see/me/v2", pairs, hdrs, atHex);
+  delete hdrs["content-length"];
+  const sendQs = pairs.map((p) => p[0] + "=" + encodeURIComponent(p[1])).join("&");
+  csHttpGet("https://api-a.soulapp.cn/meet/see/me/v2?" + sendQs, hdrs, (err, data) => {
+    if (err || !data) { done(null); return; }
+    let fresh = null;
+    try { fresh = JSON.parse(data); } catch (e) { }
+    if (!fresh || !fresh.data) { done(null); return; }
+    fresh.data.superUser = true;
+    fresh.data.uncoverSecretCount = 999;
+    const ppl = harvestUsers(fresh.data).filter((x) => x.user);
+    if (ppl.length) saveViewerCache(ppl, null);
+    done(fresh);
+  });
+}
+
 function fmtTime(t) {
   const d = new Date(t);
   const p = (n) => (n < 10 ? "0" + n : "" + n);
@@ -123,6 +285,8 @@ function readViewerCache() {
 function saveViewerCache(list, metric) {
   try { store.set(VKEY, JSON.stringify({ v: 2, t: Date.now(), list: list, metric: metric || null })); } catch (e) { }
 }
+
+let ASYNC = false;   /* 自签拉取挂起中，$done 交给回调 */
 
 try {
   /*
@@ -460,29 +624,38 @@ try {
 */
   else if (has("see/me")) {
     const obj = JSON.parse(body);
+    let cached = null;
+    let servedReal = false;
     if (obj && obj.data) {
       obj.data.superUser = true;
       obj.data.uncoverSecretCount = 999;
       /* 服务端会给本次访客(只有访问次数/星座等标签，没有 userIdEcpt，点不进人) */
       const served = Array.isArray(obj.data.list) ? obj.data.list : [];
-      /* 能点进去的才算真资料 */
-      const clickable = served.filter((x) => x && x.userIdEcpt);
-      let stamp = 0;
-      if (clickable.length) {
-        stamp = Date.now();
-      } else {
-        const c = readViewerCache();
-        if (c) {
-          fillViewers(obj, c.list);
-          stamp = c.t;
-        }
-      }
-      if (NOTIFY) {
-        if (stamp) notify("Soul 谁看过我列表", "✅下发 " + fmtTime(stamp), "");
+      /* 能点进去的才算真资料（只认服务端原话，缓存补的不算，否则永远不刷新） */
+      servedReal = served.some((x) => x && x.userIdEcpt);
+      if (!servedReal) {
+        /* 先用同接口缓存兜底，再自己带签名拉最新覆盖 */
+        cached = readViewerCache();
+        if (cached) fillViewers(obj, cached.list);
       }
     }
-
     body = JSON.stringify(obj);
+    if (obj && obj.data && !servedReal) {
+      /* 彻底全自动：本地自签重放，拿到真人直接替换响应，不用点「揭晓缘分」 */
+      ASYNC = true;
+      pullViewers(obj, (fresh) => {
+        let out = body;
+        if (fresh) {
+          out = JSON.stringify(fresh);
+          if (NOTIFY) notify("Soul 谁看过我列表", "✅最新 " + fmtTime(Date.now()), "");
+        } else if (NOTIFY) {
+          notify("Soul 谁看过我列表", cached ? "⚠️自签失败，用缓存 " + fmtTime(cached.t) : "⚠️自签失败", "");
+        }
+        $done(out === null ? {} : { body: out });
+      });
+    } else if (NOTIFY) {
+      notify("Soul 谁看过我列表", "✅下发 " + fmtTime(Date.now()), "");
+    }
   }
 
   /*
@@ -564,7 +737,9 @@ try {
   body = null;
 }
 
-if (body === null || body === undefined) {
+if (ASYNC) {
+  /* 响应交给自签回调里的 $done */
+} else if (body === null || body === undefined) {
   $done({});
 } else {
   $done({ body });

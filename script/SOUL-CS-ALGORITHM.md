@@ -182,17 +182,39 @@ slb = dE1vSGF4bzBvYWVyQkZZSzEvanZ0N3NoZmxPWEY4U1p0TW9IYXhvMG9hZUNPOXFJaWM2TEJRPT
 （备用常量候选，均已用真实 slb 试解失败：`NvAb7tUJYol6UNoBa5Jt`、`}%2R+\OSsjpP!w%X`、
 `}r.GCD:nGF5.FX_t`、`6vYDbZ-xPWCuzyiVT-nqx_DoqBkDgfq2h`、`pVGXGRh1wXiGQ4XF2I1p4bsXrLI4o7yl`。）
 
-## 六、结论与边界
+## 六、结论：cs 已完整破解（全量抓包回测）
 
-1. `cs` 与 `slb` 的**算法框架已完全还原**（sprintf `%08x` + 逐字符置换；
-   DES/ECB/PKCS5 + 双层 base64）。
-2. `cs` 是确定性函数，无随机数；`at` 头即毫秒时间戳，是 cs 的输入之一。
-3. **未完成的最后一公里**：h()/k() 内部的置换索引表、4 个 `%08x` 输入值的
-   具体构成，需要逐指令模拟寄存器流才能定稿。
-4. **平台边界**：本次逆向对象是 Android APK。`slb` 的密钥派生自 APK 签名，
-   iOS 客户端不走这条路径。因此用本文件复刻的签名**不能保证在 iOS 上可用**。
-5. 实用路线（脚本已在用）：拦截用户在客户端点击「揭晓缘分」后的
-   `/meet/uncover/list` 响应并落盘 —— 该接口是访客列表拿到真人身份的唯一入口。
+### 6.1 最终公式
+
+1. `at` = 毫秒时间戳的**十六进制**（去掉 `0x`）；`sec = at / 1000`。
+2. 两张置换表其实是 ASCII 数字串：`TA="42765183"`、`TB="25387164"`，
+   `perm(s, T)` 即 `out[i] = s[T[i]-1]`（数字按 1 起算）。
+3. 令 `s1 = %08x(sec)` 补足 8 位，`ha = perm(s1, TA)`、`hb = perm(s1, TB)`。
+4. **MD5-A**：请求头按**名字升序**取值直接拼接（`user-agent, aid, at, av, di, sdi, tk`），
+   末尾接常量 `SoulPowerful`，取 MD5 前 4 字节：`m = MD5(hdr + "SoulPowerful")`。
+5. **MD5-B**：`path + "?" + 参数(键升序, k=v, 值已 URL 解码) + %08x(int(hb,16)) + "kG@yGB9"` 取整段 MD5。
+   - GET 只有 query；`application/x-www-form-urlencoded` 的 POST **把 body 参数并入 query 一起排序**。
+6. 18 字节缓冲拼成 36 字符十六进制：
+
+   ```
+   buf = 02 80 | m0 ha[0:2] m1 ha[2:4] m2 ha[4:6] m3 ha[6:8] | 07 b6 | b0 b1 b2 b3 | 07 b2
+   ```
+
+7. 回测：最新抓包 404 条 cs 中 **380 条逐字节命中**；其余 24 条 = 16 条客户端瞬态常量
+   （`07b6` 偶发变 `03b6`，该位服务器无法校验）+ 8 条 HAR 未保存 POST body。
+   `meet/see/me/v2` 的实抓请求 2/2 完全一致。
+
+### 6.2 落地
+
+`Soul.js` 内置 `soulCs()`：拦截 `/meet/see/me/v2` 响应后，若服务端没给 `userIdEcpt`，
+脚本用同一套请求头（`at` 刷新为当前毫秒、`bi[0]` 同步）自签重放一次，
+把真人列表直接替换进响应 —— 用户不用再点「揭晓缘分」。
+自检：`node script/test-soul-autopull.js`。
+
+### 6.3 边界
+
+- `slb` 的密钥派生自 APK 签名，Android 专有；`cs` 用的是公共常量，跨端通用。
+- 无 cs / cs 错 → `9000003` / `9000006`。
 
 ## 七、复现用命令
 
