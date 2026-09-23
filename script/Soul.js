@@ -4,7 +4,6 @@
 ^https:\/\/api-chat\.soulapp\.cn\/snapchat\/url url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js
 ^https:\/\/api-a\.soulapp\.cn\/(html\/settlement\/)?meet\/(see\/me|mine\/see|queryInvisibleCount) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js
 ^https:\/\/api-pay\.soulapp\.cn\/(privilege\/supervip\/status|vip\/meet\/userInfo|show\/superVIP\/detail\/v2) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js
-^https:\/\/api-a\.soulapp\.cn\/meet\/mine\/see url script-request-header https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js
 [mitm]
 hostname = api-chat.soulapp.cn, api-a.soulapp.cn, api-pay.soulapp.cn, api-user.soulapp.cn, post.soulapp.cn
 */
@@ -74,6 +73,12 @@ function httpGet(u, headers) {
       } else reject(new Error("no http client"));
     } catch (e) { reject(e); }
   });
+}
+function fmtTime(t) {
+  const d = new Date(t);
+  const p = (n) => (n < 10 ? "0" + n : "" + n);
+  return d.getFullYear() + "/" + (d.getMonth() + 1) + "/" + d.getDate() + " " +
+    p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds());
 }
 function notify(title, sub, content) {
   try {
@@ -451,19 +456,20 @@ try {
       obj.data.uncoverSecretCount = 999;
       /* 只认服务端这次下发的数据，挖空时才拿同接口的历史缓存兜底 */
       const real = (Array.isArray(obj.data.list) ? obj.data.list : []).filter((x) => x && x.user);
-      const hasReal = real.length > 0;
-      if (hasReal) {
-        /* 服务端这次给了真人，直接用；顺便存一份，供它下次挖空时兜底 */
+      let stamp = 0;
+      if (real.length) {
+        stamp = Date.now();
         saveViewerCache(real, obj.data.meSeeMetricResp);
-        if (NOTIFY) notify("Soul 谁看过我", "✅ 服务端下发真人 " + real.length + " 条", "直接显示");
       } else {
         const c = readViewerCache();
         if (c) {
           fillViewers(obj, c.list);
-          if (NOTIFY) notify("Soul 谁看过我", "✅ 已回填 " + c.list.length + " 条", "上次服务端下发 " + new Date(c.t).toLocaleString());
-        } else if (NOTIFY) {
-          notify("Soul 谁看过我", "⚠️ 服务端这次没下发真人", "本地也没存货，过会儿再进一次");
+          stamp = c.t;
         }
+      }
+      if (NOTIFY) {
+        if (stamp) notify("Soul 谁看过我列表", "✅下发 " + fmtTime(stamp), "");
+        else notify("Soul 谁看过我列表", "⚠️服务端这次没下发", "本地也没存货，过会儿再进一次");
       }
     }
 
