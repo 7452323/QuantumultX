@@ -101,13 +101,14 @@ function readViewerCache() {
   if (!raw) return null;
   try {
     const c = typeof raw === "string" ? JSON.parse(raw) : raw;
-    if (!c || !Array.isArray(c.list) || !c.list.length) return null;
+    if (!c || c.v !== 2) return null;   // 旧版本缓存里存的是「我看过谁」的人，作废
+    if (!Array.isArray(c.list) || !c.list.length) return null;
     if (Date.now() - (c.t || 0) > 12 * 3600 * 1000) return null;
     return c;
   } catch (e) { return null; }
 }
 function saveViewerCache(list, metric) {
-  try { store.set(VKEY, JSON.stringify({ t: Date.now(), list: list, metric: metric || null })); } catch (e) { }
+  try { store.set(VKEY, JSON.stringify({ v: 2, t: Date.now(), list: list, metric: metric || null })); } catch (e) { }
 }
 
 try {
@@ -433,19 +434,15 @@ try {
     if (obj && obj.data) {
       obj.data.superUser = true;
       if (obj.data.meSeeMetricResp) obj.data.meSeeMetricResp.invisibleCount = 9999;
-      const real = Array.isArray(obj.data.userList) ? obj.data.userList.filter((x) => x && x.user) : [];
-      if (real.length) {
-        saveViewerCache(real, obj.data.meSeeMetricResp);
-        if (NOTIFY) notify("Soul 谁看过我", "✅ 已抓取 " + real.length + " 条真人", "现在去「我的足迹」就能看到");
-      }
     }
     body = JSON.stringify(obj);
   }
 
   /*
-  10b. 我的足迹 / 谁看过我：回填真人
-  服务端把 list[].user / uid / userIdEcpt 全置 null，只留「访问16次/摩羯座」烟雾弹。
-  有缓存就回填，没缓存就主动拉一次，失败原样放行。
+  10b. 谁看过我 / 我的足迹
+  服务端正常会下发 user 列表(只把 userId 置 null，用 userIdEcpt 代替)。
+  偶尔整批挖空，这时用同接口的历史缓存兜底。
+  注意：绝不拿 /meet/mine/see(我看过谁) 的人来填，那是另一批人。
 */
   else if (has("see/me")) {
     const obj = JSON.parse(body);
