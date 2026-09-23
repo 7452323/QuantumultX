@@ -439,6 +439,9 @@ try {
     if (obj && obj.data) {
       obj.data.superUser = true;
       if (obj.data.meSeeMetricResp) obj.data.meSeeMetricResp.invisibleCount = 9999;
+      /* 服务端只在这条接口下发完整真人(带 userIdEcpt)，存一份给「谁看过我」列表用 */
+      const ul = (Array.isArray(obj.data.userList) ? obj.data.userList : []).filter((x) => x && x.user);
+      if (ul.length) saveViewerCache(ul, obj.data.meSeeMetricResp);
     }
     body = JSON.stringify(obj);
   }
@@ -454,12 +457,13 @@ try {
     if (obj && obj.data) {
       obj.data.superUser = true;
       obj.data.uncoverSecretCount = 999;
-      /* 只认服务端这次下发的数据，挖空时才拿同接口的历史缓存兜底 */
-      const real = (Array.isArray(obj.data.list) ? obj.data.list : []).filter((x) => x && x.user);
+      /* 服务端会给本次访客(只有访问次数/星座等标签，没有 userIdEcpt，点不进人) */
+      const served = Array.isArray(obj.data.list) ? obj.data.list : [];
+      /* 能点进去的才算真资料 */
+      const clickable = served.filter((x) => x && x.userIdEcpt);
       let stamp = 0;
-      if (real.length) {
+      if (clickable.length) {
         stamp = Date.now();
-        saveViewerCache(real, obj.data.meSeeMetricResp);
       } else {
         const c = readViewerCache();
         if (c) {
@@ -469,7 +473,6 @@ try {
       }
       if (NOTIFY) {
         if (stamp) notify("Soul 谁看过我列表", "✅下发 " + fmtTime(stamp), "");
-        else notify("Soul 谁看过我列表", "⚠️服务端这次没下发", "本地也没存货，过会儿再进一次");
       }
     }
 
