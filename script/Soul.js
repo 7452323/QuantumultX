@@ -43,21 +43,22 @@ const ARG_NAMED = Object.keys(ARG).length > 0;
   Loon 插件只支持位置传参，约定固定顺序：0 通知 / 1 星球页保留 / 2 派对频道保留。
   有具名参数（Surge 的 {{{通知}}}）时优先用具名，位置参数只在没有具名时才兜底。
 */
+/* Surge 参数不能留空默认值，「一个都不保留」用 -- 表示 */
+const ARG_SENTINEL = ["--", "-", "none", "null", "无", "空"];
+function goodArg(v) {
+  if (v === undefined || v === null) return "";
+  const s = String(v).trim();
+  if (!s) return "";
+  if (/^\{+.*\}+$/.test(s)) return "";                              /* 占位符没被替换 */
+  if (ARG_SENTINEL.indexOf(s.toLowerCase()) >= 0) return "";        /* 空值哨兵 */
+  return s;
+}
 function argOf(names, pos) {
   for (let i = 0; i < names.length; i++) {
-    const v = ARG[names[i]];
-    if (v === undefined || v === null) continue;
-    const s = String(v).trim();
-    if (!s || /^\{+.*\}+$/.test(s)) continue;
-    return s;
+    const s = goodArg(ARG[names[i]]);
+    if (s) return s;
   }
-  if (!ARG_NAMED && Array.isArray(RAW_ARG) && pos !== undefined) {
-    const v = RAW_ARG[pos];
-    if (v !== undefined && v !== null) {
-      const s = String(v).trim();
-      if (s) return s;
-    }
-  }
+  if (!ARG_NAMED && Array.isArray(RAW_ARG) && pos !== undefined) return goodArg(RAW_ARG[pos]);
   return "";
 }
 function flagOf(names, pos, dft) {

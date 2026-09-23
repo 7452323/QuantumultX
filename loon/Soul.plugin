@@ -15,8 +15,8 @@
 [Argument]
 # 顺序即传给脚本的位置参数顺序，勿调换：0 通知 / 1 星球页保留 / 2 派对频道保留
 notify = switch, true, tag = 阅后即焚通知, desc = 抓到阅后即焚图片时弹通知，可点击查看或保存
-planetKeep = input, "", tag = 星球页保留入口, desc = 要保留的入口，逗号或竖线分隔：soulMatch,voiceMatch,partyMatch,masked,maskedMatch,planet。留空则隐藏全部入口
-roomTagKeep = input, "", tag = 派对频道保留, desc = 要保留的频道，逗号或竖线分隔：hot,all,emotion,personal,play,interest,argue,story,chat,heart。留空则隐藏全部频道
+planetKeep = input, "--", tag = 星球页保留入口, desc = 要保留的入口，逗号或竖线分隔：soulMatch,voiceMatch,partyMatch,masked,maskedMatch,planet。填 -- 则一个都不保留
+roomTagKeep = input, "--", tag = 派对频道保留, desc = 要保留的频道，逗号或竖线分隔：hot,all,emotion,personal,play,interest,argue,story,chat,heart。填 -- 则一个都不保留
 
 [Rule]
 DOMAIN,ssp.soulapp.cn,REJECT

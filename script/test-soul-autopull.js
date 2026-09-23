@@ -128,6 +128,12 @@ p2.then(() => {
 
       const f = argState(undefined);
       chk(f[1] === true && f[2] === "" && f[3] === "", "完全不给参数走默认（QX）");
+
+      const g = argState("通知=true,星球页保留=--,派对频道保留=--");
+      chk(g[2] === "" && g[3] === "", "Surge 默认值 -- 当作「一个都不保留」");
+
+      const h = argState(["false", "--", "hot,chat"]);
+      chk(h[1] === false && h[2] === "" && h[3] === "hot,chat", "Loon 位置参数里的哨兵也认");
     }
 
     console.log("\n" + pass + " passed, " + fail + " failed");
