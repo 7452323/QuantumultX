@@ -32,12 +32,6 @@ const NOTIFY = flag("notify", true);        // 阅后即焚抓到图片时弹通
 const PLANET_KEEP = ARG.planetKeep || "";   // 星球页保留入口，逗号分隔: soulMatch,voiceMatch,partyMatch,masked,maskedMatch,planet
 const ROOMTAG_KEEP = ARG.roomTagKeep || ""; // 派对频道保留，逗号分隔: hot,all,emotion,personal,play,interest,argue,story,chat,heart
 
-/*
-  请求阶段（Surge/Loon http-request、QX script-request-header）：
-  会员页那条 /meet/mine/see 的 URL + 请求头（含 cs 签名）存下来。
-  cs 实测可复用（同 cs 连调 5 次全成功），且只绑「接口+参数」，所以这套头能反复拿去拉真人。
-  之后每次进访客页，响应脚本就用这套头主动拉一次最新数据。
-*/
 const url = ($request && $request.url) || "";
 let body = ($response && $response.body) || "";
 
@@ -46,13 +40,10 @@ const keepList = (s) => s.split(",").map((x) => x.trim()).filter(Boolean);
 
 /*
   三平台存储 / HTTP 适配
-  谁看过我：服务端按账号真实会员态过滤 user/uid/userIdEcpt（全 null），
-  客户端改标记只能拆掉「需会员」提示，拆不出服务端没下发的数据。
-  唯一不设防的是「会员购买页」那条 /meet/mine/see（真机抓包返 100 条真人），
-  所以：见到它就缓存，进我的足迹页时回填。
+  谁看过我（/meet/see/me/v2）：服务端会下发 user 列表，但 userId 置 null，
+  只给 userIdEcpt。有时整批挖空，所以留一份同接口缓存兜底。
 */
 const VKEY = "soul_viewer_cache";
-const MKEY = "soul_mine_see_req";
 const store = {
   get(k) {
     try {
@@ -69,15 +60,6 @@ const store = {
     return null;
   },
 };
-const __isRequest = typeof $response === "undefined";
-if (__isRequest) {
-  try {
-    if (($request.url || "").indexOf("/meet/mine/see") !== -1) {
-      store.set(MKEY, JSON.stringify({ u: $request.url, h: $request.headers || {} }));
-    }
-  } catch (e) { }
-  $done({});
-} else {
 const qs = (k) => {
   const m = url.match(new RegExp("[?&]" + k + "=([^&]*)"));
   return m ? m[1] : "";
@@ -127,54 +109,6 @@ function readViewerCache() {
 function saveViewerCache(list, metric) {
   try { store.set(VKEY, JSON.stringify({ t: Date.now(), list: list, metric: metric || null })); } catch (e) { }
 }
-/*
-  缓存为空时的兜底：带客户端原始请求头主动拉一次会员页那条接口。
-  注意 S 的 cs/at 可能与 URL 绑定，失败就原样放行，不影响客户端。
-*/
-function fetchViewers(obj) {
-  /*
-    用「会员页那次请求」的原样 URL + 请求头去拉。
-    cs 只绑接口+参数（实测换 cs 必挂、同 cs 连调 5 次全成功），
-    所以必须原样复用会员页那套，不能用当前足迹页的。
-  */
-  let saved = null;
-  try {
-    const raw = store.get(MKEY);
-    saved = raw ? (typeof raw === "string" ? JSON.parse(raw) : raw) : null;
-  } catch (e) { }
-  let u, hdr;
-  if (saved && saved.u) {
-    u = saved.u;
-    hdr = saved.h || {};
-  } else {
-    const src = ($request && $request.headers) || {};
-    hdr = {};
-    ["tk", "slb", "sdi", "di", "aid", "av", "avc", "os", "srs", "cs",
-      "user-agent", "User-Agent", "accept-language", "Accept-Language"].forEach((k) => {
-        if (src[k] != null) hdr[k] = src[k];
-      });
-    u = "https://api-a.soulapp.cn/meet/mine/see?bi=" + qs("bi") + "&bik=" + (qs("bik") || "32243") +
-      "&limit=100&pageId=MSoulMember_PayNew&sortType=1";
-  }
-  return httpGet(u, hdr).then((t) => {
-    const j = JSON.parse(t);
-    const real = (j && j.data && Array.isArray(j.data.userList)) ? j.data.userList.filter((x) => x && x.user) : [];
-    if (real.length) {
-      fillViewers(obj, real);
-      saveViewerCache(real, j.data.meSeeMetricResp);
-      if (NOTIFY) notify("Soul 谁看过我", "✅ 已拉最新 " + real.length + " 条", saved ? "用会员页那套头" : "用当前页头(可能被拒)");
-    } else {
-      if (NOTIFY) notify("Soul 谁看过我", "⚠️ 拉取被拒 code=" + (j && j.code),
-        saved ? "存的是会员页那套头但仍被拒，估计签名过期了，进一次会员页刷新" : "还没存到会员页的头，进一次会员页(我的→超星/会员)再回来");
-    }
-    return JSON.stringify(obj);
-  }).catch((err) => {
-    if (NOTIFY) notify("Soul 谁看过我", "❌ 拉取异常", String(err).slice(0, 120));
-    return JSON.stringify(obj);
-  });
-}
-let pending = null;
-
 
 try {
   /*
@@ -496,13 +430,6 @@ try {
   }
   else if (has("/meet/mine/see")) {
     const obj = JSON.parse(body);
-    /*
-      顺手把这次请求的 URL+头存下来。响应脚本里同样能读到 $request.headers，
-      所以不依赖请求阶段那两条规则，只要进过一次会员页就能拿到可复用的 cs。
-    */
-    try {
-      if ($request && $request.url) store.set(MKEY, JSON.stringify({ u: $request.url, h: $request.headers || {} }));
-    } catch (e) { }
     if (obj && obj.data) {
       obj.data.superUser = true;
       if (obj.data.meSeeMetricResp) obj.data.meSeeMetricResp.invisibleCount = 9999;
@@ -525,19 +452,24 @@ try {
     if (obj && obj.data) {
       obj.data.superUser = true;
       obj.data.uncoverSecretCount = 999;
-      const hasReal = Array.isArray(obj.data.list) && obj.data.list.some((x) => x && x.user);
-      const c = readViewerCache();
-      if (c) fillViewers(obj, c.list);   // 先用缓存顶上，等主动拉取回来再覆盖
+      /* 只认服务端这次下发的数据，挖空时才拿同接口的历史缓存兜底 */
+      const real = (Array.isArray(obj.data.list) ? obj.data.list : []).filter((x) => x && x.user);
+      const hasReal = real.length > 0;
       if (hasReal) {
-        if (NOTIFY) notify("Soul 谁看过我", "🎉 服务端直出真人 " + obj.data.list.length + " 条", "无需拉取");
+        /* 服务端这次给了真人，直接用；顺便存一份，供它下次挖空时兜底 */
+        saveViewerCache(real, obj.data.meSeeMetricResp);
+        if (NOTIFY) notify("Soul 谁看过我", "✅ 服务端下发真人 " + real.length + " 条", "直接显示");
       } else {
-        if (typeof $task !== "undefined" || typeof $httpClient !== "undefined") {
-          pending = fetchViewers(obj);
+        const c = readViewerCache();
+        if (c) {
+          fillViewers(obj, c.list);
+          if (NOTIFY) notify("Soul 谁看过我", "✅ 已回填 " + c.list.length + " 条", "上次服务端下发 " + new Date(c.t).toLocaleString());
         } else if (NOTIFY) {
-          notify("Soul 谁看过我", "⚠️ 无 http 客户端", "平台不支持主动拉取");
+          notify("Soul 谁看过我", "⚠️ 服务端这次没下发真人", "本地也没存货，过会儿再进一次");
         }
       }
     }
+
     body = JSON.stringify(obj);
   }
 
@@ -605,11 +537,8 @@ try {
   body = null;
 }
 
-if (pending) {
-  pending.then((b) => $done({ body: b })).catch(() => $done(body === null || body === undefined ? {} : { body }));
-} else if (body === null || body === undefined) {
+if (body === null || body === undefined) {
   $done({});
 } else {
   $done({ body });
-}
 }
