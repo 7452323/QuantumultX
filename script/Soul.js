@@ -164,7 +164,8 @@ function fetchViewers(obj) {
       saveViewerCache(real, j.data.meSeeMetricResp);
       if (NOTIFY) notify("Soul 谁看过我", "✅ 已拉最新 " + real.length + " 条", saved ? "用会员页那套头" : "用当前页头(可能被拒)");
     } else {
-      if (NOTIFY) notify("Soul 谁看过我", "⚠️ 拉取被拒", "code=" + (j && j.code) + " msg=" + (j && (j.message || j.msg)));
+      if (NOTIFY) notify("Soul 谁看过我", "⚠️ 拉取被拒 code=" + (j && j.code),
+        saved ? "存的是会员页那套头但仍被拒，估计签名过期了，进一次会员页刷新" : "还没存到会员页的头，进一次会员页(我的→超星/会员)再回来");
     }
     return JSON.stringify(obj);
   }).catch((err) => {
@@ -495,6 +496,13 @@ try {
   }
   else if (has("/meet/mine/see")) {
     const obj = JSON.parse(body);
+    /*
+      顺手把这次请求的 URL+头存下来。响应脚本里同样能读到 $request.headers，
+      所以不依赖请求阶段那两条规则，只要进过一次会员页就能拿到可复用的 cs。
+    */
+    try {
+      if ($request && $request.url) store.set(MKEY, JSON.stringify({ u: $request.url, h: $request.headers || {} }));
+    } catch (e) { }
     if (obj && obj.data) {
       obj.data.superUser = true;
       if (obj.data.meSeeMetricResp) obj.data.meSeeMetricResp.invisibleCount = 9999;
