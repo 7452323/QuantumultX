@@ -1,39 +1,13 @@
 /*
-  Soul 去广告 + 私聊限制解除 + 阅后即焚抓图 + 谁看过我/会员解锁  三平台统一版 v1.2.0
-  Build 2026-09-23  (v1.2.0 谁看过我：服务端把 user/uid/userIdEcpt 全置 null，改标记只能拆提示拆不出数据，
-  改为缓存「会员页那条不设防的 /meet/mine/see」再回填我的足迹页;
-  v1.1.0 新增：谁看过我 superUser 解锁 + 超星会员标记;
-  v1.0.1 修复 official/scene/module 全量拦截打死 MHomeMyTrack_Main)
-  字段依据 2026-09-23 真机抓包 (iPhone16 / iOS27 / Soul 27.0) 校准。
-  来源
-  抄自 ishowshu/qx（作者：树先生 / 怎么肥事 / 奶思）
-  https://github.com/ishowshu/qx
-  · rewrite/soul.snippet   2026-09-19  QX 重写规则（本仓库转成 Soul.conf）
-  · script/soul_qx.js      2026-08-29  私聊限制解除 · 阅后即焚抓图
-  · script/soul.js         2026-05-27  去广告 · 星球/派对/广场入口精简
-  本仓库版本做了三平台统一 + 容错兜底，未识别 URL 一律原样放行。
-  平台差异
-  QX    : 建议直接用 script/Soul.conf（reject + jsonjq 原生处理，更省电），
-  本脚本在 QX 只需挂 /chat/limitInfo 与 /snapchat/url 两条。
-  Surge : 无 jq 语法，[URL Rewrite] 之外的所有 body 类接口都走本脚本。
-  Loon  : 同 Surge。
-  QX 引用
-  [rewrite_local]
-  ^https:\/\/api-chat\.soulapp\.cn\/chat\/limitInfo url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js
-  ^https:\/\/api-chat\.soulapp\.cn\/snapchat\/url url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js
-  ^https:\/\/api-a\.soulapp\.cn\/(html\/settlement\/)?meet\/(see\/me|mine\/see|queryInvisibleCount) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js
-  ^https:\/\/api-pay\.soulapp\.cn\/(privilege\/supervip\/status|vip\/meet\/userInfo|show\/superVIP\/detail\/v2) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js
-  [mitm]
-  hostname = api-chat.soulapp.cn, api-a.soulapp.cn, api-pay.soulapp.cn
+[rewrite_local]
+^https:\/\/api-chat\.soulapp\.cn\/chat\/limitInfo url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js
+^https:\/\/api-chat\.soulapp\.cn\/snapchat\/url url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js
+^https:\/\/api-a\.soulapp\.cn\/(html\/settlement\/)?meet\/(see\/me|mine\/see|queryInvisibleCount) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js
+^https:\/\/api-pay\.soulapp\.cn\/(privilege\/supervip\/status|vip\/meet\/userInfo|show\/superVIP\/detail\/v2) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js
+[mitm]
+hostname = api-chat.soulapp.cn, api-a.soulapp.cn, api-pay.soulapp.cn
 */
 
-/*
-  参数
-  Loon   : [Argument] 对象参数 → $argument 为 Object
-  Surge  : #!arguments 占位符替换 → $argument 为 String "k=v,k=v"
-  QX     : 不支持参数 → $argument 不存在，全部走默认值
-  三种形态都在这里统一成对象。
-*/
 function parseArgs(raw) {
   if (!raw) return {};
   if (typeof raw === "object") return raw;
