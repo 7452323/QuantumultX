@@ -1,22 +1,28 @@
 /*
 [rewrite_local]
-^https:\/\/api-chat\.soulapp\.cn\/chat\/limitInfo url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js
-^https:\/\/api-chat\.soulapp\.cn\/snapchat\/url url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js
-^https:\/\/api-a\.soulapp\.cn\/(html\/settlement\/)?meet\/(see\/me|mine\/see|queryInvisibleCount) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js
-^https:\/\/api-pay\.soulapp\.cn\/(privilege\/supervip\/status|vip\/meet\/userInfo|show\/superVIP\/detail\/v2) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js
+^https:\/\/api-chat\.soulapp\.cn\/(chat\/limitInfo|snapchat\/url|privilege\/bubble\/status\/simple|chat\/aigc\/preCheckConfig) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js
+^https:\/\/api-user\.soulapp\.cn\/(v6\/planet\/config|user\/homepage\/metrics|user\/homepage\/liked\/metric|user\/queryInvisibleSetting|robot\/call\/remainTimesAndSpeedCards|avatar\/user\/popover) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js
+^https:\/\/api-a\.soulapp\.cn\/(html\/settlement\/meet\/see\/me|meet\/(see\/me|mine\/see|match\/list|uncover\/list)|loveBell\/queryMatchSpeedupConf|videoMatch\/getConfig|soulreal\/post\/highlight\/quota) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js
+^https:\/\/api-pay\.soulapp\.cn\/(privilege\/supervip\/status|vip\/(meet\/userInfo|show\/info|rights\/avatar\/qryMyAvatarRights)|show\/superVIP\/detail\/v2|meet\/my\/count) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js
+^https:\/\/post\.soulapp\.cn\/(v\d\/rec\/square\/header\/tabs|homepage\/tabs\/v2|v1\/post\/highLight\/recommend\/quota|v\d\/post\/(homepage|recommended)(\?|$)) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js
+^https:\/\/chat-live\.soulapp\.cn\/(chatroom\/(chatClassifyRoomList|getRoomTagInfo)|live\/queryFollowRoomList|square\/relation\/guideUserList) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js
 [mitm]
-hostname = api-chat.soulapp.cn, api-a.soulapp.cn, api-pay.soulapp.cn, api-user.soulapp.cn, post.soulapp.cn
+hostname = api-chat.soulapp.cn, api-user.soulapp.cn, api-a.soulapp.cn, api-pay.soulapp.cn, post.soulapp.cn, chat-live.soulapp.cn
 */
 
 function parseArgs(raw) {
+  /* Surge 用 "k:v,k:v"、Loon/QX 用 "k=v,k=v"，两种都要吃下 */
   if (!raw) return {};
   if (typeof raw === "object") return raw;
   const out = {};
-  String(raw).split(",").forEach((p) => {
-    const i = p.indexOf("=");
+  String(raw).split(/[,\n]/).forEach((p) => {
+    const s = p.trim();
+    if (!s) return;
+    let i = s.indexOf("=");
+    if (i < 0) i = s.indexOf(":");
     if (i < 0) return;
-    const k = p.slice(0, i).trim();
-    const v = p.slice(i + 1).trim();
+    const k = s.slice(0, i).trim();
+    const v = s.slice(i + 1).trim();
     if (k) out[k] = v;
   });
   return out;
@@ -59,21 +65,6 @@ const store = {
     return null;
   },
 };
-const qs = (k) => {
-  const m = url.match(new RegExp("[?&]" + k + "=([^&]*)"));
-  return m ? m[1] : "";
-};
-function httpGet(u, headers) {
-  return new Promise((resolve, reject) => {
-    try {
-      if (typeof $task !== "undefined" && $task.fetch) {
-        $task.fetch({ url: u, headers }).then((r) => resolve(r.body)).catch(reject);
-      } else if (typeof $httpClient !== "undefined") {
-        $httpClient.get({ url: u, headers }, (err, resp, data) => (err ? reject(err) : resolve(data)));
-      } else reject(new Error("no http client"));
-    } catch (e) { reject(e); }
-  });
-}
 function fmtTime(t) {
   const d = new Date(t);
   const p = (n) => (n < 10 ? "0" + n : "" + n);
@@ -456,10 +447,8 @@ try {
     if (obj && obj.data) {
       obj.data.superUser = true;
       if (obj.data.meSeeMetricResp) obj.data.meSeeMetricResp.invisibleCount = 9999;
-      /* 服务端只在这条接口下发完整真人(带 userIdEcpt)，存一份给「谁看过我」列表用 */
-      const ul = (Array.isArray(obj.data.userList) ? obj.data.userList : []).filter((x) => x && x.user);
-      if (ul.length) saveViewerCache(ul, obj.data.meSeeMetricResp);
     }
+    /* 这里的人是「我看过谁」，与「谁看过我」是两批人，不能拿来互相填 */
     body = JSON.stringify(obj);
   }
 
