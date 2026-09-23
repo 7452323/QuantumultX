@@ -382,6 +382,94 @@ try {
     }
     body = JSON.stringify(obj);
   }
+  /* ── 第四轮：服务端下发的功能配额/开关（真实限制值）───────────
+   * 原则：只改服务端下发的「限制值/开关值」，不改服务端挖空的数据。 */
+  /* 视频匹配：通话时长限制、免费次数、高清、AI、露脸屏蔽 */
+  else if (has("videoMatch/getConfig")) {
+    const obj = JSON.parse(body);
+    if (obj && obj.data) {
+      const d = obj.data;
+      if (d.videoMatchConfig) {
+        d.videoMatchConfig.maleFreeTimes = 9999;
+        d.videoMatchConfig.femaleFreeTimes = 9999;
+        d.videoMatchConfig.timeMinutesLimit = 9999;   /* 每次通话时长上限(原 4 分钟) */
+        d.videoMatchConfig.maskFreePreviewSeconds = 9999;
+        d.videoMatchConfig.endPageCountDownSeconds = 9999;
+      }
+      if (d.availableSituation) {
+        d.availableSituation.freeTimesRemain = 9999;
+        d.availableSituation.soulMatchLimit = false;
+      }
+      if (d.renewalInfo) d.renewalInfo.remainTimes = 9999;
+      d.limitStatus = 0;
+      d.highQualitySwitch = true;
+      d.aiSwitch = true;
+      d.bareShieldOpenState = false;
+      d.showVideoMatchRecord = true;
+      d.showNewcomerGuide = false;
+      d.emptyHeartCallTime = 99999;
+      d.fullHeartCallTime = 99999;
+      d.needCollect = false;
+      if (typeof d.remainingCount === "number") d.remainingCount = 9999;
+    }
+    body = JSON.stringify(obj);
+  }
+  /* 瞬间高亮推荐配额：非会员 remainedQuota=0、canRecommend=false */
+  else if (has("highLight/recommend/quota")) {
+    const obj = JSON.parse(body);
+    if (obj && obj.data) {
+      obj.data.remainedQuota = 9999;
+      obj.data.canRecommend = true;
+      obj.data.isJuror = true;
+    }
+    body = JSON.stringify(obj);
+  }
+  /* 高亮配额：total/remained=0 */
+  else if (has("highlight/quota")) {
+    const obj = JSON.parse(body);
+    if (obj && obj.data) {
+      obj.data.total = 9999;
+      obj.data.remained = 9999;
+    }
+    body = JSON.stringify(obj);
+  }
+  /* AIGC 聊天预检：sessionLimit=30(一轮会话上限)、短内容/雷区词拦截 */
+  else if (has("aigc/preCheckConfig")) {
+    const obj = JSON.parse(body);
+    if (obj && obj.data) {
+      obj.data.sessionLimit = 99999;
+      obj.data.notInputSwitch = false;
+      obj.data.notInputTime = 99999;
+      obj.data.shortContentSwitch = false;
+      obj.data.mineFieldSwitch = false;
+      obj.data.unfriendlySwitch = false;
+      obj.data.characterSwitch = false;
+    }
+    body = JSON.stringify(obj);
+  }
+  /* 瞬间列表里的会员标 + 点赞特效每日上限 */
+  else if (has("/v5/post/homepage") || has("/v6/post/recommended")) {
+    const obj = JSON.parse(body);
+    const fix = (o) => {
+      if (!o || typeof o !== "object") return;
+      if ("superVIP" in o) o.superVIP = true;
+      if ("superstar" in o) o.superstar = true;
+      if ("praiseEffectDailyLimit" in o) o.praiseEffectDailyLimit = 9999;
+      if ("avatarGuideFlag" in o) o.avatarGuideFlag = false;
+    };
+    fix(obj.data);
+    /* 列表项里嵌套的发布者对象 */
+    const walk = (n, depth) => {
+      if (!n || typeof n !== "object" || depth > 4) return;
+      if (Array.isArray(n)) { n.forEach((x) => walk(x, depth + 1)); return; }
+      fix(n);
+      Object.keys(n).forEach((k) => {
+        if (n[k] && typeof n[k] === "object") walk(n[k], depth + 1);
+      });
+    };
+    walk(obj.data, 0);
+    body = JSON.stringify(obj);
+  }
   else if (has("/meet/mine/see")) {
     const obj = JSON.parse(body);
     if (obj && obj.data) {
