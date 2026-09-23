@@ -1,41 +1,39 @@
 /*
- * Soul 去广告 + 私聊限制解除 + 阅后即焚抓图 + 谁看过我/会员解锁 —— 三平台统一版 v1.2.0
- * Build 2026-09-23  (v1.2.0 谁看过我：服务端把 user/uid/userIdEcpt 全置 null，改标记只能拆提示拆不出数据，
- *                    改为缓存「会员页那条不设防的 /meet/mine/see」再回填我的足迹页;
- *                    v1.1.0 新增：谁看过我 superUser 解锁 + 超星会员标记;
- *                    v1.0.1 修复 official/scene/module 全量拦截打死 MHomeMyTrack_Main)
- * 字段依据 2026-09-23 真机抓包 (iPhone16 / iOS27 / Soul 27.0) 校准。
- *
- * ── 来源 ──────────────────────────────────────────────
- * 抄自 ishowshu/qx（作者：树先生 / 怎么肥事 / 奶思）
- *   https://github.com/ishowshu/qx
- *   · rewrite/soul.snippet   2026-09-19  QX 重写规则（本仓库转成 Soul.conf）
- *   · script/soul_qx.js      2026-08-29  私聊限制解除 · 阅后即焚抓图
- *   · script/soul.js         2026-05-27  去广告 · 星球/派对/广场入口精简
- * 本仓库版本做了三平台统一 + 容错兜底，未识别 URL 一律原样放行。
- *
- * ── 平台差异 ──────────────────────────────────────────
- * QX    : 建议直接用 script/Soul.conf（reject + jsonjq 原生处理，更省电），
- *         本脚本在 QX 只需挂 /chat/limitInfo 与 /snapchat/url 两条。
- * Surge : 无 jq 语法，[URL Rewrite] 之外的所有 body 类接口都走本脚本。
- * Loon  : 同 Surge。
- *
- * ── QX 引用 ───────────────────────────────────────────
- * [rewrite_local]
- * ^https:\/\/api-chat\.soulapp\.cn\/chat\/limitInfo url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js
- * ^https:\/\/api-chat\.soulapp\.cn\/snapchat\/url url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js
- * ^https:\/\/api-a\.soulapp\.cn\/(html\/settlement\/)?meet\/(see\/me|mine\/see|queryInvisibleCount) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js
- * ^https:\/\/api-pay\.soulapp\.cn\/(privilege\/supervip\/status|vip\/meet\/userInfo|show\/superVIP\/detail\/v2) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js
- *
- * [mitm]
- * hostname = api-chat.soulapp.cn, api-a.soulapp.cn, api-pay.soulapp.cn
- */
+  Soul 去广告 + 私聊限制解除 + 阅后即焚抓图 + 谁看过我/会员解锁  三平台统一版 v1.2.0
+  Build 2026-09-23  (v1.2.0 谁看过我：服务端把 user/uid/userIdEcpt 全置 null，改标记只能拆提示拆不出数据，
+  改为缓存「会员页那条不设防的 /meet/mine/see」再回填我的足迹页;
+  v1.1.0 新增：谁看过我 superUser 解锁 + 超星会员标记;
+  v1.0.1 修复 official/scene/module 全量拦截打死 MHomeMyTrack_Main)
+  字段依据 2026-09-23 真机抓包 (iPhone16 / iOS27 / Soul 27.0) 校准。
+  来源
+  抄自 ishowshu/qx（作者：树先生 / 怎么肥事 / 奶思）
+  https://github.com/ishowshu/qx
+  · rewrite/soul.snippet   2026-09-19  QX 重写规则（本仓库转成 Soul.conf）
+  · script/soul_qx.js      2026-08-29  私聊限制解除 · 阅后即焚抓图
+  · script/soul.js         2026-05-27  去广告 · 星球/派对/广场入口精简
+  本仓库版本做了三平台统一 + 容错兜底，未识别 URL 一律原样放行。
+  平台差异
+  QX    : 建议直接用 script/Soul.conf（reject + jsonjq 原生处理，更省电），
+  本脚本在 QX 只需挂 /chat/limitInfo 与 /snapchat/url 两条。
+  Surge : 无 jq 语法，[URL Rewrite] 之外的所有 body 类接口都走本脚本。
+  Loon  : 同 Surge。
+  QX 引用
+  [rewrite_local]
+  ^https:\/\/api-chat\.soulapp\.cn\/chat\/limitInfo url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js
+  ^https:\/\/api-chat\.soulapp\.cn\/snapchat\/url url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js
+  ^https:\/\/api-a\.soulapp\.cn\/(html\/settlement\/)?meet\/(see\/me|mine\/see|queryInvisibleCount) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js
+  ^https:\/\/api-pay\.soulapp\.cn\/(privilege\/supervip\/status|vip\/meet\/userInfo|show\/superVIP\/detail\/v2) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Soul.js
+  [mitm]
+  hostname = api-chat.soulapp.cn, api-a.soulapp.cn, api-pay.soulapp.cn
+*/
 
-/* ── 参数 ──────────────────────────────────────────────
- * Loon   : [Argument] 对象参数 → $argument 为 Object
- * Surge  : #!arguments 占位符替换 → $argument 为 String "k=v,k=v"
- * QX     : 不支持参数 → $argument 不存在，全部走默认值
- * 三种形态都在这里统一成对象。 */
+/*
+  参数
+  Loon   : [Argument] 对象参数 → $argument 为 Object
+  Surge  : #!arguments 占位符替换 → $argument 为 String "k=v,k=v"
+  QX     : 不支持参数 → $argument 不存在，全部走默认值
+  三种形态都在这里统一成对象。
+*/
 function parseArgs(raw) {
   if (!raw) return {};
   if (typeof raw === "object") return raw;
@@ -65,11 +63,13 @@ let body = ($response && $response.body) || "";
 const has = (s) => url.indexOf(s) !== -1;
 const keepList = (s) => s.split(",").map((x) => x.trim()).filter(Boolean);
 
-/* ── 三平台存储 / HTTP 适配 ───────────────────────────
- * 谁看过我：服务端按账号真实会员态过滤 user/uid/userIdEcpt（全 null），
- * 客户端改标记只能拆掉「需会员」提示，拆不出服务端没下发的数据。
- * 唯一不设防的是「会员购买页」那条 /meet/mine/see（真机抓包返 100 条真人），
- * 所以：见到它就缓存，进我的足迹页时回填。 */
+/*
+  三平台存储 / HTTP 适配
+  谁看过我：服务端按账号真实会员态过滤 user/uid/userIdEcpt（全 null），
+  客户端改标记只能拆掉「需会员」提示，拆不出服务端没下发的数据。
+  唯一不设防的是「会员购买页」那条 /meet/mine/see（真机抓包返 100 条真人），
+  所以：见到它就缓存，进我的足迹页时回填。
+*/
 const VKEY = "soul_viewer_cache";
 const store = {
   get(k) {
@@ -112,8 +112,10 @@ function fillViewers(obj, list) {
   if (!obj || !obj.data || !Array.isArray(list) || !list.length) return;
   obj.data.list = list;
   if (!(obj.data.allViewerCount > 0)) obj.data.allViewerCount = list.length;
-  /* 服务端把 uncoverSecretUserList 给成 null，客户端就把整个列表当「未揭秘」
-   * 渲染成模糊头像；把已回填的人塞进去，让它认为这些人已揭秘。 */
+  /*
+  服务端把 uncoverSecretUserList 给成 null，客户端就把整个列表当「未揭秘」
+  渲染成模糊头像；把已回填的人塞进去，让它认为这些人已揭秘。
+*/
   if (!Array.isArray(obj.data.uncoverSecretUserList) || !obj.data.uncoverSecretUserList.length) {
     obj.data.uncoverSecretUserList = list;
   }
@@ -134,8 +136,10 @@ function readViewerCache() {
 function saveViewerCache(list, metric) {
   try { store.set(VKEY, JSON.stringify({ t: Date.now(), list: list, metric: metric || null })); } catch (e) { }
 }
-/* 缓存为空时的兜底：带客户端原始请求头主动拉一次会员页那条接口。
- * 注意 S 的 cs/at 可能与 URL 绑定，失败就原样放行，不影响客户端。 */
+/*
+  缓存为空时的兜底：带客户端原始请求头主动拉一次会员页那条接口。
+  注意 S 的 cs/at 可能与 URL 绑定，失败就原样放行，不影响客户端。
+*/
 function fetchViewers(obj) {
   const src = ($request && $request.headers) || {};
   const hdr = {};
@@ -165,9 +169,11 @@ let pending = null;
 
 
 try {
-  /* ── 1. 私聊限制解除（核心）──────────────────────────
-   * 服务端在 /chat/limitInfo 下发「需先送礼才能私聊」的限流参数，
-   * 抹掉提示文案与剩余次数并把 limit 置 false，客户端即认为无限制。 */
+  /*
+  1. 私聊限制解除（核心）
+  服务端在 /chat/limitInfo 下发「需先送礼才能私聊」的限流参数，
+  抹掉提示文案与剩余次数并把 limit 置 false，客户端即认为无限制。
+*/
   if (has("/chat/limitInfo")) {
     const obj = JSON.parse(body);
     if (obj && obj.data) {
@@ -178,8 +184,10 @@ try {
     body = JSON.stringify(obj);
   }
 
-  /* ── 2. 阅后即焚抓图 ────────────────────────────────
-   * 上游只做通知，响应原样回传（图片在客户端仍按阅后即焚处理，但地址已拿到）。 */
+  /*
+  2. 阅后即焚抓图
+  上游只做通知，响应原样回传（图片在客户端仍按阅后即焚处理，但地址已拿到）。
+*/
   else if (has("/snapchat/url")) {
     const obj = JSON.parse(body);
     const imageUrl = obj && obj.data && obj.data.url;
@@ -194,8 +202,10 @@ try {
     body = null;
   }
 
-  /* ── 3. 星球页（v6/planet/config）────────────────────
-   * 隐藏红点与红包入口，按 argument 过滤核心卡片；未传参则全部隐藏（同上游默认）。 */
+  /*
+  3. 星球页（v6/planet/config）
+  隐藏红点与红包入口，按 argument 过滤核心卡片；未传参则全部隐藏（同上游默认）。
+*/
   else if (has("/v6/planet/config") || has("/planet/config")) {
     const obj = JSON.parse(body);
     const map = { soulMatch: 1, voiceMatch: 2, partyMatch: 3, masked: 4, maskedMatch: 9, planet: 10 };
@@ -218,14 +228,14 @@ try {
     body = JSON.stringify(obj);
   }
 
-  /* ── 4. 派对列表中间横幅广告 ──────────────────────── */
+  /* 4. 派对列表中间横幅广告 */
   else if (has("/chatroom/chatClassifyRoomList")) {
     const obj = JSON.parse(body);
     if (obj && obj.data) obj.data.positionContentRespList = [];
     body = JSON.stringify(obj);
   }
 
-  /* ── 5. 广场头部 tab 精简 ─────────────────────────── */
+  /* 5. 广场头部 tab 精简 */
   else if (has("/square/header/tabs")) {
     const obj = JSON.parse(body);
     if (Array.isArray(obj.data)) {
@@ -235,7 +245,7 @@ try {
     body = JSON.stringify(obj);
   }
 
-  /* ── 6. 我的页面数据（metrics）────────────────────── */
+  /* 6. 我的页面数据（metrics） */
   else if (has("/homepage/metrics")) {
     const obj = JSON.parse(body);
     if (obj && obj.data) {
@@ -253,7 +263,7 @@ try {
     body = JSON.stringify(obj);
   }
 
-  /* ── 7. 关注 tab 推荐 / 猜你喜欢 ──────────────────── */
+  /* 7. 关注 tab 推荐 / 猜你喜欢 */
   else if (has("relation/guideUserList")) {
     const obj = JSON.parse(body);
     if (obj && obj.data) obj.data.userDTOList = [];
@@ -264,7 +274,7 @@ try {
     body = JSON.stringify(obj);
   }
 
-  /* ── 8. 我的页面 tab ─────────────────────────────── */
+  /* 8. 我的页面 tab */
   else if (has("/homepage/tabs/v2")) {
     const obj = JSON.parse(body);
     if (obj && obj.data) {
@@ -276,7 +286,7 @@ try {
     body = JSON.stringify(obj);
   }
 
-  /* ── 9. 派对频道列表 ─────────────────────────────── */
+  /* 9. 派对频道列表 */
   else if (has("/chatroom/getRoomTagInfo")) {
     const obj = JSON.parse(body);
     const map = { hot: 11, all: 0, emotion: 43, personal: 44, play: 12, interest: 10, argue: 6, story: 5, chat: 4, heart: 2 };
@@ -288,9 +298,11 @@ try {
     body = JSON.stringify(obj);
   }
 
-  /* ── 10. 谁看过我：会员页预览（服务端不设防）→ 顺手存缓存 ── */
-  /* ── 第二轮抓包新增：服务端下发「非会员值」的权益位 ─────────
-   * 这些接口都返回真实结构，但值是未开通态，客户端据此隐藏功能。 */
+  /* 10. 谁看过我：会员页预览（服务端不设防）→ 顺手存缓存 */
+  /*
+  第二轮抓包新增：服务端下发「非会员值」的权益位
+  这些接口都返回真实结构，但值是未开通态，客户端据此隐藏功能。
+*/
   /* 「谁看过我」计数上限：非会员 viewUserCountConfigLimit=200，放开 */
   else if (has("/meet/my/count")) {
     const obj = JSON.parse(body);
@@ -352,8 +364,10 @@ try {
     }
     body = JSON.stringify(obj);
   }
-  /* ── 第三轮抓包新增 ─────────────────────────────────
-   * 隐身设置：非会员直接返回 {"superVip":false}，这是隐身功能的开关。 */
+  /*
+  第三轮抓包新增
+  隐身设置：非会员直接返回 {"superVip":false}，这是隐身功能的开关。
+*/
   else if (has("queryInvisibleSetting")) {
     const obj = JSON.parse(body);
     if (obj && obj.data) obj.data.superVip = true;
@@ -382,8 +396,10 @@ try {
     }
     body = JSON.stringify(obj);
   }
-  /* ── 第四轮：服务端下发的功能配额/开关（真实限制值）───────────
-   * 原则：只改服务端下发的「限制值/开关值」，不改服务端挖空的数据。 */
+  /*
+  第四轮：服务端下发的功能配额/开关（真实限制值）
+  原则：只改服务端下发的「限制值/开关值」，不改服务端挖空的数据。
+*/
   /* 视频匹配：通话时长限制、免费次数、高清、AI、露脸屏蔽 */
   else if (has("videoMatch/getConfig")) {
     const obj = JSON.parse(body);
@@ -484,9 +500,11 @@ try {
     body = JSON.stringify(obj);
   }
 
-  /* ── 10b. 我的足迹 / 谁看过我：回填真人 ───────────────
-   * 服务端把 list[].user / uid / userIdEcpt 全置 null，只留「访问16次/摩羯座」烟雾弹。
-   * 有缓存就回填，没缓存就主动拉一次，失败原样放行。 */
+  /*
+  10b. 我的足迹 / 谁看过我：回填真人
+  服务端把 list[].user / uid / userIdEcpt 全置 null，只留「访问16次/摩羯座」烟雾弹。
+  有缓存就回填，没缓存就主动拉一次，失败原样放行。
+*/
   else if (has("see/me")) {
     const obj = JSON.parse(body);
     if (obj && obj.data) {
@@ -510,14 +528,14 @@ try {
     body = JSON.stringify(obj);
   }
 
-  /* ── 11b. 缘分匹配列表 ────────────────────────────── */
+  /* 11b. 缘分匹配列表 */
   else if (has("/meet/match/list")) {
     const obj = JSON.parse(body);
     if (obj && obj.data) obj.data.superUser = true;
     body = JSON.stringify(obj);
   }
 
-  /* ── 12. 超级会员状态（我的相遇 / 谁看过我 权益位） ── */
+  /* 12. 超级会员状态（我的相遇 / 谁看过我 权益位） */
   else if (has("/privilege/supervip/status")) {
     const obj = JSON.parse(body);
     if (obj && obj.data) {
@@ -532,7 +550,7 @@ try {
     body = JSON.stringify(obj);
   }
 
-  /* ── 13. 会员信息卡 ───────────────────────────────── */
+  /* 13. 会员信息卡 */
   else if (has("/vip/meet/userInfo")) {
     const obj = JSON.parse(body);
     const s0 = obj && obj.data && obj.data.superStarDTO;
@@ -552,7 +570,7 @@ try {
     body = JSON.stringify(obj);
   }
 
-  /* ── 14. 超星详情页 ───────────────────────────────── */
+  /* 14. 超星详情页 */
   else if (has("/show/superVIP/detail/v2")) {
     const obj = JSON.parse(body);
     if (obj && obj.data) {
@@ -565,7 +583,7 @@ try {
     body = JSON.stringify(obj);
   }
 
-  /* ── 未命中：原样放行 ─────────────────────────────── */
+  /* 未命中：原样放行 */
   else {
     body = null;
   }
