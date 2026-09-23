@@ -204,35 +204,46 @@ slb = dE1vSGF4bzBvYWVyQkZZSzEvanZ0N3NoZmxPWEY4U1p0TW9IYXhvMG9hZUNPOXFJaWM2TEJRPT
    （`07b6` 偶发变 `03b6`，该位服务器无法校验）+ 8 条 HAR 未保存 POST body。
    `meet/see/me/v2` 的实抓请求 2/2 完全一致。
 
-### 6.2 落地
+### 6.2 落地：真身份在会员页访客榜
 
-`Soul.js` 内置 `soulCs()`：拦截 `/meet/see/me/v2` 响应后，若服务端没给 `userIdEcpt`，
-脚本用同一套请求头（`at` 刷新为当前毫秒、`bi[0]` 同步）自签重放一次。
+`Soul.js` 内置 `soulCs()`，自签两条接口（都用同一套 `at` 刷新 + `bi[0]` 同步）：
+
+| 接口 | 给什么 |
+|---|---|
+| `/meet/see/me/v2?pageId=MHomeMyTrack_Main` | **只有匿名暗卡**：20 条 `buttonType:4`、`userIdEcpt:null`、`user:null`，带城市/星座/访问次数/帖子配图，但点不进人 |
+| `/meet/mine/see?pageId=MSoulMember_PayNew` | **真身份**：`data.userList` 100 条，含 `userIdEcpt` + `user`(昵称/头像/星球) + `count`(访问次数) + `time` |
+
+字段完全同构（`userIdEcpt,count,time,user,alias,description,invisible,meetType,postInfo,tagList...`），
+且响应里 `meSeeMetricResp.highViewList[].viewCount=77` 与 `userList[0].count=77` 对得上
+（`highViewList` = 高访问量访客）—— 所以 `mine/see+MSoulMember_PayNew` 就是「谁看过我」的访客榜，
+服务端明明有真身份，只是不给普通请求。
+
+`limit=20` 即可拿到 100 条（`limit=100` 反而判 `9000006`）。
+
+脚本策略（`pullViewers`）：
+
+1. 服务端已给真人 → 原样放行，不额外请求；
+2. 只给暗卡 → 先自签打访客榜，拿到人就 `fillViewers()` 回填 `data.list`/`uncoverSecretUserList`
+   并置 `superUser=true`（否则客户端按未开通把头像糊了），存缓存；
+3. 访客榜空 → 退回 `/meet/see/me/v2`；
+4. 两条都没人 → `done(null)`，保留原响应/缓存，**绝不拿暗卡覆盖真名单**（见 6.4）；
+5. 每条自签请求 4 秒超时兜底，避免不给 `$done` 导致页面白屏。
+
 自检：`node script/test-soul-autopull.js`。
-
-**自签重放的真实能力（2026-09-23 实测，勿夸大）：**
-
-- 自签的 cs **服务端认可**：`/meet/mine/see` 用自签 cs 实测能拿到 12 万字节真数据。
-- 但 `/meet/see/me/v2` 无论 `limit=20/100`、有无 `sortType`、换 `pageId`，
-  服务端一律只回 17KB 的**匿名暗卡**（20 条 `buttonType:4`、`userIdEcpt:null`），
-  也就是「code 10001 成功但一条真人都没有」。
-- 结论：**真人身份只能来自 App 自己带正确上下文发出的响应**（揭晓缘分 / 历史会话），
-  自签重放拿不到。所以脚本策略是：
-  1. 服务端已给真人 → 原样放行；
-  2. 服务端只给暗卡 → 用同接口缓存兜底，**且自签结果里没有真人时绝不覆盖**（见 6.4）；
-  3. 自签请求 4 秒超时兜底，避免不给 `$done` 导致页面白屏。
 
 ### 6.3 边界
 
 - `slb` 的密钥派生自 APK 签名，Android 专有；`cs` 用的是公共常量，跨端通用。
 - 无 cs / cs 错 → `9000003` / `9000006`。
 - `/meet/mine/see` 带 `limit=100` 会被服务端判 `9000006`，要用 `limit=20`。
+- `meet/see/me/v2` 与 `meet/mine/see` 都不是 dex 里的字面量（服务端配置下发路径），
+  定位接口只能靠抓包比对 + 响应字段语义（如 `highViewList`）。
 
 ### 6.4 已知坑：暗卡顶掉真名单 = 点头像空白
 
-曾把自签结果无条件替换进响应。自签拿到的是暗卡（也带 `data.list`，但 `userIdEcpt` 全空），
+曾把自签结果无条件替换进响应。`see/me/v2` 拿到的是暗卡（也带 `data.list`，但 `userIdEcpt` 全空），
 一替换就把调用方刚用缓存填好的真名单顶掉，表现是**列表还在、点进头像一片空白**。
-规则：只有 `harvestUsers(fresh.data)` 捞到人（`userIdEcpt` + `user` 同时存在）才允许替换，
+规则：只有 `harvestUsers()` 捞到人（`userIdEcpt` + `user` 同时存在）才允许替换，
 其余一律保留原响应 / 缓存。回归测试见 `test-soul-autopull.js` 的 [6][7][8]。
 
 ## 七、复现用命令

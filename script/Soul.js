@@ -229,8 +229,11 @@ function csHttpGet(u, headers, cb) {
 }
 
 /*
-  全自动拉「谁看过我」：服务端这次没给真身份时，脚本自己用正确 cs 重新签一次请求，
-  拿到真人列表后直接替换响应，用户不用再点「揭晓缘分」。
+  全自动拉「谁看过我」的真身份。
+  服务端给 /meet/see/me/v2 只发匿名暗卡(buttonType:4, userIdEcpt 全空，点不进人)，
+  真身份只在会员页访客榜 /meet/mine/see?pageId=MSoulMember_PayNew 里下发(data.userList,
+  字段结构与暗卡一致，含 userIdEcpt/user/count)。两条都用同一套 cs 自签，
+  先试访客榜，拿到人才填响应；拿不到再退回 see/me/v2；都没有就 done(null) 让调用方保留缓存。
 */
 function pullViewers(obj, done) {
   const src = ($request && $request.headers) || {};
@@ -243,33 +246,36 @@ function pullViewers(obj, done) {
     if (mm) {
       const arr = JSON.parse(csDec(mm[1]));
       if (Array.isArray(arr) && arr.length) {
-        arr[0] = atHex;          // bi[0] 与 at 同步刷新
+        arr[0] = atHex;          /* bi[0] 与 at 同步刷新 */
         biJson = JSON.stringify(arr);
       }
     }
   } catch (e) { }
   if (!biJson) { done(null); return; }
-  const pairs = [["bi", biJson], ["bik", "32243"], ["limit", "20"], ["pageId", "MHomeMyTrack_Main"], ["sortType", "1"]];
-  hdrs["at"] = atHex;
-  hdrs["cs"] = soulCs("/meet/see/me/v2", pairs, hdrs, atHex);
-  delete hdrs["content-length"];
-  const sendQs = pairs.map((p) => p[0] + "=" + encodeURIComponent(p[1])).join("&");
-  csHttpGet("https://api-a.soulapp.cn/meet/see/me/v2?" + sendQs, hdrs, (err, data) => {
-    if (err || !data) { done(null); return; }
-    let fresh = null;
-    try { fresh = JSON.parse(data); } catch (e) { }
-    if (!fresh || !fresh.data) { done(null); return; }
-    /*
-    服务端这次可能只给匿名暗卡(buttonType:4，没有 userIdEcpt，点不进人)。
-    这种「成功但没用」的响应绝不能拿去覆盖调用方已经填好的缓存真名单，
-    否则列表会退化成匿名行 —— 点进头像就是空白。
-    */
-    const ppl = harvestUsers(fresh.data).filter((x) => x.user);
-    if (!ppl.length) { done(null); return; }
-    fresh.data.superUser = true;
-    fresh.data.uncoverSecretCount = 999;
-    saveViewerCache(ppl, null);
-    done(fresh);
+
+  const fetchList = (path, pageId, cb) => {
+    const pairs = [["bi", biJson], ["bik", "32243"], ["limit", "20"], ["pageId", pageId], ["sortType", "1"]];
+    const h = Object.assign({}, hdrs);
+    h["at"] = atHex;
+    delete h["content-length"];
+    h["cs"] = soulCs(path, pairs, h, atHex);
+    const qs = pairs.map((p) => p[0] + "=" + encodeURIComponent(p[1])).join("&");
+    csHttpGet("https://api-a.soulapp.cn" + path + "?" + qs, h, (err, data) => {
+      if (err || !data) { cb([]); return; }
+      let j = null;
+      try { j = JSON.parse(data); } catch (e) { }
+      cb(j && j.data ? harvestUsers(j.data).filter((x) => x.user) : []);
+    });
+  };
+
+  fetchList("/meet/mine/see", "MSoulMember_PayNew", (ppl) => {
+    if (ppl.length) { fillViewers(obj, ppl); saveViewerCache(ppl, null); done(obj); return; }
+    fetchList("/meet/see/me/v2", "MHomeMyTrack_Main", (ppl2) => {
+      if (!ppl2.length) { done(null); return; }
+      fillViewers(obj, ppl2);
+      saveViewerCache(ppl2, null);
+      done(obj);
+    });
   });
 }
 
@@ -316,6 +322,8 @@ function fillViewers(obj, list) {
   if (obj.data.uncoverSecretCount == null || obj.data.uncoverSecretCount <= 0) {
     obj.data.uncoverSecretCount = 999;
   }
+  /* 客户端拿 superUser 决定要不要模糊访客头像，回填了真身份就必须标成已开通 */
+  if (obj.data.superUser !== true) obj.data.superUser = true;
 }
 function readViewerCache() {
   const raw = store.get(VKEY);
@@ -658,8 +666,14 @@ try {
     if (obj && obj.data) {
       obj.data.superUser = true;
       if (obj.data.meSeeMetricResp) obj.data.meSeeMetricResp.invisibleCount = 9999;
+      /*
+      这条就是「谁看过我」访客榜：userList 按访问时间倒序，含 userIdEcpt + user，
+      meSeeMetricResp.highViewList 是高访问量访客。App 自己打开时才带这条请求，
+      顺手喂缓存，列表就有真名单可兜底。
+      */
+      const ppl = harvestUsers(obj.data).filter((x) => x.user);
+      if (ppl.length) saveViewerCache(ppl, null);
     }
-    /* 这里的人是「我看过谁」，与「谁看过我」是两批人，不能拿来互相填 */
     body = JSON.stringify(obj);
   }
 
@@ -694,7 +708,7 @@ try {
         let out = body;
         if (fresh) {
           out = JSON.stringify(fresh);
-          if (NOTIFY) notify("Soul 谁看过我列表", "✅最新 " + fmtTime(Date.now()), "");
+          if (NOTIFY) notify("Soul 谁看过我列表", "✅最新 " + harvestUsers(fresh.data).length + " 位访客", "");
         } else if (NOTIFY) {
           /* 自签失败、超时、或只拿到匿名暗卡 —— 一律保留原响应/缓存真名单 */
           notify("Soul 谁看过我列表", cached ? "⚠️未拿到真人，用缓存 " + fmtTime(cached.t) : "⚠️未拿到真人", "");
