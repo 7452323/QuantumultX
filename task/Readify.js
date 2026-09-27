@@ -2,8 +2,8 @@
 ------------------------------------------
 @Author: 7452323
 @Github: https://github.com/7452323/QuantumultX
-@Description: Readify深读 签到脚本
-@Update: 2026.09.20
+@Description: Readify深读 签到脚本（第七天自动领取奖励）
+@Update: 2026.09.27
 ------------------------------------------
 
 # Surge
@@ -38,6 +38,7 @@ BoxJS: readify_accounts
 
 密码传输方式: SHA256哈希后发送
 自动刷新token: userToken 7天过期，过期后自动用邮箱密码重新登录
+奖励领取: 每轮第7天签到后检测 canClaim，自动 POST /api/campaigns/streaks/reward-claims
 */
 
 const scriptName = 'Readify深读';
@@ -199,6 +200,35 @@ async function checkIn(token) {
   return $.toObj(resp.body) || {};
 }
 
+// 奖励类型 → 中文名
+const REWARD_NAMES = {
+  VOICE_SEAT: '声音席位',
+  REWARD_POINT: '积分',
+  VIP_DAY: '会员天数',
+};
+
+// ============ 领取第七天奖励 ============
+async function claimReward(token) {
+  const resp = await http({
+    url: `${API_BASE}/api/campaigns/streaks/reward-claims`,
+    headers: baseHeaders(token),
+    body: JSON.stringify({ campaignId: CAMPAIGN_ID }),
+  });
+  return $.toObj(resp.body) || {};
+}
+
+// 领取并写入通知，返回是否成功
+function pushClaimNotify(nickname, claimed) {
+  const d = claimed.data || {};
+  if (claimed.code === 0 && (d.claimResult === 'CLAIMED' || d.claimResult === 'ALREADY_CLAIMED')) {
+    const name = REWARD_NAMES[d.rewardType] || d.rewardType || '奖励';
+    notifyMsg.push(`「${nickname}」领取奖励 ${name}+${d.rewardCount || 1}`);
+    return true;
+  }
+  notifyMsg.push(`「${nickname}」领取失败: ${claimed.message || 'unknown'}`);
+  return false;
+}
+
 // ============ 获取有效Token ============
 async function getValidToken(email, password) {
   const store = loadTokenStore();
@@ -286,6 +316,15 @@ async function captureToken() {
       
       const streakInfo = status.data || {};
       
+      // 已达成第七天但没领奖的（含上轮漏领），先领
+      if (streakInfo.canClaim) {
+        pushClaimNotify(nickname, await claimReward(tokenData.userToken));
+        if (streakInfo.streakedToday) {
+          notifyMsg.push(`「${nickname}」今日已签到 连续${streakInfo.currentDay || 1}天`);
+          continue;
+        }
+      }
+      
       if (streakInfo.streakedToday) {
         notifyMsg.push(`「${nickname}」今日已签到 连续${streakInfo.currentDay || 1}天`);
         continue;
@@ -296,6 +335,14 @@ async function captureToken() {
       const checkInData = result.data || {};
       if (result.code === 0 && (checkInData.checkInResult === 'CHECKED_IN' || checkInData.checkInResult === 'ALREADY_CHECKED_IN')) {
         notifyMsg.push(`「${nickname}」签到成功 连续${checkInData.currentDay || 1}天`);
+        // 第七天签到完成后，重新查状态直接领奖
+        if (checkInData.currentDay >= 7) {
+          const after = await getStreakStatus(tokenData.userToken);
+          const afterData = after.data || {};
+          if (after.code === 0 && afterData.canClaim) {
+            pushClaimNotify(nickname, await claimReward(tokenData.userToken));
+          }
+        }
       } else {
         notifyMsg.push(`「${nickname}」签到失败: ${result.message || 'unknown'}`);
       }
