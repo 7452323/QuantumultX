@@ -1,73 +1,116 @@
 /*
-RE0(影巢签到) 每日签到 / 赌狗签到 双模式，每天只能二选一
-版本：3.0.0（2026-10-02）— 新增赌狗模式；gambler action 自动发现（首页 layout chunk）；解析兼容转义 flight 数据
-变量名：re0_accounts       多账号 user#pass&user2#pass2
-变量名：re0_mode           normal=每日签到（默认）/ gambler=赌狗签到
-可选：re0_cookie          手动/Cookie采集得到的完整 Cookie（未配账号时使用）
-可选：re0_base_url        默认 https://re0.me
-可选：re0_login_action    登录 action id（留空自动从 /login 页扫描）
-可选：re0_checkin_action  每日签到 action id（留空用内置默认，登录后可自动扫描刷新）
-可选：re0_gambler_action  赌狗签到 action id（留空用内置默认，可自动扫描刷新）
+------------------------------------------
+@Author: 7452323
+@Github: https://github.com/7452323/QuantumultX
+@Description: RE0(影巢) 签到脚本 — 每日签到 / 赌狗签到 双模式（每天二选一）
+@Update: 2026.10.03
+------------------------------------------
+
+# Surge
+[Script]
+RE0签到 = type=cron, cronexp="20 0 * * *", script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js, argument="re0_accounts={{{RE0账号}}},re0_mode={{{签到模式}}}"
+RE0Cookie = type=http-request, pattern=^https?:\/\/re0\.me, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js
+
+[MITM]
+hostname = %APPEND% re0.me
+
+# Loon
+[Script]
+http-request ^https?:\/\/re0\.me script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js, tag=RE0Cookie, require-body=false
+cron "20 0 * * *" script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js, argument="re0_accounts=${re0_accounts},re0_mode=${re0_mode}", tag=RE0签到
+
+[MITM]
+hostname = re0.me
+
+# QuantumultX
+[task_local]
+20 0 * * * https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js, tag=RE0签到, enabled=true
 
 [rewrite_local]
 ^https?:\/\/re0\.me url script-request-header https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js
 
-[task_local]
-20 0 * * * https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js, tag=RE0签到, enabled=true
-
 [MITM]
-hostname = %APPEND% re0.me
+hostname = re0.me
+
+变量: re0_accounts / re0_mode
+格式: user#pass （多账号用 & 分隔）
+模式: re0_mode=normal 每日签到（默认）/ gambler 赌狗签到
+BoxJS: re0_accounts, re0_mode
+
+签到协议: Next.js Server Action（免 X-HDH 签名），body 均为 [true]
+每日签到: POST /manager/account，action 藏在 manager layout chunk
+赌狗签到: POST /，action 藏在首页 (app) layout chunk（抓包 2026-10-02）
+action 自愈: 内置默认 id，失效时自动从 chunk 扫描刷新并缓存
 */
 
-// ============ 常量与默认值 ============
+const scriptName = 'RE0签到';
+const ckName = 're0_accounts';
+
+/* 模块参数优先（Surge/Loon 的 argument 值走 $argument），没给才用持久化存储 */
+const BLANK = ['--', '-', 'none', 'null', '无', '空'];
+function argValue(key) {
+  let v = '';
+  if (typeof $argument === 'string' && $argument) {
+    // 在 & 或 , 后面跟着新参数名时才断开；值里的 &（多账号）和普通逗号不会被切碎
+    $argument.split(/[&,](?=[A-Za-z_][A-Za-z0-9_]*=)/).forEach(p => {
+      const i = p.indexOf('=');
+      if (i > 0 && p.slice(0, i).trim() === key) v = p.slice(i + 1).trim();
+    });
+  } else if (typeof $argument === 'object' && $argument) {
+    v = $argument[key] || '';
+  }
+  try { v = decodeURIComponent(v); } catch (e) { }
+  return (!v || BLANK.indexOf(String(v).trim().toLowerCase()) >= 0) ? '' : v;
+}
+
+// ============ chavyleung's Env.js ============
+function Env(t,e){class s{constructor(t){this.env=t}send(t,e="GET"){t="string"==typeof t?{url:t}:t;let s=this.get;"POST"===e&&(s=this.post);const i=new Promise(((e,i)=>{s.call(this,t,((t,s,o)=>{t?i(t):e(s)}))}));return t.timeout?((t,e=1e3)=>Promise.race([t,new Promise(((t,s)=>{setTimeout((()=>{s(new Error("请求超时"))}),e)}))]))(i,t.timeout):i}get(t){return this.send.call(this.env,t)}post(t){return this.send.call(this.env,t,"POST")}}return new class{constructor(t,e){this.logLevels={debug:0,info:1,warn:2,error:3},this.logLevelPrefixs={debug:"[DEBUG] ",info:"[INFO] ",warn:"[WARN] ",error:"[ERROR] "},this.logLevel="info",this.name=t,this.http=this,this.data=null,this.dataFile="box.dat",this.logs=[],this.isMute=!1,this.isNeedRewrite=!1,this.logSeparator="\n",this.encoding="utf-8",this.startTime=(new Date).getTime(),Object.assign(this,e),this.log("",`🔔${this.name}, 开始!`)}getEnv(){return"undefined"!=typeof $environment&&$environment["surge-version"]?"Surge":"undefined"!=typeof $environment&&$environment["stash-version"]?"Stash":"undefined"!=typeof module&&module.exports?"Node.js":"undefined"!=typeof $task?"Quantumult X":"undefined"!=typeof $loon?"Loon":"undefined"!=typeof $rocket?"Shadowrocket":void 0}isNode(){return"Node.js"===this.getEnv()}isQuanX(){return"Quantumult X"===this.getEnv()}isSurge(){return"Surge"===this.getEnv()}isLoon(){return"Loon"===this.getEnv()}isShadowrocket(){return"Shadowrocket"===this.getEnv()}isStash(){return"Stash"===this.getEnv()}toObj(t,e=null){try{return JSON.parse(t)}catch{return e}}toStr(t,e=null,...s){try{return JSON.stringify(t,...s)}catch{return e}}getjson(t,e){let s=e;if(this.getdata(t))try{s=JSON.parse(this.getdata(t))}catch{}return s}setjson(t,e){try{return this.setdata(JSON.stringify(t),e)}catch{return!1}}getScript(t){return new Promise((e=>{this.get({url:t},((t,s,i)=>e(i)))}))}loaddata(){if(!this.isNode())return{};{this.fs=this.fs?this.fs:require("fs"),this.path=this.path?this.path:require("path");const t=this.path.resolve(this.dataFile),e=this.path.resolve(process.cwd(),this.dataFile),s=this.fs.existsSync(t),i=!s&&this.fs.existsSync(e);if(!s&&!i)return{};{const i=s?t:e;try{return JSON.parse(this.fs.readFileSync(i))}catch(t){return{}}}}}writedata(){if(this.isNode()){this.fs=this.fs?this.fs:require("fs"),this.path=this.path?this.path:require("path");const t=this.path.resolve(this.dataFile),e=this.path.resolve(process.cwd(),this.dataFile),s=this.fs.existsSync(t),i=!s&&this.fs.existsSync(e),o=JSON.stringify(this.data);s?this.fs.writeFileSync(t,o):i?this.fs.writeFileSync(e,o):this.fs.writeFileSync(t,o)}}lodash_get(t,e,s){const i=e.replace(/\[(\d+)\]/g,".$1").split(".");let o=t;for(const t of i)if(o=Object(o)[t],void 0===o)return s;return o}lodash_set(t,e,s){return Object(t)!==t||(Array.isArray(e)||(e=e.toString().match(/[^.[\]]+/g)||[]),e.slice(0,-1).reduce(((t,s,i)=>Object(t[s])===t[s]?t[s]:t[s]=Math.abs(e[i+1])>>0==+e[i+1]?[]:{}),t)[e[e.length-1]]=s),t}getdata(t){let e=this.getval(t);if(/^@/.test(t)){const[,s,i]=/^@(.*?)\.(.*?)$/.exec(t),o=s?this.getval(s):"";if(o)try{const t=JSON.parse(o);e=t?this.lodash_get(t,i,""):e}catch(t){e=""}}return e}setdata(t,e){let s=!1;if(/^@/.test(e)){const[,i,o]=/^@(.*?)\.(.*?)$/.exec(e),r=this.getval(i),a=i?"null"===r?null:r||"{}":"{}";try{const e=JSON.parse(a);this.lodash_set(e,o,t),s=this.setval(JSON.stringify(e),i)}catch(e){const r={};this.lodash_set(r,o,t),s=this.setval(JSON.stringify(r),i)}}else s=this.setval(t,e);return s}getval(t){switch(this.getEnv()){case"Surge":case"Loon":case"Stash":case"Shadowrocket":return $persistentStore.read(t);case"Quantumult X":return $prefs.valueForKey(t);case"Node.js":return this.data=this.loaddata(),this.data[t];default:return this.data&&this.data[t]||null}}setval(t,e){switch(this.getEnv()){case"Surge":case"Loon":case"Stash":case"Shadowrocket":return $persistentStore.write(t,e);case"Quantumult X":return $prefs.setValueForKey(t,e);case"Node.js":return this.data=this.loaddata(),this.data[e]=t,this.writedata(),!0;default:return this.data&&this.data[e]||null}}get(t,e=(()=>{})){switch(t.headers&&(delete t.headers["Content-Type"],delete t.headers["Content-Length"],delete t.headers["content-type"],delete t.headers["content-length"]),t.params&&(t.url+="?"+this.queryStr(t.params)),void 0===t.followRedirect||t.followRedirect||((this.isSurge()||this.isLoon())&&(t["auto-redirect"]=!1),this.isQuanX()&&t.opts?t.opts.redirection=!1:t.opts={redirection:!1}),this.getEnv()){case"Surge":case"Loon":case"Stash":case"Shadowrocket":default:this.isSurge()&&this.isNeedRewrite&&(t.headers=t.headers||{},Object.assign(t.headers,{"X-Surge-Skip-Scripting":!1})),$httpClient.get(t,((t,s,i)=>{!t&&s&&(s.body=i,s.statusCode=s.status?s.status:s.statusCode,s.status=s.statusCode),e(t,s,i)}));break;case"Quantumult X":this.isNeedRewrite&&(t.opts=t.opts||{},Object.assign(t.opts,{hints:!1})),$task.fetch(t).then((t=>{const{statusCode:s,statusCode:i,headers:o,body:r}=t;e(null,{status:s,statusCode:i,headers:o,body:r},r)}),(t=>e(t&&t.error||"UndefinedError")));break;case"Node.js":const s=require("iconv-lite");this.initGotEnv(t),this.got(t).then((t=>{const{statusCode:i,statusCode:o,headers:r,rawBody:a}=t,n=s.decode(a,this.encoding);e(null,{status:i,statusCode:o,headers:r,rawBody:a,body:n},n)}),(t=>{const{message:i,response:o}=t;e(i,o,o&&s.decode(o.rawBody,this.encoding))}));break}}post(t,e=(()=>{})){const s=t.method?t.method.toLocaleLowerCase():"post";switch(t.body&&t.headers&&!t.headers["Content-Type"]&&!t.headers["content-type"]&&(t.headers["content-type"]="application/x-www-form-urlencoded"),t.headers&&(delete t.headers["Content-Length"],delete t.headers["content-length"]),void 0===t.followRedirect||t.followRedirect||((this.isSurge()||this.isLoon())&&(t["auto-redirect"]=!1),this.isQuanX()&&t.opts?t.opts.redirection=!1:t.opts={redirection:!1}),this.getEnv()){case"Surge":case"Loon":case"Stash":case"Shadowrocket":default:this.isSurge()&&this.isNeedRewrite&&(t.headers=t.headers||{},Object.assign(t.headers,{"X-Surge-Skip-Scripting":!1})),$httpClient[s](t,((t,s,i)=>{!t&&s&&(s.body=i,s.statusCode=s.status?s.status:s.statusCode,s.status=s.statusCode),e(t,s,i)}));break;case"Quantumult X":t.method=s,this.isNeedRewrite&&(t.opts=t.opts||{},Object.assign(t.opts,{hints:!1})),$task.fetch(t).then((t=>{const{statusCode:s,statusCode:i,headers:o,body:r}=t;e(null,{status:s,statusCode:i,headers:o,body:r},r)}),(t=>e(t&&t.error||"UndefinedError")));break;case"Node.js":let i=require("iconv-lite");this.initGotEnv(t);const{url:o,...r}=t;this.got[s](o,r).then((t=>{const{statusCode:s,statusCode:o,headers:r,rawBody:a}=t,n=i.decode(a,this.encoding);e(null,{status:s,statusCode:o,headers:r,rawBody:a,body:n},n)}),(t=>{const{message:s,response:o}=t;e(s,o,o&&i.decode(o.rawBody,this.encoding))}));break}}queryStr(t){let e="";for(const s in t){let i=t[s];null!=i&&""!==i&&("object"==typeof i&&(i=JSON.stringify(i)),e+=`${s}=${i}&`)}return e=e.substring(0,e.length-1),e}msg(e=t,s="",i="",o={}){if(!this.isMute)switch(this.getEnv()){case"Surge":case"Loon":case"Stash":case"Shadowrocket":default:$notification.post(e,s,i,o);break;case"Quantumult X":$notify(e,s,i,o);break;case"Node.js":break}if(!this.isMuteLog){let t=["","==============📣系统通知📣=============="];t.push(e),s&&t.push(s),i&&t.push(i),console.log(t.join("\n")),this.logs=this.logs.concat(t)}}log(...t){t.length>0&&(this.logs=[...this.logs,...t],console.log(t.map((t=>t??String(t))).join(this.logSeparator)))}logErr(t,e){this.log("",`❗️${this.name}, 错误!`,e,t)}wait(t){return new Promise((e=>setTimeout(e,t)))}done(t={}){const e=((new Date).getTime()-this.startTime)/1e3;switch(this.log("",`🔔${this.name}, 结束! 🕛 ${e} 秒`),this.getEnv()){case"Surge":case"Loon":case"Stash":case"Shadowrocket":case"Quantumult X":default:$done(t);break;case"Node.js":break}}initGotEnv(t){this.got=this.got?this.got:require("got"),this.cktough=this.cktough?this.cktough:require("tough-cookie"),this.ckjar=this.ckjar?this.ckjar:new this.cktough.CookieJar,t&&(t.headers=t.headers?t.headers:{},t&&(t.headers=t.headers?t.headers:{},void 0===t.headers.cookie&&void 0===t.headers.Cookie&&void 0===t.cookieJar&&(t.cookieJar=this.ckjar)))}}(t,e)}
+
+const $ = new Env(scriptName);
+const notifyMsg = [];
+
+// ============ 常量 ============
 const DEF_BASE = 'https://re0.me';
 const DEF_LOGIN_ACTION = '60fa5517c023301ab84757ba19fd91f0ef5cc482dd';   // createServerReference(...,"login")
-const DEF_CHECKIN_ACTION = '4004fe56299e6451fc007a19f6df5f592551ab9c78'; // 每日签到 createServerReference(...,"checkIn")
-const DEF_GAMBLER_ACTION = '409c3461f006f9de5e010af69e072690dd8b736acd'; // 赌狗签到 createServerReference(...,"checkIn")，首页 (app) layout chunk，抓包 2026-10-02
+const DEF_CHECKIN_ACTION = '4004fe56299e6451fc007a19f6df5f592551ab9c78'; // 每日签到：manager layout chunk 的 checkIn
+const DEF_GAMBLER_ACTION = '409c3461f006f9de5e010af69e072690dd8b736acd'; // 赌狗签到：首页 (app) layout chunk 的 checkIn，抓包 2026-10-02
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
+const cacheLoginKey = 're0_cache_login_action';
+const cacheCheckinKey = 're0_cache_checkin_action';
+const cacheGamblerKey = 're0_cache_gambler_action';
+const WANT_COOKIES = ['token', 'refresh_token', 'csrf_access_token', 'csrfaccesstoken', 'hdh_uid', 'hdh_sa_token'];
 
-let $ = new Env('RE0签到');
-let allMsg = '';
-
-// ============ 配置读取 ============
-/* 空值哨兵：Surge 参数不能留空默认值，「不填」用 -- 表示 */
-const BLANK = ['--', '-', 'none', 'null', '无', '空'];
-const isBlank = v => v === undefined || v === null || !String(v).trim() || BLANK.indexOf(String(v).trim().toLowerCase()) >= 0;
-const CONFIG = (() => {
-  const args = {};
-  if (typeof $argument === 'string' && $argument) {
-    // 只在 & 后面跟着新参数名时才断开，值里带 & (多账号) 不会被切碎
-    $argument.split(/&(?=[A-Za-z_][A-Za-z0-9_]*=)/).forEach(p => { const i = p.indexOf('='); if (i > 0) args[p.slice(0, i).trim()] = p.slice(i + 1).trim(); });
-  } else if (typeof $argument === 'object' && $argument) {
-    Object.keys($argument).forEach(k => { args[k] = $argument[k]; });
-  }
-  const get = (k, f) => {
-    if (!isBlank(args[k])) { try { const d = decodeURIComponent(args[k]); if (!isBlank(d)) return d; } catch (e) { return args[k]; } }
-    if ($.isNode() && process.env[k.toUpperCase()]) return process.env[k.toUpperCase()];
-    return $.getdata(k) || f;
-  };
-  const modeRaw = (get('re0_mode', 'normal') || 'normal').toLowerCase();
+// ============ 配置 ============
+function getConfig() {
+  const modeRaw = (argValue('re0_mode') || $.getdata('re0_mode') || 'normal').toLowerCase();
   return {
-    base_url: (get('re0_base_url') || DEF_BASE).replace(/\/+$/, ''),
-    accounts: get('re0_accounts', ''),
-    cookie: get('re0_cookie', ''),
+    base_url: (argValue('re0_base_url') || $.getdata('re0_base_url') || DEF_BASE).replace(/\/+$/, ''),
+    accounts: argValue('re0_accounts') || $.getdata(ckName) || '',
+    cookie: argValue('re0_cookie') || $.getdata('re0_cookie') || '',
     mode: /gambl|赌狗|^gg$/.test(modeRaw) ? 'gambler' : 'normal',
-    login_action: get('re0_login_action', ''),
-    checkin_action: get('re0_checkin_action', ''),
-    gambler_action: get('re0_gambler_action', ''),
+    login_action: argValue('re0_login_action') || '',
+    checkin_action: argValue('re0_checkin_action') || '',
+    gambler_action: argValue('re0_gambler_action') || '',
   };
-})();
+}
 
 // ============ 工具 ============
-function nowStr() { const d = new Date(), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`; }
-function collect(m) { const c = (m || '').trim(); if (!c) return; if (/^[=\-─]+$/.test(c)) return; if (c.includes('[流程]') || c.includes('[INFO]')) return; allMsg += c + '\n'; }
+function safeName(n) { return (n || 'default').replace(/[^a-zA-Z0-9_.-]/g, '_'); }
+function b64(s) {
+  if (typeof Buffer !== 'undefined') return Buffer.from(s, 'utf8').toString('base64');
+  if (typeof btoa !== 'undefined') return btoa(unescape(encodeURIComponent(s)));
+  return s;
+}
+function fmtErr(e) { return (e && e.message) ? e.message : String(e); }
+function tryJson(s) { try { return JSON.parse(s); } catch { return null; } }
+function cut(s, n = 400) { return (s || '').slice(0, n).replace(/\n/g, ' '); }
 
+// ============ Cookie ============
 function parseCookiesToMap(str) {
   const m = {};
   (str || '').split(';').forEach(p => { const i = p.indexOf('='); if (i > 0) m[p.slice(0, i).trim()] = p.slice(i + 1).trim(); });
   return m;
 }
-const WANT_COOKIES = ['token', 'refresh_token', 'csrf_access_token', 'csrfaccesstoken', 'hdh_uid', 'hdh_sa_token'];
 function mergeSetCookie(map, setCookie) {
   // 兼容各引擎：数组 / 单串 / 多行拼接；只收白名单 cookie（忽略 Expires/Path 等属性名）
   const list = Array.isArray(setCookie) ? setCookie : (setCookie ? [setCookie] : []);
@@ -81,15 +124,7 @@ function mergeSetCookie(map, setCookie) {
 }
 function cookieString(map) { return Object.entries(map).map(([k, v]) => `${k}=${v}`).join('; '); }
 
-function safeName(n) { return (n || 'default').replace(/[^a-zA-Z0-9_.-]/g, '_'); }
-function b64(s) {
-  if (typeof Buffer !== 'undefined') return Buffer.from(s, 'utf8').toString('base64');
-  if (typeof btoa !== 'undefined') return btoa(unescape(encodeURIComponent(s)));
-  return s;
-}
-function fmtErr(e) { return (e && e.message) ? e.message : String(e); }
-
-// ============ HTTP 封装（跨平台 + Set-Cookie 维持） ============
+// ============ HTTP请求（自带 cookie 桶，Set-Cookie 自动并入） ============
 function httpReq(opts, method = 'GET') {
   return new Promise((resolve, reject) => {
     const done = (err, status, headers, body) => {
@@ -130,28 +165,21 @@ class Re0Worker {
     this.base = base;
     this.username = username;
     this.password = password;
-    this.cookie = cookie || '';            // 传入的持久化 Cookie
-    this.jar = parseCookiesToMap(cookie);  // 运行时 cookie 桶
+    this.cookie = cookie || '';
+    this.jar = parseCookiesToMap(cookie);
     this.ids = ids || {};
     this.mode = mode === 'gambler' ? 'gambler' : 'normal';
     this.tag = safeName(username);
-    this.metaKey = `re0_meta_${this.tag}`;
-    this.historyKey = `re0_history_${this.tag}`;
   }
-  _load(k, d) { try { const v = $.getdata(k); return v ? JSON.parse(v) : d; } catch { return d; } }
-  _save(k, v) { try { $.setdata(JSON.stringify(v), k); } catch {} }
-  getMeta() { return this._load(this.metaKey, {}); }
-  saveMeta(m) { this._save(this.metaKey, m); }
-  getHistory() { return this._load(this.historyKey, []); }
+  getMeta() { return $.getjson(`re0_meta_${this.tag}`, {}) || {}; }
+  saveMeta(m) { $.setdata(JSON.stringify(m), `re0_meta_${this.tag}`); }
 
-  // --- HTTP helpers with cookie jar auto-update ---
   async req(method, path, { headers = {}, body = '', accept } = {}) {
     const h = { 'User-Agent': UA, 'Accept-Language': 'zh-CN,zh;q=0.9', ...headers };
     if (accept) h['Accept'] = accept;
     if (Object.keys(this.jar).length) h['Cookie'] = cookieString(this.jar);
     if (body !== '') h['Content-Type'] = h['Content-Type'] || 'text/plain;charset=UTF-8';
     const r = await httpReq({ url: this.base + path, headers: h, body }, method);
-    // 轮换 cookie：响应 Set-Cookie 头名大小写不一，统一小写扫描并入
     const hkeys = Object.keys(r.headers || {});
     for (const k of hkeys) { if (k.toLowerCase() === 'set-cookie') { mergeSetCookie(this.jar, r.headers[k]); break; } }
     return r;
@@ -163,23 +191,19 @@ class Re0Worker {
       headers: { 'Accept': 'text/x-component', 'Origin': this.base, 'Referer': this.base + path, 'next-action': actionId },
     });
   }
-
   cookieNow() { return cookieString(this.jar); }
 
-  // --- 登录（server action，免 X-HDH） ---
+  // 登录（server action，免 X-HDH）
   async login() {
     const action = this.ids.login;
     if (!action) throw new Error('未取得 login action');
-    // 1) GET /login 绑定 hdh_sa_token
-    await this.get('/login?redirect=/');
-    // 2) POST login action
+    await this.get('/login?redirect=/');   // 绑定 hdh_sa_token
     const payload = JSON.stringify([{ username: this.username, password: b64(this.password), password_transport: 'base64' }, '/']);
     const r = await this.post('/login?redirect=/', payload, action);
     const hasToken = !!this.jar['token'];
     const js = tryJson(r.body);
     if (js && js.code === 'action_token_required') throw new Error(`登录需先绑定（GET /login），code=${js.code}`);
     if (!hasToken) {
-      // 诊断：响应头到底有没有 set-cookie / 含哪些目标 cookie
       const hkeys = Object.keys(r.headers || {});
       let raw = '';
       for (const k of hkeys) { if (k.toLowerCase() === 'set-cookie') raw += String(r.headers[k]); }
@@ -190,25 +214,23 @@ class Re0Worker {
     return r;
   }
 
-  // --- 签到（双模式：normal 走 /manager/account，gambler 走 /） ---
+  // 签到：normal 走 /manager/account，gambler 走 /
   async checkIn() {
     if (this.mode === 'gambler') {
       const action = this.ids.gambler;
       if (!action) throw new Error('未取得 gambler action');
-      await this.get('/', 'text/html');            // 首页刷新绑定
-      const r = await this.post('/', '[true]', action);  // 赌狗签到 POST 到 /
+      await this.get('/', 'text/html');
+      const r = await this.post('/', '[true]', action);
       return { http: r.status, body: r.body };
     }
     const action = this.ids.checkin;
     if (!action) throw new Error('未取得 checkIn action');
-    // GET /manager/account 刷新绑定 + 页面
     await this.get('/manager/account', 'text/x-component');
-    // POST action body [true]
     const r = await this.post('/manager/account', '[true]', action);
     return { http: r.status, body: r.body };
   }
 
-  // --- 账号资料（从签到响应 RSC 抠昵称/积分/连续天数） ---
+  // 账号资料（从签到响应 RSC 抠昵称/积分/连续天数）
   parseProfile(rsc) {
     const o = {};
     const t = (rsc || '').replace(/\\"/g, '"');   // flight 数据可能是转义的，先还原
@@ -220,8 +242,6 @@ class Re0Worker {
 }
 
 // ============ 结果解析（RSC / JSON） ============
-function tryJson(s) { try { return JSON.parse(s); } catch { return null; } }
-function cut(s, n = 400) { return (s || '').slice(0, n).replace(/\n/g, ' '); }
 function analyzeCheckin(resp) {
   const raw = (resp && resp.body) || '';
   const body = raw.replace(/\\"/g, '"');   // flight action 结果行可能是转义的，先还原；纯 JSON 无反斜杠不受影响
@@ -248,26 +268,7 @@ function analyzeCheckin(resp) {
   return { ok: isOk || isAlready, isAlready, message: text || ('HTTP ' + resp.http), code };
 }
 
-// ============ Cookie 采集（rewrite 模式） ============
-function handleCookie() {
-  const h = ($request && ($request.headers || {})) || {};
-  const ck = h['Cookie'] || h['cookie'] || '';
-  if (!ck) { $.done(); return; }
-  const m = parseCookiesToMap(ck);
-  if (!m['token']) { $.done(); return; }   // 只要带 token 的完整登录态
-  const old = $.getdata('re0_cookie') || '';
-  if (old !== ck) {
-    $.setdata(ck, 're0_cookie');
-    $.log(`[Cookie] 已保存 RE0 Cookie（含 token）`);
-  }
-  $.done();
-}
-
 // ============ Action id 发现 ============
-const cacheLoginKey = 're0_cache_login_action';
-const cacheCheckinKey = 're0_cache_checkin_action';
-const cacheGamblerKey = 're0_cache_gambler_action';
-
 function scanActionId(text, name) {
   const re = new RegExp('createServerReference\\)\\s*\\(\\s*["\']([^"\']+)["\'][^)]*?,\\s*["\']' + name.replace(/[$.*+?^${}()|[\]\\]/g, '\\$&') + '["\']\\s*\\)');
   const m = text.match(re);
@@ -292,7 +293,6 @@ async function discoverLoginAction(base) {
   return scanActionId(js, 'login');
 }
 async function discoverCheckinAction(base, cookie) {
-  // manager 布局 chunk 只在登录态页面出现；cookie 可选
   const html = await fetchText(base, '/manager/account', { accept: 'text/html', cookie });
   const c = chunkUrlFromHtml(html, '/_next/static/chunks/app/manager/layout-');
   if (!c) return '';
@@ -310,51 +310,66 @@ async function discoverGamblerAction(base) {
   return scanActionId(js, 'checkIn');
 }
 
+// ============ MITM采集 ============
+async function captureCookie() {
+  try {
+    const h = ($request && $request.headers) || {};
+    const ck = h['Cookie'] || h['cookie'] || '';
+    if (!ck) return;
+    const m = parseCookiesToMap(ck);
+    if (!m['token']) return;   // 只要带 token 的完整登录态
+    const old = $.getdata('re0_cookie') || '';
+    if (old !== ck) {
+      $.setdata(ck, 're0_cookie');
+      $.msg(scriptName, 'Cookie采集成功', '');
+    }
+  } catch (e) { $.logErr(e); }
+}
+
 // ============ 主流程 ============
-async function main() {
-  if (typeof $request !== 'undefined') { handleCookie(); return; }
+!(async () => {
+  if (typeof $request !== 'undefined') {
+    await captureCookie();
+    return;
+  }
+
+  const CONFIG = getConfig();
   const mode = CONFIG.mode;
   const modeName = mode === 'gambler' ? '赌狗签到' : '每日签到';
   const modeIcon = mode === 'gambler' ? '🎲' : '✅';
-  $.log(`🔔 ${$.name}（${modeName}）, 开始!`);
-  $.log(`BASE = ${CONFIG.base_url}`);
 
-  // 解析账号
   const accounts = [];
-  (CONFIG.accounts || '').split('&').forEach(item => {
+  CONFIG.accounts.split('&').forEach(item => {
     item = item.trim(); if (!item) return;
     const p = item.split('#');
     if (p.length >= 2) accounts.push({ username: p[0].trim(), password: p[1].trim(), cookie: p[2] ? p[2].trim() : '' });
   });
   if (!accounts.length && CONFIG.cookie) accounts.push({ username: 'cookie', password: '', cookie: CONFIG.cookie });
   if (!accounts.length) {
-    $.msg($.name, '', '⚠️ 未配置 re0_accounts\n\n示例：user#pass&user2#pass2\n或抓包后配置 re0_cookie\n\n🎯 失败');
-    $.done(); return;
+    $.msg(scriptName, '❌ 未配置账号', '请填入 re0_accounts: user#pass&user2#pass2');
+    return;
   }
+  $.log(`[RE0] ${modeName}模式，共${accounts.length}个账号`);
 
-  // action ids：优先缓存/手动，失败再发现
   const ids = {
     login: CONFIG.login_action || $.getdata(cacheLoginKey) || DEF_LOGIN_ACTION,
     checkin: CONFIG.checkin_action || $.getdata(cacheCheckinKey) || DEF_CHECKIN_ACTION,
     gambler: CONFIG.gambler_action || $.getdata(cacheGamblerKey) || DEF_GAMBLER_ACTION,
   };
 
-  for (let idx = 0; idx < accounts.length; idx++) {
-    const acc = accounts[idx];
-    $.log(`\n${'─'.repeat(56)}`);
-    $.log(`[账号 ${idx + 1}] ${acc.username}`);
+  for (const acc of accounts) {
     try {
       const w = new Re0Worker(CONFIG.base_url, acc.username, acc.password, acc.cookie || '', ids, mode);
       // 保证登录态（密码优先自动登录；action 失效则现场扫描重试一次）
       if (acc.password) {
-        $.log(' [流程] 自动登录...');
+        $.log(`[RE0] ${acc.username} 自动登录...`);
         try {
           await w.login();
         } catch (e) {
           if (!/action|Action/.test(fmtErr(e))) throw e;
           const nid = await discoverLoginAction(CONFIG.base_url).catch(() => '');
           if (!nid) throw e;
-          $.log(` [info] login action 已刷新: ${nid}`);
+          $.log(`[RE0] login action 已刷新: ${nid}`);
           ids.login = nid; $.setdata(nid, cacheLoginKey);
           w.ids.login = nid;
           await w.login();
@@ -362,7 +377,7 @@ async function main() {
       } else if (!w.jar['token']) {
         throw new Error('无 token：请配置账号密码，或先抓包配置 re0_cookie');
       } else {
-        $.log(' [流程] 使用已有 Cookie');
+        $.log(`[RE0] ${acc.username} 使用已有 Cookie`);
       }
 
       // 登录后自动校准签到 action（未手动配置且未缓存过）
@@ -370,17 +385,17 @@ async function main() {
         if (!CONFIG.gambler_action && !$.getdata(cacheGamblerKey)) {
           try {
             const id = await discoverGamblerAction(CONFIG.base_url);
-            if (id) { ids.gambler = id; $.setdata(id, cacheGamblerKey); $.log(` [info] gambler action 已校准: ${id}`); }
-          } catch (e) { $.log(` [warn] gambler action 扫描失败: ${fmtErr(e)}`); }
+            if (id) { ids.gambler = id; $.setdata(id, cacheGamblerKey); $.log(`[RE0] gambler action 已校准: ${id}`); }
+          } catch (e) { $.log(`[RE0] gambler action 扫描失败: ${fmtErr(e)}`); }
         }
       } else if (!CONFIG.checkin_action && !$.getdata(cacheCheckinKey)) {
         try {
           const id = await discoverCheckinAction(CONFIG.base_url, w.cookieNow());
           if (id) { ids.checkin = id; $.setdata(id, cacheCheckinKey); }
-        } catch (e) { $.log(` [warn] checkin action 扫描失败: ${fmtErr(e)}`); }
+        } catch (e) { $.log(`[RE0] checkin action 扫描失败: ${fmtErr(e)}`); }
       }
 
-      $.log(` [流程] 执行${modeName}...`);
+      $.log(`[RE0] ${acc.username} 执行${modeName}...`);
       let resp = await w.checkIn();
       let r = analyzeCheckin(resp);
       // 签到 action 疑似失效 → 重新扫描后重试一次
@@ -393,87 +408,30 @@ async function main() {
             const key = mode === 'gambler' ? cacheGamblerKey : cacheCheckinKey;
             if (mode === 'gambler') { ids.gambler = id; w.ids.gambler = id; } else { ids.checkin = id; w.ids.checkin = id; }
             $.setdata(id, key);
-            $.log(` [info] ${modeName} action 已刷新: ${id}`);
+            $.log(`[RE0] ${modeName} action 已刷新: ${id}`);
             resp = await w.checkIn();
             r = analyzeCheckin(resp);
           }
-        } catch (e2) { $.log(` [warn] 重扫 action 失败: ${fmtErr(e2)}`); }
+        } catch (e2) { $.log(`[RE0] 重扫 action 失败: ${fmtErr(e2)}`); }
       }
 
       // 真实用户名：优先站内昵称，回退登录账号
       const pf = w.parseProfile(resp.body || '');
-      const display = pf.nickname || acc.username;
+      const nickname = pf.nickname || acc.username;
       const extra = (pf.points != null ? ` ｜ 积分 ${pf.points}${pf.days != null ? ' / 连续 ' + pf.days + ' 天' : ''}` : '');
 
       // 持久化 Cookie（供下次复用 / 展示）
-      const meta = w.getMeta(); meta.cookie = w.cookieNow(); meta.display = display; meta.points = pf.points; w.saveMeta(meta);
+      const meta = w.getMeta(); meta.cookie = w.cookieNow(); meta.display = nickname; meta.points = pf.points; w.saveMeta(meta);
 
-      let sub = '';
-      if (r.isAlready) { sub = `⏭️ 今日已签到${r.message ? '：' + r.message : ''}`; }
-      else if (r.ok) { sub = `${modeIcon} ${r.message || (modeName + '成功')}`; }
-      else { sub = `❌ ${modeName}失败：${r.message || ''}`; }
-      $.log(`[账号 ${idx + 1}] ${acc.username} | ${sub}`);
-      collect(`${display}${extra}`); collect(sub);
+      if (r.isAlready) notifyMsg.push(`「${nickname}」⏭️ 今日已签到${extra}`);
+      else if (r.ok) notifyMsg.push(`「${nickname}」${modeIcon} ${r.message || (modeName + '成功')}${extra}`);
+      else notifyMsg.push(`「${nickname}」❌ ${modeName}失败：${r.message || ''}`);
     } catch (e) {
-      const msg = fmtErr(e);
-      $.log(`[账号 ${idx + 1}] ${acc.username} ❌ ${msg}`);
-      collect(`${acc.username} ❌ ${msg}`);
+      notifyMsg.push(`「${acc.username}」执行失败: ${fmtErr(e)}`);
     }
   }
 
-  $.log(`\n${'═'.repeat(56)}`);
-  if (allMsg) { $.msg($.name, '', allMsg); }
-  $.done();
-}
-
-// ============ Env.js 精简框架 ============
-function Env(name) {
-  return new (class {
-    constructor() { this.name = name; this.data = null; this.startTime = Date.now(); }
-    getEnv() {
-      if (typeof $task !== 'undefined') return 'Quantumult X';
-      if (typeof $environment !== 'undefined' && $environment['surge-version']) return 'Surge';
-      if (typeof $environment !== 'undefined' && $environment['stash-version']) return 'Stash';
-      if (typeof $loon !== 'undefined') return 'Loon';
-      if (typeof $rocket !== 'undefined') return 'Shadowrocket';
-      if (typeof module !== 'undefined' && module.exports) return 'Node.js';
-      return 'Unknown';
-    }
-    isNode() { return this.getEnv() === 'Node.js'; }
-    getdata(k) {
-      switch (this.getEnv()) {
-        case 'Quantumult X': return $prefs.valueForKey(k) || '';
-        case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket': return $persistentStore.read(k) || '';
-        case 'Node.js': return this.data && this.data[k] || process.env[k] || '';
-        default: return '';
-      }
-    }
-    setdata(v, k) {
-      switch (this.getEnv()) {
-        case 'Quantumult X': return $prefs.setValueForKey(v, k);
-        case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket': return $persistentStore.write(v, k);
-        case 'Node.js': this.data = this.data || {}; this.data[k] = v; return true;
-      }
-    }
-    log(...t) { console.log(t.join('\n')); }
-    wait(ms) { return new Promise(r => setTimeout(r, ms)); }
-    msg(s, t, c) {
-      switch (this.getEnv()) {
-        case 'Node.js': console.log(`${s}: ${t || ''} - ${c || ''}`); break;
-        case 'Quantumult X': $notify(s, t || '', c || ''); break;
-        case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket': default: $notification.post(s, t || '', c || ''); break;
-      }
-    }
-    done() {
-      const el = ((Date.now() - this.startTime) / 1000).toFixed(2);
-      this.log(`结束! ${el}s`);
-      switch (this.getEnv()) {
-        case 'Node.js': process.exit(0); break;
-        default: $done(); break;
-      }
-    }
-  })();
-}
-
-// ============ 启动 ============
-main().catch(e => { $.log(`❌ ${$.name} 异常: ${fmtErr(e)}`); try { $.done(); } catch (_) {} });
+  $.msg(scriptName, '', notifyMsg.join('\n'));
+})()
+.catch((e) => { $.logErr(e); $.msg(scriptName, '❌ 执行异常', e.message || e); })
+.finally(() => { $.done({}); });
