@@ -33,9 +33,10 @@ hostname = re0.me
 hostname = re0.me
 
 变量: re0_accounts / re0_mode
-格式: user#pass （多账号用 & 分隔）
+格式: user#pass （多账号用 & 分隔；第三段可带 Cookie：user#pass#cookie）
 模式: re0_mode=1 每日签到（默认）/ 2 赌狗签到
 BoxJS: re0_accounts, re0_mode
+免密: 开启 RE0Cookie 重写后，在浏览器打开 re0.me（登录态）自动抓取 Cookie 存入 re0_cookie，定时任务免密签到；抓到的 Cookie 含 cf_clearance，可顺带过 Cloudflare；免密与账号密码相互独立都会跑（重复签到服务端返回已签到）
 
 签到协议: Next.js Server Action（免 X-HDH 签名），body 均为 [true]
 每日签到: POST /manager/account，action 藏在 manager layout chunk
@@ -113,6 +114,25 @@ function b64(s) {
 function fmtErr(e) { return (e && e.message) ? e.message : String(e); }
 function tryJson(s) { try { return JSON.parse(s); } catch { return null; } }
 function cut(s, n = 400) { return (s || '').slice(0, n).replace(/\n/g, ' '); }
+// JWT 只解 payload 不验签，取 exp（移植自旧版 py 的 _cookie_looks_expired）
+function jwtExp(token) {
+  try {
+    let seg = String(token || '').split('.')[1];
+    if (!seg) return 0;
+    seg = seg.replace(/-/g, '+').replace(/_/g, '/');
+    while (seg.length % 4) seg += '=';
+    const json = typeof Buffer !== 'undefined'
+      ? Buffer.from(seg, 'base64').toString('utf8')
+      : decodeURIComponent(escape(atob(seg)));
+    const exp = JSON.parse(json).exp;
+    return typeof exp === 'number' ? exp : 0;
+  } catch (e) { return 0; }
+}
+function tokenExpired(token, skewSec = 60) {
+  const exp = jwtExp(token);
+  if (!exp) return false;   // 解析不出 exp 就不误判，交给服务端
+  return exp <= Math.floor(Date.now() / 1000) + skewSec;
+}
 
 // ============ Cookie ============
 function parseCookiesToMap(str) {
@@ -407,7 +427,9 @@ async function captureCookie() {
           await w.login();
         }
       } else if (!w.jar['token']) {
-        throw new Error('无 token：请配置账号密码，或先抓包配置 re0_cookie');
+        throw new Error('无 token：请配置账号密码，或开启 RE0Cookie 重写后在浏览器打开 re0.me 自动抓取 Cookie');
+      } else if (tokenExpired(w.jar['token'])) {
+        throw new Error('Cookie 已过期：请在浏览器打开 re0.me（保持登录态）重新抓取，抓取时需开启 RE0Cookie 重写');
       } else {
         $.log(`[RE0] ${acc.username} 使用已有 Cookie`);
       }
