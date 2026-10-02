@@ -154,15 +154,15 @@
         {
           "id": "re0_mode",
           "name": "签到模式",
-          "val": "normal",
+          "val": "1",
           "type": "select",
           "items": [
             {
-              "key": "normal",
+              "key": "1",
               "label": "每日签到（默认）"
             },
             {
-              "key": "gambler",
+              "key": "2",
               "label": "赌狗签到"
             }
           ],
