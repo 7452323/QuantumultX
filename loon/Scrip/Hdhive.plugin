@@ -1,1 +1,16 @@
-IyFuYW1lPVJFMOetvuWIsAojIWRlc2M9UkUwKHJlMC5tZe+8jOWOn0hESGl2ZeW9seW3oikg5q+P5pel562+5YiwL+i1jOeLl+etvuWIsCDigJQgTmV4dC5qcyBTZXJ2ZXIgQWN0aW9uIOWNj+iuru+8iOWFjSBYLUhESCDnrb7lkI3vvIl2My4wLjDvvJtyZTBfbW9kZT1ub3JtYWwg5q+P5pel562+5YiwIC8gZ2FtYmxlciDotYzni5fnrb7liLDvvIjmr4/lpKnkuozpgInkuIDvvIkKIyFhdXRob3I9NzQ1MjMyMwojIWhvbWVwYWdlPWh0dHBzOi8vZ2l0aHViLmNvbS83NDUyMzIzL1F1YW50dW11bHRYCiMhdGFnPVJFMCznrb7liLAs6LWM54uXCgpbQXJndW1lbnRdCnJlMF9hY2NvdW50cyA9IGlucHV0LCAiLS0iLCB0YWcgPSBSRTDotKblj7csIGRlc2MgPSB1c2VyI3Bhc3PvvIzlpJrotKblj7fnlKggJiDov57mjqXvvJvloasgLS0g5YiZ6K+75oyB5LmF5YyW5a2Y5YKoIHJlMF9hY2NvdW50cwpyZTBfbW9kZSA9IGlucHV0LCAibm9ybWFsIiwgdGFnID0g562+5Yiw5qih5byPLCBkZXNjID0gbm9ybWFsIOavj+aXpeetvuWIsCAvIGdhbWJsZXIg6LWM54uX562+5Yiw77yM5q+P5aSp5Y+q6IO95LqM6YCJ5LiACgpbU2NyaXB0XQpodHRwLXJlcXVlc3QgXmh0dHBzPzpcL1wvcmUwXC5tZSBzY3JpcHQtcGF0aD1odHRwczovL3Jhdy5naXRodWJ1c2VyY29udGVudC5jb20vNzQ1MjMyMy9RdWFudHVtdWx0WC9tYWluL3Rhc2svSGRoaXZlLmpzLCB0YWc9UkUwQ29va2llLCByZXF1aXJlLWJvZHk9ZmFsc2UKY3JvbiAiMjAgMCAqICogKiIgc2NyaXB0LXBhdGg9aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tLzc0NTIzMjMvUXVhbnR1bXVsdFgvbWFpbi90YXNrL0hkaGl2ZS5qcywgYXJndW1lbnQ9InJlMF9hY2NvdW50cz0ke3JlMF9hY2NvdW50c30scmUwX21vZGU9JHtyZTBfbW9kZX0iLCB0YWc9UkUw562+5YiwCgpbTUlUTV0KaG9zdG5hbWUgPSByZTAubWUK
+#!name=RE0签到
+#!desc=RE0(re0.me，原HDHive影巢) 每日签到/赌狗签到 — Next.js Server Action 协议（免 X-HDH 签名）v3.0.0；re0_mode=normal 每日签到 / gambler 赌狗签到（每天二选一）
+#!author=7452323
+#!homepage=https://github.com/7452323/QuantumultX
+#!tag=RE0,签到,赌狗
+
+[Argument]
+re0_accounts = input, "--", tag = RE0账号, desc = user#pass，多账号用 & 连接；填 -- 则读持久化存储 re0_accounts
+re0_mode = input, "normal", tag = 签到模式, desc = normal 每日签到 / gambler 赌狗签到，每天只能二选一
+
+[Script]
+http-request ^https?:\/\/re0\.me script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js, tag=RE0Cookie, require-body=false
+cron "20 0 * * *" script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js, argument="re0_accounts=${re0_accounts},re0_mode=${re0_mode}", tag=RE0签到
+
+[MITM]
+hostname = re0.me
