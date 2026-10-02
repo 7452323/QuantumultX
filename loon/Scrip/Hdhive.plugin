@@ -1,5 +1,5 @@
 #!name=RE0签到
-#!desc=RE0(re0.me，原HDHive影巢) 每日签到/赌狗签到 — Next.js Server Action 协议（免 X-HDH 签名）v3.0.0；re0_mode=normal 每日签到 / gambler 赌狗签到（每天二选一）
+#!desc=RE0(re0.me，原HDHive影巢) 每日签到/赌狗签到 — Next.js Server Action 协议（免 X-HDH 签名）v3.1.0；re0_mode=normal 每日签到 / gambler 赌狗签到（每天二选一）
 #!author=7452323
 #!homepage=https://github.com/7452323/QuantumultX
 #!tag=RE0,签到,赌狗
