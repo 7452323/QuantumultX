@@ -41,6 +41,7 @@ BoxJS: re0_accounts, re0_mode
 每日签到: POST /manager/account，action 藏在 manager layout chunk
 赌狗签到: POST /，action 藏在首页 (app) layout chunk（抓包 2026-10-02）
 action 自愈: 内置默认 id，失效时自动从 chunk 扫描刷新并缓存
+Cloudflare: 请求被验证拦截时直接报错并给处理方式（re0.me 设直连 / 浏览器过验证后靠 RE0Cookie 重写自动抓 Cookie）
 */
 
 const scriptName = 'RE0签到';
@@ -75,6 +76,14 @@ const DEF_LOGIN_ACTION = '60fa5517c023301ab84757ba19fd91f0ef5cc482dd';   // crea
 const DEF_CHECKIN_ACTION = '4004fe56299e6451fc007a19f6df5f592551ab9c78'; // 每日签到：manager layout chunk 的 checkIn
 const DEF_GAMBLER_ACTION = '409c3461f006f9de5e010af69e072690dd8b736acd'; // 赌狗签到：首页 (app) layout chunk 的 checkIn，抓包 2026-10-02
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
+// 浏览器指纹头：缺 sec-ch-ua / Sec-Fetch-* 的请求更容易被 Cloudflare 拦
+const BROWSER_HEADERS = {
+  'Accept-Language': 'zh-CN,zh;q=0.9',
+  'sec-ch-ua': '"Chromium";v="125", "Not.A/Brand";v="24", "Google Chrome";v="125"',
+  'sec-ch-ua-mobile': '?0',
+  'sec-ch-ua-platform': '"Windows"',
+};
+const CF_HINT = 'Cloudflare 人机验证拦截：请将 re0.me 设为直连（DIRECT）后重试；或在浏览器打开 re0.me 通过验证（保持 RE0Cookie 重写开启以自动抓取 Cookie）后再跑脚本';
 const cacheLoginKey = 're0_cache_login_action';
 const cacheCheckinKey = 're0_cache_checkin_action';
 const cacheGamblerKey = 're0_cache_gambler_action';
@@ -129,6 +138,9 @@ function httpReq(opts, method = 'GET') {
   return new Promise((resolve, reject) => {
     const done = (err, status, headers, body) => {
       if (err) return reject(new Error(err));
+      const hkeys = Object.keys(headers || {});
+      const cfHit = hkeys.some(k => k.toLowerCase() === 'cf-mitigated') || /Just a moment|cf-challenge/i.test(body || '');
+      if (cfHit) return reject(new Error(`${CF_HINT}（HTTP ${status}）`));
       resolve({ status, headers: headers || {}, body });
     };
     if (typeof $task !== 'undefined') {
@@ -175,8 +187,8 @@ class Re0Worker {
   saveMeta(m) { $.setdata(JSON.stringify(m), `re0_meta_${this.tag}`); }
 
   async req(method, path, { headers = {}, body = '', accept } = {}) {
-    const h = { 'User-Agent': UA, 'Accept-Language': 'zh-CN,zh;q=0.9', ...headers };
-    if (accept) h['Accept'] = accept;
+    const h = { 'User-Agent': UA, ...BROWSER_HEADERS, ...headers };
+    if (accept && !h['Accept']) h['Accept'] = accept;
     if (Object.keys(this.jar).length) h['Cookie'] = cookieString(this.jar);
     if (body !== '') h['Content-Type'] = h['Content-Type'] || 'text/plain;charset=UTF-8';
     const r = await httpReq({ url: this.base + path, headers: h, body }, method);
@@ -184,11 +196,25 @@ class Re0Worker {
     for (const k of hkeys) { if (k.toLowerCase() === 'set-cookie') { mergeSetCookie(this.jar, r.headers[k]); break; } }
     return r;
   }
-  get(path, accept = 'text/html') { return this.req('GET', path, { accept }); }
+  // accept=text/html 走完整导航头；RSC 预取走 cors 头
+  get(path, accept = 'text/html', site = 'same-origin') {
+    const nav = accept === 'text/html' ? {
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+      'Upgrade-Insecure-Requests': '1',
+      'Sec-Fetch-Dest': 'document',
+      'Sec-Fetch-Mode': 'navigate',
+      'Sec-Fetch-Site': site,
+      'Sec-Fetch-User': '?1',
+    } : { 'Sec-Fetch-Dest': 'empty', 'Sec-Fetch-Mode': 'cors', 'Sec-Fetch-Site': 'same-origin' };
+    return this.req('GET', path, { headers: nav, accept });
+  }
   post(path, body, actionId) {
     return this.req('POST', path, {
       body,
-      headers: { 'Accept': 'text/x-component', 'Origin': this.base, 'Referer': this.base + path, 'next-action': actionId },
+      headers: {
+        'Accept': 'text/x-component', 'Origin': this.base, 'Referer': this.base + path, 'next-action': actionId,
+        'Sec-Fetch-Dest': 'empty', 'Sec-Fetch-Mode': 'cors', 'Sec-Fetch-Site': 'same-origin',
+      },
     });
   }
   cookieNow() { return cookieString(this.jar); }
@@ -197,7 +223,7 @@ class Re0Worker {
   async login() {
     const action = this.ids.login;
     if (!action) throw new Error('未取得 login action');
-    await this.get('/login?redirect=/');   // 绑定 hdh_sa_token
+    await this.get('/login?redirect=/', 'text/html', Object.keys(this.jar).length ? 'same-origin' : 'none');   // 绑定 hdh_sa_token
     const payload = JSON.stringify([{ username: this.username, password: b64(this.password), password_transport: 'base64' }, '/']);
     const r = await this.post('/login?redirect=/', payload, action);
     const hasToken = !!this.jar['token'];
@@ -275,7 +301,13 @@ function scanActionId(text, name) {
   return m ? m[1] : '';
 }
 async function fetchText(base, path, { accept, cookie } = {}) {
-  const h = { 'User-Agent': UA, 'Accept': accept || 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' };
+  const h = {
+    'User-Agent': UA, ...BROWSER_HEADERS,
+    'Accept': accept || 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Sec-Fetch-Dest': /\.js$/.test(path) ? 'script' : 'document',
+    'Sec-Fetch-Mode': /\.js$/.test(path) ? 'no-cors' : 'navigate',
+    'Sec-Fetch-Site': 'same-origin',
+  };
   if (cookie) h['Cookie'] = cookie;
   const r = await httpReq({ url: base + path, headers: h, body: '' }, 'GET');
   return r.body || '';
