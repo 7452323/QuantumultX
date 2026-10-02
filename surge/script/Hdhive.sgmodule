@@ -1,1 +1,12 @@
-IyFuYW1lPVJFMOetvuWIsAojIWRlc2M9UkUwKHJlMC5tZe+8jOWOn0hESGl2ZeW9seW3oikg5q+P5pel562+5YiwL+i1jOeLl+etvuWIsCDigJQgTmV4dC5qcyBTZXJ2ZXIgQWN0aW9uIOWNj+iuru+8iOWFjSBYLUhESCDnrb7lkI3vvIl2My4wLjDvvJvnrb7liLDmqKHlvI8gbm9ybWFsL2dhbWJsZXIg5q+P5aSp5LqM6YCJ5LiACiMhYXV0aG9yPTc0NTIzMjMKIyFhcmd1bWVudHM9UkUw6LSm5Y+3Oi0tLOetvuWIsOaooeW8jzpub3JtYWwKIyFhcmd1bWVudHMtZGVzYz1SRTDotKblj7floasgdXNlciNwYXNz77yM5aSa6LSm5Y+355SoICYg6L+e5o6l77yM5aGrIC0tIOWImeivu+aMgeS5heWMluWtmOWCqCByZTBfYWNjb3VudHPvvJvnrb7liLDmqKHlvI/loasgbm9ybWFsIOavj+aXpeetvuWIsCDmiJYgZ2FtYmxlciDotYzni5fnrb7liLDvvIjmr4/lpKnlj6rog73kuozpgInkuIDvvIkKCltTY3JpcHRdClJFMOetvuWIsCA9IHR5cGU9Y3JvbiwgY3JvbmV4cD0iMjAgMCAqICogKiIsIHNjcmlwdC1wYXRoPWh0dHBzOi8vcmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbS83NDUyMzIzL1F1YW50dW11bHRYL21haW4vdGFzay9IZGhpdmUuanMsIGFyZ3VtZW50PSJyZTBfYWNjb3VudHM9e3t7UkUw6LSm5Y+3fX19LHJlMF9tb2RlPXt7e+etvuWIsOaooeW8j319fSIKUkUwQ29va2llID0gdHlwZT1odHRwLXJlcXVlc3QsIHBhdHRlcm49Xmh0dHBzPzpcL1wvcmUwXC5tZSwgc2NyaXB0LXBhdGg9aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tLzc0NTIzMjMvUXVhbnR1bXVsdFgvbWFpbi90YXNrL0hkaGl2ZS5qcwoKW01JVE1dCmhvc3RuYW1lID0gJUFQUEVORCUgcmUwLm1lCg==
+#!name=RE0签到
+#!desc=RE0(re0.me，原HDHive影巢) 每日签到/赌狗签到 — Next.js Server Action 协议（免 X-HDH 签名）v3.0.0；签到模式 normal/gambler 每天二选一
+#!author=7452323
+#!arguments=RE0账号:--,签到模式:normal
+#!arguments-desc=RE0账号填 user#pass，多账号用 & 连接，填 -- 则读持久化存储 re0_accounts；签到模式填 normal 每日签到 或 gambler 赌狗签到（每天只能二选一）
+
+[Script]
+RE0签到 = type=cron, cronexp="20 0 * * *", script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js, argument="re0_accounts={{{RE0账号}}},re0_mode={{{签到模式}}}"
+RE0Cookie = type=http-request, pattern=^https?:\/\/re0\.me, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js
+
+[MITM]
+hostname = %APPEND% re0.me
