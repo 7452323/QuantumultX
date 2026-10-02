@@ -34,7 +34,7 @@ hostname = re0.me
 
 变量: re0_accounts / re0_mode
 格式: user#pass （多账号用 & 分隔）
-模式: re0_mode=normal 每日签到（默认）/ gambler 赌狗签到
+模式: re0_mode=1 每日签到（默认）/ 2 赌狗签到
 BoxJS: re0_accounts, re0_mode
 
 签到协议: Next.js Server Action（免 X-HDH 签名），body 均为 [true]
@@ -82,12 +82,12 @@ const WANT_COOKIES = ['token', 'refresh_token', 'csrf_access_token', 'csrfaccess
 
 // ============ 配置 ============
 function getConfig() {
-  const modeRaw = (argValue('re0_mode') || $.getdata('re0_mode') || 'normal').toLowerCase();
+  const modeRaw = (argValue('re0_mode') || $.getdata('re0_mode') || '1').toLowerCase();
   return {
     base_url: (argValue('re0_base_url') || $.getdata('re0_base_url') || DEF_BASE).replace(/\/+$/, ''),
     accounts: argValue('re0_accounts') || $.getdata(ckName) || '',
     cookie: argValue('re0_cookie') || $.getdata('re0_cookie') || '',
-    mode: /gambl|赌狗|^gg$/.test(modeRaw) ? 'gambler' : 'normal',
+    mode: /^(2|gambler|gg|赌狗)$/.test(modeRaw) ? 'gambler' : 'normal',
     login_action: argValue('re0_login_action') || '',
     checkin_action: argValue('re0_checkin_action') || '',
     gambler_action: argValue('re0_gambler_action') || '',
