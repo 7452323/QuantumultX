@@ -36,7 +36,7 @@ hostname = re0.me
 格式: user#pass （多账号用 & 分隔；第三段可带 Cookie：user#pass#cookie）
 模式: re0_mode=1 每日签到（默认）/ 2 赌狗签到
 BoxJS: re0_accounts, re0_mode
-免密: 开启 RE0Cookie 重写后，在浏览器打开 re0.me（登录态）自动抓取 Cookie 存入 re0_cookie，定时任务免密签到；抓到的 Cookie 含 cf_clearance，可顺带过 Cloudflare；免密与账号密码相互独立都会跑（重复签到服务端返回已签到）
+免密: 开启 RE0Cookie 重写后，在浏览器打开 re0.me（登录态）自动抓取 Cookie 存入 re0_cookie（抓取时自动验证有效性，无效不存）；抓到的 Cookie 含 cf_clearance，可顺带过 Cloudflare；浏览器与脚本需走同一代理节点；有有效免密 Cookie 时密码登录被 CF 拦截会自动跳过
 
 签到协议: Next.js Server Action（免 X-HDH 签名），body 均为 [true]
 每日签到: POST /manager/account，action 藏在 manager layout chunk
@@ -84,7 +84,7 @@ const BROWSER_HEADERS = {
   'sec-ch-ua-mobile': '?0',
   'sec-ch-ua-platform': '"Windows"',
 };
-const CF_HINT = 'Cloudflare 人机验证拦截：请将 re0.me 设为直连（DIRECT）后重试；或在浏览器打开 re0.me 通过验证（保持 RE0Cookie 重写开启以自动抓取 Cookie）后再跑脚本';
+const CF_HINT = 'Cloudflare 人机验证拦截：在浏览器打开 re0.me 通过验证，脚本会自动抓取含 cf_clearance 的 Cookie（需开启 RE0Cookie 重写）；浏览器与脚本需走同一代理节点，切换节点后需重新抓取';
 const cacheLoginKey = 're0_cache_login_action';
 const cacheCheckinKey = 're0_cache_checkin_action';
 const cacheGamblerKey = 're0_cache_gambler_action';
@@ -363,19 +363,29 @@ async function discoverGamblerAction(base) {
 }
 
 // ============ MITM采集 ============
+// 抓到 Cookie 后先实地验证：JWT 未过期 + 带它请求一次首页能通过（非 CF 拦截），才算成功
 async function captureCookie() {
   try {
     const h = ($request && $request.headers) || {};
     const ck = h['Cookie'] || h['cookie'] || '';
     if (!ck) return;
+    const seenKey = 're0_cookie_seen';
+    if ($.getdata(seenKey) === ck) return;   // 同一个 Cookie 只处理一次，不重复验证
+    $.setdata(ck, seenKey);
     const m = parseCookiesToMap(ck);
-    if (!m['token']) return;   // 只要带 token 的完整登录态
+    if (!m['token']) { $.log('[RE0] 抓到 Cookie 但无 token，忽略'); return; }
+    if (tokenExpired(m['token'])) { $.log('[RE0] 抓到过期 Cookie，忽略'); return; }
+    const base = (argValue('re0_base_url') || $.getdata('re0_base_url') || 'https://re0.me').replace(/\/+$/, '');
+    await httpReq({ url: base + '/', headers: { 'User-Agent': UA, ...BROWSER_HEADERS, 'Cookie': ck } }, 'GET');
     const old = $.getdata('re0_cookie') || '';
     if (old !== ck) {
       $.setdata(ck, 're0_cookie');
-      $.msg(scriptName, 'Cookie采集成功', '');
+      $.msg(scriptName, 'Cookie采集成功', '已验证有效');
     }
-  } catch (e) { $.logErr(e); }
+  } catch (e) {
+    if (/Cloudflare 人机验证/.test(fmtErr(e))) $.log('[RE0] 抓到的 Cookie 未通过验证（CF 拦截），已忽略');
+    else $.logErr(e);
+  }
 }
 
 // ============ 主流程 ============
@@ -409,6 +419,10 @@ async function captureCookie() {
     gambler: CONFIG.gambler_action || $.getdata(cacheGamblerKey) || DEF_GAMBLER_ACTION,
   };
 
+  // 全局免密 Cookie 有效时，密码登录若被 CF 拦截则静默跳过（免密已覆盖，不再弹失败通知）
+  const _ckMap = parseCookiesToMap(CONFIG.cookie || '');
+  const cookieValid = !!(_ckMap['token'] && !tokenExpired(_ckMap['token']));
+
   for (const acc of accounts) {
     try {
       const w = new Re0Worker(CONFIG.base_url, acc.username, acc.password, acc.cookie || '', ids, mode);
@@ -418,7 +432,12 @@ async function captureCookie() {
         try {
           await w.login();
         } catch (e) {
-          if (!/action|Action/.test(fmtErr(e))) throw e;
+          const emsg = fmtErr(e);
+          if (/Cloudflare 人机验证/.test(emsg) && cookieValid) {
+            $.log(`[RE0] ${acc.username} 密码登录被 CF 拦截，已有有效免密 Cookie，跳过`);
+            continue;
+          }
+          if (!/action|Action/.test(emsg)) throw e;
           const nid = await discoverLoginAction(CONFIG.base_url).catch(() => '');
           if (!nid) throw e;
           $.log(`[RE0] login action 已刷新: ${nid}`);
