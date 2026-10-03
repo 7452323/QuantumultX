@@ -4,9 +4,10 @@ RE0(影巢) 签到 — re0.me
 Cookie 变量：re0_cookie
 账号变量：re0_accounts（user#pass，多账号用 & 分隔）
 模式变量：re0_mode（1 每日签到 / 2 赌狗签到，每天二选一）
+UA 变量：re0_ua（可选，一般不用填——开 Cookie 重写时会自动记下浏览器的 UA）
 
-认证：re0_cookie 有效则免密直签；否则用账号密码登录，登录后 Cookie 缓存复用。
-cf_clearance 绑定出网 IP —— 浏览器抓 Cookie 时需与脚本走同一节点。
+认证：re0_cookie 有效则免密直签，失败自动回落账号密码登录；登录后 Cookie 缓存复用。
+cf_clearance 与出网 IP + UA 双向绑定 —— 抓 Cookie 的浏览器需与脚本走同一节点，UA 由脚本自动记录。
 
 [rewrite_local]
 ^https?:\/\/re0\.me url script-request-header https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js
@@ -25,13 +26,10 @@ function Env(t,e){class s{constructor(t){this.env=t}send(t,e="GET"){t="string"==
 
 // ============ 常量 ============
 const BASE = 'https://re0.me';
-const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
-const BROWSER_HEADERS = {
-  'Accept-Language': 'zh-CN,zh;q=0.9',
-  'sec-ch-ua': '"Chromium";v="125", "Not.A/Brand";v="24", "Google Chrome";v="125"',
-  'sec-ch-ua-mobile': '?0',
-  'sec-ch-ua-platform': '"Windows"',
-};
+// cf_clearance 与 UA 绑定：抓 Cookie 时脚本会把浏览器 UA 记到 re0_ua，这里只是兜底
+const UA_DEFAULT = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.0 Mobile/15E148 Safari/604.1';
+let UA = UA_DEFAULT;
+const HEADERS = { 'Accept-Language': 'zh-CN,zh-Hans;q=0.9' };
 const KEEP = ['token', 'refresh_token', 'csrf_access_token', 'hdh_uid', 'hdh_sa_token', 'cf_clearance'];
 
 // Next.js Server Action id，随站点构建变化；失效时自动重扫 chunk 刷新
@@ -47,7 +45,7 @@ const ACTION_SOURCE = {
   checkin: { page: '/manager/account', chunk: 'app/manager/layout-', fn: 'checkIn' },
   gambler: { page: '/', chunk: 'app/\\(app\\)/layout-', fn: 'checkIn' },
 };
-const CF_HINT = 'Cloudflare 拦截：Cookie 需含 cf_clearance，且与浏览器同一出网 IP';
+const CF_HINT = 'Cloudflare 403：cf_clearance 与出网 IP + UA 绑定，需与抓 Cookie 的浏览器同节点';
 
 // ============ 工具 ============
 const BLANK = ['--', '-', 'none', 'null', '无', '空'];
@@ -161,7 +159,7 @@ class Re0 {
   set meta(m) { $.setdata(JSON.stringify(m), this.metaKey); }
 
   async req(method, path, headers = {}, body = '') {
-    const h = { 'User-Agent': UA, ...BROWSER_HEADERS, ...headers };
+    const h = { 'User-Agent': UA, ...HEADERS, ...headers };
     if (Object.keys(this.jar).length) h['Cookie'] = cookieStr(this.jar);
     if (body) h['Content-Type'] = 'text/plain;charset=UTF-8';
     const r = await http({ url: this.base + path, headers: h, body }, method);
@@ -245,7 +243,7 @@ function actionFrom(js, fn) {
 async function discover(kind, jar, base) {
   const s = ACTION_SOURCE[kind];
   const h = {
-    'User-Agent': UA, ...BROWSER_HEADERS, 'Accept': 'text/html',
+    'User-Agent': UA, ...HEADERS, 'Accept': 'text/html',
     'Sec-Fetch-Dest': 'document', 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Site': 'same-origin',
   };
   if (Object.keys(jar).length) h['Cookie'] = cookieStr(jar);
@@ -269,9 +267,62 @@ function captureCookie() {
     }
     return;
   }
+  // cf_clearance 与 UA 绑定，必须连 UA 一起存，否则定时任务必吃 403
+  const ua = h['User-Agent'] || h['user-agent'] || '';
+  if (ua) $.setdata(ua, 're0_ua');
   if ($.getdata('re0_cookie') === ck) return;
   $.setdata(ck, 're0_cookie');
   $.msg('RE0签到', 'Cookie已抓取', '定时任务将使用免密签到');
+}
+
+// ============ 单账号执行 ============
+async function runAccount(acc, ids, mode, key, modeName) {
+  const w = new Re0(BASE, acc, ids, mode);
+
+  if (acc.password) {
+    const cached = validCookie(w.meta.cookie || '');
+    if (cached) { w.jar = cached; $.log(`[RE0] ${acc.username} 复用缓存 Cookie`); }
+    else await w.login();
+  } else if (!validCookie(cookieStr(w.jar))) {
+    throw new Error('Cookie 无效或已过期：请在浏览器重新登录 re0.me');
+  }
+
+  let resp = await w.checkIn();
+  let r = parseResult(resp);
+
+  // action 疑似失效 → 重扫 chunk 后重试一次
+  if (!r.already && /action|Action|未知/.test(r.msg)) {
+    const nid = await discover(key, w.jar, BASE).catch(() => '');
+    if (nid && nid !== ids[key]) {
+      ids[key] = nid; w.ids[key] = nid;
+      $.setdata(nid, ACTION_CACHE[key]);
+      $.log(`[RE0] ${modeName} action 已刷新: ${nid}`);
+      r = parseResult(await w.checkIn());
+    }
+  }
+
+  const pf = parseProfile(resp.body);
+  const name = pf.nickname || acc.username;
+  const extra = pf.points != null ? ` ${pf.points}${(!r.already && r.gained) ? '+' + r.gained : ''}` : '';
+  w.meta = { cookie: cookieStr(w.jar), display: name, points: pf.points };
+
+  if (r.already) return { ok: true, line: `「${name}」重复签到${extra}` };
+  if (r.ok) return { ok: true, line: `「${name}」签到成功${extra}` };
+  return { ok: false, line: `「${name}」签到失败 ${r.msg}` };
+}
+async function runAll(accounts, ids, mode, key, modeName) {
+  const out = [];
+  let ok = 0;
+  for (const acc of accounts) {
+    try {
+      const r = await runAccount(acc, ids, mode, key, modeName);
+      out.push(r.line);
+      if (r.ok) ok++;
+    } catch (e) {
+      out.push(`「${acc.username}」${fmtErr(e)}`);
+    }
+  }
+  return { out, ok };
 }
 
 // ============ 主流程 ============
@@ -282,19 +333,18 @@ function captureCookie() {
   const modeName = mode === 'gambler' ? '赌狗签到' : '每日签到';
   const rawAccounts = argValue('re0_accounts') || $.getdata('re0_accounts') || '';
   const rawCookie = argValue('re0_cookie') || $.getdata('re0_cookie') || '';
+  UA = argValue('re0_ua') || $.getdata('re0_ua') || UA_DEFAULT;
 
   const listed = rawAccounts.split('&').map(s => s.trim()).filter(Boolean).map(item => {
     const p = item.split('#');
     return { username: p[0].trim(), password: (p[1] || '').trim() };
   });
-  // 免密优先：全局 Cookie 有效就不走密码登录
   const gMap = validCookie(rawCookie);
-  const accounts = gMap ? [{ username: 'cookie', password: '', cookie: rawCookie }] : listed;
-  if (!accounts.length) {
+  if (!gMap && !listed.length) {
     $.msg('RE0签到', '❌ 未配置账号', '填 re0_accounts（user#pass）或开 Cookie 重写后浏览器打开 re0.me');
     return;
   }
-  $.log(`[RE0] ${modeName}，${accounts.length} 个账号${gMap ? '（免密）' : ''}`);
+  $.log(`[RE0] ${modeName}｜免密 Cookie ${gMap ? '有效' : '无'}｜账号 ${listed.length} 个`);
 
   const ids = {
     login: $.getdata(ACTION_CACHE.login) || ACTION_DEFAULT.login,
@@ -302,45 +352,17 @@ function captureCookie() {
     gambler: $.getdata(ACTION_CACHE.gambler) || ACTION_DEFAULT.gambler,
   };
   const key = mode === 'gambler' ? 'gambler' : 'checkin';
-  const out = [];
 
-  for (const acc of accounts) {
-    try {
-      const w = new Re0(BASE, acc, ids, mode);
-
-      if (acc.password) {
-        const cached = validCookie(w.meta.cookie || '');
-        if (cached) { w.jar = cached; $.log(`[RE0] ${acc.username} 复用缓存 Cookie`); }
-        else await w.login();
-      } else if (!validCookie(cookieStr(w.jar))) {
-        throw new Error('Cookie 无效或已过期：请在浏览器重新登录 re0.me');
-      }
-
-      let resp = await w.checkIn();
-      let r = parseResult(resp);
-
-      // action 疑似失效 → 重扫 chunk 后重试一次
-      if (!r.already && /action|Action|未知/.test(r.msg)) {
-        const nid = await discover(key, w.jar, BASE).catch(() => '');
-        if (nid && nid !== ids[key]) {
-          ids[key] = nid; w.ids[key] = nid;
-          $.setdata(nid, ACTION_CACHE[key]);
-          $.log(`[RE0] ${modeName} action 已刷新: ${nid}`);
-          r = parseResult(await w.checkIn());
-        }
-      }
-
-      const pf = parseProfile(resp.body);
-      const name = pf.nickname || acc.username;
-      const extra = pf.points != null ? ` ${pf.points}${(!r.already && r.gained) ? '+' + r.gained : ''}` : '';
-      if (r.already) out.push(`「${name}」重复签到${extra}`);
-      else if (r.ok) out.push(`「${name}」签到成功${extra}`);
-      else out.push(`「${name}」签到失败 ${r.msg}`);
-
-      w.meta = { cookie: cookieStr(w.jar), display: name, points: pf.points };
-    } catch (e) {
-      out.push(`「${acc.username}」${fmtErr(e)}`);
+  let out, ok;
+  if (gMap) {
+    ({ out, ok } = await runAll([{ username: 'cookie', password: '', cookie: rawCookie }], ids, mode, key, modeName));
+    if (!ok && listed.length) {   // 免密挂了（过期/CF）→ 回落账号密码
+      $.log('[RE0] 免密直签失败，回落账号密码登录');
+      const r2 = await runAll(listed, ids, mode, key, modeName);
+      out = out.concat(r2.out); ok = r2.ok;
     }
+  } else {
+    ({ out, ok } = await runAll(listed, ids, mode, key, modeName));
   }
   $.msg('RE0签到', '', out.join('\n'));
 })()
