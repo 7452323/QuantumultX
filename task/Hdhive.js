@@ -10,6 +10,7 @@
 [Script]
 RE0签到 = type=cron, cronexp="20 0 * * *", script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js, argument="re0_accounts={{{RE0账号}}},re0_mode={{{签到模式}}}"
 RE0Cookie = type=http-request, pattern=^https?:\/\/re0\.me, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js
+RE0AutoCheckin = type=http-response, pattern=^https?:\/\/re0\.me(\/|\/manager\/account)(\?.*)?$, script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js, requires-body=true, argument="re0_mode={{{签到模式}}}"
 
 [MITM]
 hostname = %APPEND% re0.me
@@ -17,6 +18,7 @@ hostname = %APPEND% re0.me
 # Loon
 [Script]
 http-request ^https?:\/\/re0\.me script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js, tag=RE0Cookie, require-body=false
+http-response ^https?:\/\/re0\.me(\/|\/manager\/account)(\?.*)?$ script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js, requires-body=true, argument="re0_mode=${re0_mode}", tag=RE0AutoCheckin
 cron "20 0 * * *" script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js, argument="re0_accounts=${re0_accounts},re0_mode=${re0_mode}", tag=RE0签到
 
 [MITM]
@@ -28,6 +30,7 @@ hostname = re0.me
 
 [rewrite_local]
 ^https?:\/\/re0\.me url script-request-header https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js
+^https?:\/\/re0\.me(\/|\/manager\/account)(\?.*)?$ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js, tag=RE0AutoCheckin
 
 [MITM]
 hostname = re0.me
@@ -36,6 +39,7 @@ hostname = re0.me
 格式: user#pass（多账号用 & 分隔）
 模式: re0_mode=1 每日签到（默认）/ 2 赌狗签到
 免密: 开 RE0Cookie 重写 → 浏览器打开 re0.me（登录态）→ 自动抓取存入 re0_cookie；有有效免密 Cookie 时跳过所有密码登录（免密优先）
+自动签到: 开 RE0AutoCheckin 响应重写 → 每天首次打开 re0.me 首页 / 账号页时，页面内自动发签到请求（真浏览器指纹，不过 CF 验证），结果经上报信标回传通知
 缓存: 密码登录成功后 Cookie 缓存复用，过期自动重登（移植旧版 py 逻辑）
 注意: 浏览器与脚本需走同一代理节点（cf_clearance 绑定出网 IP）；切换节点后重新抓取
 排查: 抓不到 Cookie 请检查 ①重写已启用 ②MITM 开启且 hostname 含 re0.me ③证书已信任 ④浏览器里已登录
@@ -95,12 +99,11 @@ const WANT_COOKIES = ['token', 'refresh_token', 'csrf_access_token', 'csrfaccess
 
 // ============ 配置 ============
 function getConfig() {
-  const modeRaw = (argValue('re0_mode') || $.getdata('re0_mode') || '1').toLowerCase();
   return {
     base_url: (argValue('re0_base_url') || $.getdata('re0_base_url') || DEF_BASE).replace(/\/+$/, ''),
     accounts: argValue('re0_accounts') || $.getdata(ckName) || '',
     cookie: argValue('re0_cookie') || $.getdata('re0_cookie') || '',
-    mode: /^(2|gambler|gg|赌狗)$/.test(modeRaw) ? 'gambler' : 'normal',
+    mode: parseMode(),
     login_action: argValue('re0_login_action') || '',
     checkin_action: argValue('re0_checkin_action') || '',
     gambler_action: argValue('re0_gambler_action') || '',
@@ -388,11 +391,94 @@ async function captureCookie() {
   $.msg(scriptName, 'Cookie已抓取', '定时任务将使用免密签到');
 }
 
+// ============ 浏览器内自动签到 ============
+// 原理：代理脚本的网络栈过不了 CF 人机验证（真浏览器可透明通过），
+// 所以把签到请求放到页面里发：http-response 重写向 re0.me 首页/账号页注入一段 JS，
+// 它用浏览器自己的指纹 + Cookie 发签到 POST，结果经上报信标回传通知。
+const REPORT_PATH = '/__re0_report';
+const INJECT_TEMPLATE = `<script>(function(){try{
+var MODE="__MODE__",URL="__URL__",CACHED="__ACTION__";
+var DAY=new Date().toISOString().slice(0,10),KEY="re0_auto_"+MODE+"_"+DAY;
+if(localStorage.getItem(KEY))return;
+function rep(ok,msg){try{fetch("https://re0.me/__re0_report?mode="+MODE+"&ok="+(ok?"1":"0")+"&msg="+encodeURIComponent(String(msg||"").slice(0,150))).catch(function(){})}catch(e){}}
+function pmsg(t){var m=String(t||"").match(/"message":"([^"]*)"/);return m?m[1]:"";}
+function post(a){return fetch(URL,{method:"POST",credentials:"same-origin",headers:{"Content-Type":"text/plain;charset=UTF-8","Accept":"text/x-component","Next-Action":a},body:"[true]"}).then(function(r){return r.text();});}
+function disc(){
+  var page=MODE==="gambler"?"/":"/manager/account",pat=MODE==="gambler"?/\\(app\\)\\/layout-/:/manager\\/layout-/;
+  return fetch(page,{credentials:"same-origin"}).then(function(r){return r.text();}).then(function(html){
+    var re=/\\/_next\\/static\\/chunks\\/[^"'\\s]*?\\.js/g,m,u="";
+    while((m=re.exec(html))){if(pat.test(m[0])){u=m[0];break;}}
+    if(!u)throw new Error("chunk_not_found");
+    return fetch(u,{credentials:"same-origin"}).then(function(r){return r.text();});
+  }).then(function(js){
+    var m=js.match(/createServerReference\\)\\s*\\(\\s*["']([^"']+)["'][^)]*?,\\s*["']checkIn["']/);
+    if(!m)throw new Error("action_not_found");
+    return m[1];
+  });
+}
+function att(a){return post(a).then(function(t){var m=pmsg(t);return{msg:m,ok:/签到成功/.test(m),done:/已签到|签到过/.test(m)};});}
+function fin(r){localStorage.setItem(KEY,"1");rep(r.ok||r.done,r.msg||(r.ok?"签到成功":"请检查登录态"));}
+(CACHED?att(CACHED):disc().then(att)).then(function(r){
+  if(r.ok||r.done){fin(r);return;}
+  return disc().then(att).then(fin);
+}).catch(function(e){rep(false,e.message||"失败");});
+}catch(e){}})();</script>`;
+
+function todayStr(d) {
+  d = d || new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+function parseMode() {
+  const raw = (argValue('re0_mode') || $.getdata('re0_mode') || '1').toLowerCase();
+  return /^(2|gambler|gg|赌狗)$/.test(raw) ? 'gambler' : 'normal';
+}
+function parseQuery(url) {
+  const q = {};
+  const i = (url || '').indexOf('?');
+  if (i < 0) return q;
+  url.slice(i + 1).split('&').forEach(p => {
+    const j = p.indexOf('=');
+    if (j > 0) { try { q[p.slice(0, j)] = decodeURIComponent(p.slice(j + 1)); } catch (e) { q[p.slice(0, j)] = p.slice(j + 1); } }
+  });
+  return q;
+}
+// http-response：向页面注入自动签到脚本
+async function injectCheckin() {
+  try {
+    const url = ($request && $request.url) || '';
+    if (url.includes(REPORT_PATH)) return $done({});   // 上报信标不注入
+    const st = $response.status || $response.statusCode || 0;
+    const hdrs = $response.headers || {};
+    const ctype = hdrs['Content-Type'] || hdrs['content-type'] || '';
+    let body = $response.body || '';
+    if (st !== 200 || !/text\/html/i.test(ctype) || !/<\/body>/i.test(body)) return $done({});
+    const mode = parseMode();
+    const action = $.getdata(mode === 'gambler' ? cacheGamblerKey : cacheCheckinKey) || '';
+    const js = INJECT_TEMPLATE.split('__MODE__').join(mode).split('__ACTION__').join(action).split('__URL__').join(mode === 'gambler' ? 'https://re0.me/' : 'https://re0.me/manager/account');
+    body = body.replace(/<\/body>/i, js + '</body>');
+    return $done({ body });
+  } catch (e) { return $done({}); }
+}
+// http-request：接收页面内签到的上报
+async function reportCheckin() {
+  try {
+    const q = parseQuery(($request && $request.url) || '');
+    const mode = q.mode === 'gambler' ? 'gambler' : 'normal';
+    const modeName = mode === 'gambler' ? '赌狗签到' : '每日签到';
+    const ok = q.ok === '1';
+    $.setdata('1', 're0_done_' + todayStr());
+    $.msg(scriptName, (ok ? '✅ ' : '❌ ') + modeName + '（浏览器）', q.msg || '');
+  } catch (e) { $.logErr(e); }
+  return $done({});
+}
+
 // ============ 主流程 ============
 !(async () => {
-  if (typeof $request !== 'undefined') {
-    await captureCookie();
-    return;
+  if (typeof $response !== 'undefined' && $response) { await injectCheckin(); return; }
+  if (typeof $request !== 'undefined' && $request) {
+    if ((($request.url) || '').includes(REPORT_PATH)) { await reportCheckin(); return; }
+    await captureCookie(); return;
   }
 
   const CONFIG = getConfig();
@@ -500,11 +586,19 @@ async function captureCookie() {
       // 持久化 Cookie（供下次复用 / 展示）
       meta.cookie = w.cookieNow(); meta.display = nickname; meta.points = pf.points; w.saveMeta(meta);
 
+      if (r.isAlready || r.ok) $.setdata('1', 're0_done_' + todayStr());
       if (r.isAlready) notifyMsg.push(`「${nickname}」⏭️ 今日已签到${extra}`);
       else if (r.ok) notifyMsg.push(`「${nickname}」${modeIcon} ${r.message || (modeName + '成功')}${extra}`);
       else notifyMsg.push(`「${nickname}」❌ ${modeName}失败：${r.message || ''}`);
     } catch (e) {
-      notifyMsg.push(`「${acc.username}」执行失败: ${fmtErr(e)}`);
+      const emsg = fmtErr(e);
+      if (/Cloudflare 人机验证/.test(emsg)) {
+        // 脚本直连过不了 CF 验证：浏览器已签到则静默，否则提醒去浏览器完成
+        if ($.getdata('re0_done_' + todayStr())) $.log('[RE0] 今日已通过浏览器签到');
+        else notifyMsg.push(`「RE0」⏰ ${modeName}待签到：浏览器打开 re0.me 即可自动完成`);
+      } else {
+        notifyMsg.push(`「${acc.username}」执行失败: ${emsg}`);
+      }
     }
   }
 
