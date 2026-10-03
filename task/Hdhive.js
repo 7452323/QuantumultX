@@ -36,13 +36,7 @@ hostname = re0.me
 格式: user#pass（多账号用 & 分隔）
 BoxJS: re0_accounts / re0_cookie / re0_mode
 
-re0_accounts: 账号密码，填了才能免 Cookie 登录
-re0_cookie:   打开 re0.me 自动抓取，7 天有效；优先免密直签，失效自动回落账号密码
-re0_mode:     1 = 每日签到（默认），2 = 赌狗签到（两者每天只能二选一）
-re0_ua:       抓 Cookie 时自动记录浏览器 UA，一般不用填
 
-⚠️ cf_clearance 同时绑定出网 IP 和 UA：抓 Cookie 的浏览器必须与脚本走同一节点，
-   否则一律 Cloudflare 403。站点已常态化屏蔽大陆 IP，请确保节点为非大陆。
 */
 
 const scriptName = 'RE0签到';
