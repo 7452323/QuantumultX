@@ -32,17 +32,20 @@ hostname = re0.me
 [MITM]
 hostname = re0.me
 
-变量: re0_accounts / re0_mode
-格式: user#pass （多账号用 & 分隔；第三段可带 Cookie：user#pass#cookie）
+变量: re0_accounts / re0_mode / re0_cookie
+格式: user#pass（多账号用 & 分隔）
 模式: re0_mode=1 每日签到（默认）/ 2 赌狗签到
-BoxJS: re0_accounts, re0_mode
-免密: 开启 RE0Cookie 重写后，在浏览器打开 re0.me（登录态）自动抓取 Cookie 存入 re0_cookie（抓取时自动验证有效性，无效不存）；抓到的 Cookie 含 cf_clearance，可顺带过 Cloudflare；浏览器与脚本需走同一代理节点；有有效免密 Cookie 时密码登录被 CF 拦截会自动跳过
+免密: 开 RE0Cookie 重写 → 浏览器打开 re0.me（登录态）→ 自动抓取存入 re0_cookie；有有效免密 Cookie 时跳过所有密码登录（免密优先）
+缓存: 密码登录成功后 Cookie 缓存复用，过期自动重登（移植旧版 py 逻辑）
+注意: 浏览器与脚本需走同一代理节点（cf_clearance 绑定出网 IP）；切换节点后重新抓取
+排查: 抓不到 Cookie 请检查 ①重写已启用 ②MITM 开启且 hostname 含 re0.me ③证书已信任 ④浏览器里已登录
+BoxJS: re0_accounts, re0_mode, re0_cookie
 
 签到协议: Next.js Server Action（免 X-HDH 签名），body 均为 [true]
 每日签到: POST /manager/account，action 藏在 manager layout chunk
 赌狗签到: POST /，action 藏在首页 (app) layout chunk（抓包 2026-10-02）
 action 自愈: 内置默认 id，失效时自动从 chunk 扫描刷新并缓存
-Cloudflare: 请求被验证拦截时直接报错并给处理方式（re0.me 设直连 / 浏览器过验证后靠 RE0Cookie 重写自动抓 Cookie）
+Cloudflare: 请求被验证拦截时直接报错；用免密 Cookie（含 cf_clearance）可过验证
 */
 
 const scriptName = 'RE0签到';
@@ -88,7 +91,7 @@ const CF_HINT = 'Cloudflare 人机验证拦截：在浏览器打开 re0.me 通�
 const cacheLoginKey = 're0_cache_login_action';
 const cacheCheckinKey = 're0_cache_checkin_action';
 const cacheGamblerKey = 're0_cache_gambler_action';
-const WANT_COOKIES = ['token', 'refresh_token', 'csrf_access_token', 'csrfaccesstoken', 'hdh_uid', 'hdh_sa_token'];
+const WANT_COOKIES = ['token', 'refresh_token', 'csrf_access_token', 'csrfaccesstoken', 'hdh_uid', 'hdh_sa_token', 'cf_clearance'];
 
 // ============ 配置 ============
 function getConfig() {
@@ -132,6 +135,12 @@ function tokenExpired(token, skewSec = 60) {
   const exp = jwtExp(token);
   if (!exp) return false;   // 解析不出 exp 就不误判，交给服务端
   return exp <= Math.floor(Date.now() / 1000) + skewSec;
+}
+// 有效 Cookie：有 token 且 JWT 未过期；返回解析后的 map，无效返回 null
+function validCookieMap(ckStr) {
+  const m = parseCookiesToMap(ckStr);
+  if (!m['token'] || tokenExpired(m['token'])) return null;
+  return m;
 }
 
 // ============ Cookie ============
@@ -250,11 +259,7 @@ class Re0Worker {
     const js = tryJson(r.body);
     if (js && js.code === 'action_token_required') throw new Error(`登录需先绑定（GET /login），code=${js.code}`);
     if (!hasToken) {
-      const hkeys = Object.keys(r.headers || {});
-      let raw = '';
-      for (const k of hkeys) { if (k.toLowerCase() === 'set-cookie') raw += String(r.headers[k]); }
-      const got = WANT_COOKIES.filter(n => raw.includes(n + '=')).join(',');
-      throw new Error(`登录未返回 token：HTTP ${r.status} | set-cookie含[${got || '无'}] | 响应头[${hkeys.join(',')}] | ${cut(r.body)}`);
+      throw new Error(`登录未返回 token（HTTP ${r.status}）：${cut(r.body, 200) || '空响应'}`);
     }
     const meta = this.getMeta(); meta.cookie = this.cookieNow(); this.saveMeta(meta);
     return r;
@@ -310,8 +315,8 @@ function analyzeCheckin(resp) {
   const success = !!((p.success === true) || (p.data && p.data.success === true));
   const text = (msg + ' ' + desc).trim();
   const isAlready = /已签到|签到过|明日再来|明天再来/.test(text);
-  const isOk = success || /签到成功|成功/.test(text) || /^2/.test(String(resp.http));
-  return { ok: isOk || isAlready, isAlready, message: text || ('HTTP ' + resp.http), code };
+  const isOk = success || /签到成功|checkin success/i.test(text);
+  return { ok: isOk || isAlready, isAlready, message: text || `HTTP ${resp.http}（响应无法识别）`, code };
 }
 
 // ============ Action id 发现 ============
@@ -363,29 +368,24 @@ async function discoverGamblerAction(base) {
 }
 
 // ============ MITM采集 ============
-// 抓到 Cookie 后先实地验证：JWT 未过期 + 带它请求一次首页能通过（非 CF 拦截），才算成功
+// 重写只负责抓：token 有效就存，无效的一次性提示；有效性由定时任务实际使用时验证
 async function captureCookie() {
-  try {
-    const h = ($request && $request.headers) || {};
-    const ck = h['Cookie'] || h['cookie'] || '';
-    if (!ck) return;
-    const seenKey = 're0_cookie_seen';
-    if ($.getdata(seenKey) === ck) return;   // 同一个 Cookie 只处理一次，不重复验证
-    $.setdata(ck, seenKey);
-    const m = parseCookiesToMap(ck);
-    if (!m['token']) { $.log('[RE0] 抓到 Cookie 但无 token，忽略'); return; }
-    if (tokenExpired(m['token'])) { $.log('[RE0] 抓到过期 Cookie，忽略'); return; }
-    const base = (argValue('re0_base_url') || $.getdata('re0_base_url') || 'https://re0.me').replace(/\/+$/, '');
-    await httpReq({ url: base + '/', headers: { 'User-Agent': UA, ...BROWSER_HEADERS, 'Cookie': ck } }, 'GET');
-    const old = $.getdata('re0_cookie') || '';
-    if (old !== ck) {
-      $.setdata(ck, 're0_cookie');
-      $.msg(scriptName, 'Cookie采集成功', '已验证有效');
+  const h = ($request && $request.headers) || {};
+  const ck = h['Cookie'] || h['cookie'] || '';
+  if (!ck) return;
+  const m = parseCookiesToMap(ck);
+  if (!m['token']) return;   // 非登录态请求，静默
+  if (tokenExpired(m['token'])) {
+    const badKey = 're0_cookie_bad';
+    if ($.getdata(badKey) !== ck) {   // 同一个过期 Cookie 只提示一次
+      $.setdata(ck, badKey);
+      $.msg(scriptName, 'Cookie已过期', '请在浏览器重新登录 re0.me 后刷新页面');
     }
-  } catch (e) {
-    if (/Cloudflare 人机验证/.test(fmtErr(e))) $.log('[RE0] 抓到的 Cookie 未通过验证（CF 拦截），已忽略');
-    else $.logErr(e);
+    return;
   }
+  if (($.getdata('re0_cookie') || '') === ck) return;   // 无变化，不打扰
+  $.setdata(ck, 're0_cookie');
+  $.msg(scriptName, 'Cookie已抓取', '定时任务将使用免密签到');
 }
 
 // ============ 主流程 ============
@@ -400,15 +400,24 @@ async function captureCookie() {
   const modeName = mode === 'gambler' ? '赌狗签到' : '每日签到';
   const modeIcon = mode === 'gambler' ? '🎲' : '✅';
 
-  const accounts = [];
+  // ---- 账号解析 ----
+  const listed = [];
   CONFIG.accounts.split('&').forEach(item => {
     item = item.trim(); if (!item) return;
     const p = item.split('#');
-    if (p.length >= 2) accounts.push({ username: p[0].trim(), password: p[1].trim(), cookie: p[2] ? p[2].trim() : '' });
+    if (p.length >= 2) listed.push({ username: p[0].trim(), password: p[1].trim(), cookie: p[2] ? p[2].trim() : '' });
   });
-  if (!accounts.length && CONFIG.cookie) accounts.push({ username: 'cookie', password: '', cookie: CONFIG.cookie });
+  // 免密优先：全局 Cookie 有效时跳过所有密码登录
+  const gMap = validCookieMap(CONFIG.cookie);
+  let accounts;
+  if (gMap) {
+    if (listed.some(a => a.password)) $.log('[RE0] 检测到有效免密 Cookie，跳过密码登录（免密优先）');
+    accounts = [{ username: 'cookie', password: '', cookie: CONFIG.cookie }];
+  } else {
+    accounts = listed;
+  }
   if (!accounts.length) {
-    $.msg(scriptName, '❌ 未配置账号', '请填入 re0_accounts: user#pass&user2#pass2');
+    $.msg(scriptName, '❌ 未配置账号', '二选一：① re0_accounts 填 user#pass ② 开 RE0Cookie 重写后浏览器打开 re0.me 自动抓取');
     return;
   }
   $.log(`[RE0] ${modeName}模式，共${accounts.length}个账号`);
@@ -419,38 +428,33 @@ async function captureCookie() {
     gambler: CONFIG.gambler_action || $.getdata(cacheGamblerKey) || DEF_GAMBLER_ACTION,
   };
 
-  // 全局免密 Cookie 有效时，密码登录若被 CF 拦截则静默跳过（免密已覆盖，不再弹失败通知）
-  const _ckMap = parseCookiesToMap(CONFIG.cookie || '');
-  const cookieValid = !!(_ckMap['token'] && !tokenExpired(_ckMap['token']));
-
   for (const acc of accounts) {
     try {
       const w = new Re0Worker(CONFIG.base_url, acc.username, acc.password, acc.cookie || '', ids, mode);
-      // 保证登录态（密码优先自动登录；action 失效则现场扫描重试一次）
+      const meta = w.getMeta();
+      // 保证登录态：缓存 Cookie 复用（移植旧版 py），过期自动重登
       if (acc.password) {
-        $.log(`[RE0] ${acc.username} 自动登录...`);
-        try {
-          await w.login();
-        } catch (e) {
-          const emsg = fmtErr(e);
-          if (/Cloudflare 人机验证/.test(emsg) && cookieValid) {
-            $.log(`[RE0] ${acc.username} 密码登录被 CF 拦截，已有有效免密 Cookie，跳过`);
-            continue;
+        const cached = validCookieMap(meta.cookie || '');
+        if (cached) {
+          w.jar = cached;
+          $.log(`[RE0] ${acc.username} 使用缓存 Cookie`);
+        } else {
+          $.log(`[RE0] ${acc.username} 自动登录...`);
+          try {
+            await w.login();
+          } catch (e) {
+            if (!/action|Action/.test(fmtErr(e))) throw e;
+            const nid = await discoverLoginAction(CONFIG.base_url).catch(() => '');
+            if (!nid) throw e;
+            $.log(`[RE0] login action 已刷新: ${nid}`);
+            ids.login = nid; $.setdata(nid, cacheLoginKey);
+            w.ids.login = nid;
+            await w.login();
           }
-          if (!/action|Action/.test(emsg)) throw e;
-          const nid = await discoverLoginAction(CONFIG.base_url).catch(() => '');
-          if (!nid) throw e;
-          $.log(`[RE0] login action 已刷新: ${nid}`);
-          ids.login = nid; $.setdata(nid, cacheLoginKey);
-          w.ids.login = nid;
-          await w.login();
         }
-      } else if (!w.jar['token']) {
-        throw new Error('无 token：请配置账号密码，或开启 RE0Cookie 重写后在浏览器打开 re0.me 自动抓取 Cookie');
-      } else if (tokenExpired(w.jar['token'])) {
-        throw new Error('Cookie 已过期：请在浏览器打开 re0.me（保持登录态）重新抓取，抓取时需开启 RE0Cookie 重写');
       } else {
-        $.log(`[RE0] ${acc.username} 使用已有 Cookie`);
+        if (!validCookieMap(w.cookieNow())) throw new Error('Cookie 无效或已过期：请在浏览器打开 re0.me（登录态）重新抓取');
+        $.log(`[RE0] ${acc.username} 使用免密 Cookie`);
       }
 
       // 登录后自动校准签到 action（未手动配置且未缓存过）
@@ -494,7 +498,7 @@ async function captureCookie() {
       const extra = (pf.points != null ? ` ｜ 积分 ${pf.points}${pf.days != null ? ' / 连续 ' + pf.days + ' 天' : ''}` : '');
 
       // 持久化 Cookie（供下次复用 / 展示）
-      const meta = w.getMeta(); meta.cookie = w.cookieNow(); meta.display = nickname; meta.points = pf.points; w.saveMeta(meta);
+      meta.cookie = w.cookieNow(); meta.display = nickname; meta.points = pf.points; w.saveMeta(meta);
 
       if (r.isAlready) notifyMsg.push(`「${nickname}」⏭️ 今日已签到${extra}`);
       else if (r.ok) notifyMsg.push(`「${nickname}」${modeIcon} ${r.message || (modeName + '成功')}${extra}`);
