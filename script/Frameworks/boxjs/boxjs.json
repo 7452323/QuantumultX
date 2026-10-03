@@ -139,7 +139,8 @@
       ],
       "keys": [
         "re0_accounts",
-        "re0_mode"
+        "re0_mode",
+        "re0_cookie"
       ],
       "settings": [
         {
@@ -167,6 +168,15 @@
             }
           ],
           "desc": "每日签到和赌狗签到每天只能二选一"
+        },
+        {
+          "id": "re0_cookie",
+          "name": "免密Cookie",
+          "val": "",
+          "type": "textarea",
+          "autoGrow": true,
+          "rows": 3,
+          "desc": "浏览器自动抓取，一般不用手填；清空后重新抓取"
         }
       ],
       "scripts": [
@@ -184,6 +194,7 @@
       ],
       "descs_html": [
         "<span><b>RE0：</b>re0.me 每日签到 / 赌狗签到 双模式（每天二选一）— Next.js Server Action 协议。</span>",
+        "<span><b>免密：</b>开 RE0Cookie 重写后浏览器打开 re0.me（登录态）自动抓取，有效时跳过密码登录。</span>",
         "<span><b>脚本来源：</b>7452323</span>"
       ]
     },
