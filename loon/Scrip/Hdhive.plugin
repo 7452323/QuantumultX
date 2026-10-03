@@ -1,5 +1,5 @@
 #!name=RE0签到
-#!desc=RE0(re0.me，原HDHive影巢) 签到 — Next.js Server Action 协议（免 X-HDH 签名）；Cookie 免密 或 账号密码登录；re0_mode=1 每日签到 / 2 赌狗签到
+#!desc=RE0(re0.me，原HDHive影巢) 签到 — Next.js Server Action 协议（免 X-HDH 签名）；Cookie 免密 或 账号密码登录；re0_mode=1 每日签到 / 2 赌狗签到；⚠️ cf_clearance 绑出网 IP+UA，需与抓 Cookie 的浏览器同节点
 #!author=7452323
 #!homepage=https://github.com/7452323/QuantumultX
 #!tag=RE0,签到,赌狗
@@ -9,7 +9,7 @@ re0_accounts = input, "--", tag = RE0账号, desc = user#pass，多账号用 & �
 re0_mode = input, "1", tag = 签到模式, desc = 1 每日签到 / 2 赌狗签到，每天只能二选一
 
 [Script]
-http-request ^https?:\/\/re0\.me script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js, tag=RE0Cookie, require-body=false
+http-request ^https?:\/\/re0\.me\/? script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js, tag=RE0Cookie, require-body=false
 cron "20 0 * * *" script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js, argument="re0_accounts=${re0_accounts},re0_mode=${re0_mode}", tag=RE0签到
 
 [MITM]

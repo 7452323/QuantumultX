@@ -1,53 +1,54 @@
 /*
-RE0(影巢) 签到 — re0.me
+------------------------------------------
+@Author: 7452323
+@Github: https://github.com/7452323/QuantumultX
+@Description: RE0影巢 签到脚本（每日签到 / 赌狗签到）
+@Update: 2026.10.03
+------------------------------------------
 
-Cookie 变量：re0_cookie
-账号变量：re0_accounts（user#pass，多账号用 & 分隔）
-模式变量：re0_mode（1 每日签到 / 2 赌狗签到，每天二选一）
-UA 变量：re0_ua（可选，一般不用填——开 Cookie 重写时会自动记下浏览器的 UA）
-
-认证：re0_cookie 有效则免密直签，失败自动回落账号密码登录；登录后 Cookie 缓存复用。
-cf_clearance 与出网 IP + UA 双向绑定 —— 抓 Cookie 的浏览器需与脚本走同一节点，UA 由脚本自动记录。
-
-[rewrite_local]
-^https?:\/\/re0\.me url script-request-header https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js
-
-[task_local]
-20 0 * * * https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js, tag=RE0签到, enabled=true
+# Surge
+[Script]
+cron "20 0 * * *" script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js, timeout=60, tag=RE0签到
+http-request ^https?:\/\/re0\.me\/ script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js, requires-body=false, timeout=10, tag=RE0Cookie
 
 [MITM]
 hostname = re0.me
+
+# Loon
+[Script]
+cron "20 0 * * *" script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js, timeout=60, tag=RE0签到
+http-request ^https?:\/\/re0\.me\/ script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js, requires-body=false, timeout=10, tag=RE0Cookie
+
+[MITM]
+hostname = re0.me
+
+# QuantumultX
+[task_local]
+20 0 * * * https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js, tag=RE0签到, enabled=true
+
+[rewrite_local]
+^https?:\/\/re0\.me\/ url script-request-header https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Hdhive.js
+
+[MITM]
+hostname = re0.me
+
+变量: re0_accounts
+格式: user#pass（多账号用 & 分隔）
+BoxJS: re0_accounts / re0_cookie / re0_mode
+
+re0_accounts: 账号密码，填了才能免 Cookie 登录
+re0_cookie:   打开 re0.me 自动抓取，7 天有效；优先免密直签，失效自动回落账号密码
+re0_mode:     1 = 每日签到（默认），2 = 赌狗签到（两者每天只能二选一）
+re0_ua:       抓 Cookie 时自动记录浏览器 UA，一般不用填
+
+⚠️ cf_clearance 同时绑定出网 IP 和 UA：抓 Cookie 的浏览器必须与脚本走同一节点，
+   否则一律 Cloudflare 403。站点已常态化屏蔽大陆 IP，请确保节点为非大陆。
 */
 
-const $ = new Env('RE0签到');
+const scriptName = 'RE0签到';
+const ckName = 're0_accounts';
 
-// ============ chavyleung's Env.js ============
-function Env(t,e){class s{constructor(t){this.env=t}send(t,e="GET"){t="string"==typeof t?{url:t}:t;let s=this.get;"POST"===e&&(s=this.post);const i=new Promise(((e,i)=>{s.call(this,t,((t,s,o)=>{t?i(t):e(s)}))}));return t.timeout?((t,e=1e3)=>Promise.race([t,new Promise(((t,s)=>{setTimeout((()=>{s(new Error("请求超时"))}),e)}))]))(i,t.timeout):i}get(t){return this.send.call(this.env,t)}post(t){return this.send.call(this.env,t,"POST")}}return new class{constructor(t,e){this.logLevels={debug:0,info:1,warn:2,error:3},this.logLevelPrefixs={debug:"[DEBUG] ",info:"[INFO] ",warn:"[WARN] ",error:"[ERROR] "},this.logLevel="info",this.name=t,this.http=this,this.data=null,this.dataFile="box.dat",this.logs=[],this.isMute=!1,this.isNeedRewrite=!1,this.logSeparator="\n",this.encoding="utf-8",this.startTime=(new Date).getTime(),Object.assign(this,e),this.log("",`🔔${this.name}, 开始!`)}getEnv(){return"undefined"!=typeof $environment&&$environment["surge-version"]?"Surge":"undefined"!=typeof $environment&&$environment["stash-version"]?"Stash":"undefined"!=typeof module&&module.exports?"Node.js":"undefined"!=typeof $task?"Quantumult X":"undefined"!=typeof $loon?"Loon":"undefined"!=typeof $rocket?"Shadowrocket":void 0}isNode(){return"Node.js"===this.getEnv()}isQuanX(){return"Quantumult X"===this.getEnv()}isSurge(){return"Surge"===this.getEnv()}isLoon(){return"Loon"===this.getEnv()}isShadowrocket(){return"Shadowrocket"===this.getEnv()}isStash(){return"Stash"===this.getEnv()}toObj(t,e=null){try{return JSON.parse(t)}catch{return e}}toStr(t,e=null,...s){try{return JSON.stringify(t,...s)}catch{return e}}getjson(t,e){let s=e;if(this.getdata(t))try{s=JSON.parse(this.getdata(t))}catch{}return s}setjson(t,e){try{return this.setdata(JSON.stringify(t),e)}catch{return!1}}getScript(t){return new Promise((e=>{this.get({url:t},((t,s,i)=>e(i)))}))}loaddata(){if(!this.isNode())return{};{this.fs=this.fs?this.fs:require("fs"),this.path=this.path?this.path:require("path");const t=this.path.resolve(this.dataFile),e=this.path.resolve(process.cwd(),this.dataFile),s=this.fs.existsSync(t),i=!s&&this.fs.existsSync(e);if(!s&&!i)return{};{const i=s?t:e;try{return JSON.parse(this.fs.readFileSync(i))}catch(t){return{}}}}}writedata(){if(this.isNode()){this.fs=this.fs?this.fs:require("fs"),this.path=this.path?this.path:require("path");const t=this.path.resolve(this.dataFile),e=this.path.resolve(process.cwd(),this.dataFile),s=this.fs.existsSync(t),i=!s&&this.fs.existsSync(e),o=JSON.stringify(this.data);s?this.fs.writeFileSync(t,o):i?this.fs.writeFileSync(e,o):this.fs.writeFileSync(t,o)}}lodash_get(t,e,s){const i=e.replace(/\[(\d+)\]/g,".$1").split(".");let o=t;for(const t of i)if(o=Object(o)[t],void 0===o)return s;return o}lodash_set(t,e,s){return Object(t)!==t||(Array.isArray(e)||(e=e.toString().match(/[^.[\]]+/g)||[]),e.slice(0,-1).reduce(((t,s,i)=>Object(t[s])===t[s]?t[s]:t[s]=Math.abs(e[i+1])>>0==+e[i+1]?[]:{}),t)[e[e.length-1]]=s),t}getdata(t){let e=this.getval(t);if(/^@/.test(t)){const[,s,i]=/^@(.*?)\.(.*?)$/.exec(t),o=s?this.getval(s):"";if(o)try{const t=JSON.parse(o);e=t?this.lodash_get(t,i,""):e}catch(t){e=""}}return e}setdata(t,e){let s=!1;if(/^@/.test(e)){const[,i,o]=/^@(.*?)\.(.*?)$/.exec(e),r=this.getval(i),a=i?"null"===r?null:r||"{}":"{}";try{const e=JSON.parse(a);this.lodash_set(e,o,t),s=this.setval(JSON.stringify(e),i)}catch(e){const r={};this.lodash_set(r,o,t),s=this.setval(JSON.stringify(r),i)}}else s=this.setval(t,e);return s}getval(t){switch(this.getEnv()){case"Surge":case"Loon":case"Stash":case"Shadowrocket":return $persistentStore.read(t);case"Quantumult X":return $prefs.valueForKey(t);case"Node.js":return this.data=this.loaddata(),this.data[t];default:return this.data&&this.data[t]||null}}setval(t,e){switch(this.getEnv()){case"Surge":case"Loon":case"Stash":case"Shadowrocket":return $persistentStore.write(t,e);case"Quantumult X":return $prefs.setValueForKey(t,e);case"Node.js":return this.data=this.loaddata(),this.data[e]=t,this.writedata(),!0;default:return this.data&&this.data[e]||null}}get(t,e=(()=>{})){switch(t.headers&&(delete t.headers["Content-Type"],delete t.headers["Content-Length"],delete t.headers["content-type"],delete t.headers["content-length"]),t.params&&(t.url+="?"+this.queryStr(t.params)),void 0===t.followRedirect||t.followRedirect||((this.isSurge()||this.isLoon())&&(t["auto-redirect"]=!1),this.isQuanX()&&t.opts?t.opts.redirection=!1:t.opts={redirection:!1}),this.getEnv()){case"Surge":case"Loon":case"Stash":case"Shadowrocket":default:this.isSurge()&&this.isNeedRewrite&&(t.headers=t.headers||{},Object.assign(t.headers,{"X-Surge-Skip-Scripting":!1})),$httpClient.get(t,((t,s,i)=>{!t&&s&&(s.body=i,s.statusCode=s.status?s.status:s.statusCode,s.status=s.statusCode),e(t,s,i)}));break;case"Quantumult X":this.isNeedRewrite&&(t.opts=t.opts||{},Object.assign(t.opts,{hints:!1})),$task.fetch(t).then((t=>{const{statusCode:s,statusCode:i,headers:o,body:r}=t;e(null,{status:s,statusCode:i,headers:o,body:r},r)}),(t=>e(t&&t.error||"UndefinedError")));break;case"Node.js":const s=require("iconv-lite");this.initGotEnv(t),this.got(t).then((t=>{const{statusCode:i,statusCode:o,headers:r,rawBody:a}=t,n=s.decode(a,this.encoding);e(null,{status:i,statusCode:o,headers:r,rawBody:a,body:n},n)}),(t=>{const{message:i,response:o}=t;e(i,o,o&&s.decode(o.rawBody,this.encoding))}));break}}post(t,e=(()=>{})){const s=t.method?t.method.toLocaleLowerCase():"post";switch(t.body&&t.headers&&!t.headers["Content-Type"]&&!t.headers["content-type"]&&(t.headers["content-type"]="application/x-www-form-urlencoded"),t.headers&&(delete t.headers["Content-Length"],delete t.headers["content-length"]),void 0===t.followRedirect||t.followRedirect||((this.isSurge()||this.isLoon())&&(t["auto-redirect"]=!1),this.isQuanX()&&t.opts?t.opts.redirection=!1:t.opts={redirection:!1}),this.getEnv()){case"Surge":case"Loon":case"Stash":case"Shadowrocket":default:this.isSurge()&&this.isNeedRewrite&&(t.headers=t.headers||{},Object.assign(t.headers,{"X-Surge-Skip-Scripting":!1})),$httpClient[s](t,((t,s,i)=>{!t&&s&&(s.body=i,s.statusCode=s.status?s.status:s.statusCode,s.status=s.statusCode),e(t,s,i)}));break;case"Quantumult X":t.method=s,this.isNeedRewrite&&(t.opts=t.opts||{},Object.assign(t.opts,{hints:!1})),$task.fetch(t).then((t=>{const{statusCode:s,statusCode:i,headers:o,body:r}=t;e(null,{status:s,statusCode:i,headers:o,body:r},r)}),(t=>e(t&&t.error||"UndefinedError")));break;case"Node.js":let i=require("iconv-lite");this.initGotEnv(t);const{url:o,...r}=t;this.got[s](o,r).then((t=>{const{statusCode:s,statusCode:o,headers:r,rawBody:a}=t,n=i.decode(a,this.encoding);e(null,{status:s,statusCode:o,headers:r,rawBody:a,body:n},n)}),(t=>{const{message:s,response:o}=t;e(s,o,o&&i.decode(o.rawBody,this.encoding))}));break}}queryStr(t){let e="";for(const s in t){let i=t[s];null!=i&&""!==i&&("object"==typeof i&&(i=JSON.stringify(i)),e+=`${s}=${i}&`)}return e=e.substring(0,e.length-1),e}msg(e=t,s="",i="",o={}){if(!this.isMute)switch(this.getEnv()){case"Surge":case"Loon":case"Stash":case"Shadowrocket":default:$notification.post(e,s,i,o);break;case"Quantumult X":$notify(e,s,i,o);break;case"Node.js":break}if(!this.isMuteLog){let t=["","==============📣系统通知📣=============="];t.push(e),s&&t.push(s),i&&t.push(i),console.log(t.join("\n")),this.logs=this.logs.concat(t)}}log(...t){t.length>0&&(this.logs=[...this.logs,...t],console.log(t.map((t=>t??String(t))).join(this.logSeparator)))}logErr(t,e){this.log("",`❗️${this.name}, 错误!`,e,t)}wait(t){return new Promise((e=>setTimeout(e,t)))}done(t={}){const e=((new Date).getTime()-this.startTime)/1e3;switch(this.log("",`🔔${this.name}, 结束! 🕛 ${e} 秒`),this.getEnv()){case"Surge":case"Loon":case"Stash":case"Shadowrocket":case"Quantumult X":default:$done(t);break;case"Node.js":break}}initGotEnv(t){this.got=this.got?this.got:require("got"),this.cktough=this.cktough?this.cktough:require("tough-cookie"),this.ckjar=this.ckjar?this.ckjar:new this.cktough.CookieJar,t&&(t.headers=t.headers?t.headers:{},t&&(t.headers=t.headers?t.headers:{},void 0===t.headers.cookie&&void 0===t.headers.Cookie&&void 0===t.cookieJar&&(t.cookieJar=this.ckjar)))}}(t,e)}
-
-// ============ 常量 ============
-const BASE = 'https://re0.me';
-// cf_clearance 与 UA 绑定：抓 Cookie 时脚本会把浏览器 UA 记到 re0_ua，这里只是兜底
-const UA_DEFAULT = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.0 Mobile/15E148 Safari/604.1';
-let UA = UA_DEFAULT;
-const HEADERS = { 'Accept-Language': 'zh-CN,zh-Hans;q=0.9' };
-const KEEP = ['token', 'refresh_token', 'csrf_access_token', 'hdh_uid', 'hdh_sa_token', 'cf_clearance'];
-
-// Next.js Server Action id，随站点构建变化；失效时自动重扫 chunk 刷新
-const ACTION_DEFAULT = {
-  login: '6014e85b3c42c65c13a43120e9713c84ff6103b035',
-  checkin: '4004fe56299e6451fc007a19f6df5f592551ab9c78',
-  gambler: '409c3461f006f9de5e010af69e072690dd8b736acd',
-};
-const ACTION_CACHE = { login: 're0_a_login', checkin: 're0_a_checkin', gambler: 're0_a_gambler' };
-// 各自的页面 / chunk 路径特征 / 导出函数名
-const ACTION_SOURCE = {
-  login: { page: '/login', chunk: 'app/\\(auth\\)/login/page-', fn: 'login' },
-  checkin: { page: '/manager/account', chunk: 'app/manager/layout-', fn: 'checkIn' },
-  gambler: { page: '/', chunk: 'app/\\(app\\)/layout-', fn: 'checkIn' },
-};
-const CF_HINT = 'Cloudflare 403：cf_clearance 与出网 IP + UA 绑定，需与抓 Cookie 的浏览器同节点';
-
-// ============ 工具 ============
+/* 模块参数优先（Surge/Loon 的 argument 走 $argument），没给才用持久化存储 */
 const BLANK = ['--', '-', 'none', 'null', '无', '空'];
 function argValue(key) {
   let v = '';
@@ -63,13 +64,40 @@ function argValue(key) {
   try { v = decodeURIComponent(v); } catch (e) { }
   return (!v || BLANK.indexOf(String(v).trim().toLowerCase()) >= 0) ? '' : v;
 }
+
+// ============ chavyleung's Env.js ============
+function Env(t,e){class s{constructor(t){this.env=t}send(t,e="GET"){t="string"==typeof t?{url:t}:t;let s=this.get;"POST"===e&&(s=this.post);const i=new Promise(((e,i)=>{s.call(this,t,((t,s,o)=>{t?i(t):e(s)}))}));return t.timeout?((t,e=1e3)=>Promise.race([t,new Promise(((t,s)=>{setTimeout((()=>{s(new Error("请求超时"))}),e)}))]))(i,t.timeout):i}get(t){return this.send.call(this.env,t)}post(t){return this.send.call(this.env,t,"POST")}}return new class{constructor(t,e){this.logLevels={debug:0,info:1,warn:2,error:3},this.logLevelPrefixs={debug:"[DEBUG] ",info:"[INFO] ",warn:"[WARN] ",error:"[ERROR] "},this.logLevel="info",this.name=t,this.http=this,this.data=null,this.dataFile="box.dat",this.logs=[],this.isMute=!1,this.isNeedRewrite=!1,this.logSeparator="\n",this.encoding="utf-8",this.startTime=(new Date).getTime(),Object.assign(this,e),this.log("",`🔔${this.name}, 开始!`)}getEnv(){return"undefined"!=typeof $environment&&$environment["surge-version"]?"Surge":"undefined"!=typeof $environment&&$environment["stash-version"]?"Stash":"undefined"!=typeof module&&module.exports?"Node.js":"undefined"!=typeof $task?"Quantumult X":"undefined"!=typeof $loon?"Loon":"undefined"!=typeof $rocket?"Shadowrocket":void 0}isNode(){return"Node.js"===this.getEnv()}isQuanX(){return"Quantumult X"===this.getEnv()}isSurge(){return"Surge"===this.getEnv()}isLoon(){return"Loon"===this.getEnv()}isShadowrocket(){return"Shadowrocket"===this.getEnv()}isStash(){return"Stash"===this.getEnv()}toObj(t,e=null){try{return JSON.parse(t)}catch{return e}}toStr(t,e=null,...s){try{return JSON.stringify(t,...s)}catch{return e}}getjson(t,e){let s=e;if(this.getdata(t))try{s=JSON.parse(this.getdata(t))}catch{}return s}setjson(t,e){try{return this.setdata(JSON.stringify(t),e)}catch{return!1}}getScript(t){return new Promise((e=>{this.get({url:t},((t,s,i)=>e(i)))}))}loaddata(){if(!this.isNode())return{};{this.fs=this.fs?this.fs:require("fs"),this.path=this.path?this.path:require("path");const t=this.path.resolve(this.dataFile),e=this.path.resolve(process.cwd(),this.dataFile),s=this.fs.existsSync(t),i=!s&&this.fs.existsSync(e);if(!s&&!i)return{};{const i=s?t:e;try{return JSON.parse(this.fs.readFileSync(i))}catch(t){return{}}}}}writedata(){if(this.isNode()){this.fs=this.fs?this.fs:require("fs"),this.path=this.path?this.path:require("path");const t=this.path.resolve(this.dataFile),e=this.path.resolve(process.cwd(),this.dataFile),s=this.fs.existsSync(t),i=!s&&this.fs.existsSync(e),o=JSON.stringify(this.data);s?this.fs.writeFileSync(t,o):i?this.fs.writeFileSync(e,o):this.fs.writeFileSync(t,o)}}lodash_get(t,e,s){const i=e.replace(/\[(\d+)\]/g,".$1").split(".");let o=t;for(const t of i)if(o=Object(o)[t],void 0===o)return s;return o}lodash_set(t,e,s){return Object(t)!==t||(Array.isArray(e)||(e=e.toString().match(/[^.[\]]+/g)||[]),e.slice(0,-1).reduce(((t,s,i)=>Object(t[s])===t[s]?t[s]:t[s]=Math.abs(e[i+1])>>0==+e[i+1]?[]:{}),t)[e[e.length-1]]=s),t}getdata(t){let e=this.getval(t);if(/^@/.test(t)){const[,s,i]=/^@(.*?)\.(.*?)$/.exec(t),o=s?this.getval(s):"";if(o)try{const t=JSON.parse(o);e=t?this.lodash_get(t,i,""):e}catch(t){e=""}}return e}setdata(t,e){let s=!1;if(/^@/.test(e)){const[,i,o]=/^@(.*?)\.(.*?)$/.exec(e),r=this.getval(i),a=i?"null"===r?null:r||"{}":"{}";try{const e=JSON.parse(a);this.lodash_set(e,o,t),s=this.setval(JSON.stringify(e),i)}catch(e){const r={};this.lodash_set(r,o,t),s=this.setval(JSON.stringify(r),i)}}else s=this.setval(t,e);return s}getval(t){switch(this.getEnv()){case"Surge":case"Loon":case"Stash":case"Shadowrocket":return $persistentStore.read(t);case"Quantumult X":return $prefs.valueForKey(t);case"Node.js":return this.data=this.loaddata(),this.data[t];default:return this.data&&this.data[t]||null}}setval(t,e){switch(this.getEnv()){case"Surge":case"Loon":case"Stash":case"Shadowrocket":return $persistentStore.write(t,e);case"Quantumult X":return $prefs.setValueForKey(t,e);case"Node.js":return this.data=this.loaddata(),this.data[e]=t,this.writedata(),!0;default:return this.data&&this.data[e]||null}}get(t,e=(()=>{})){switch(t.headers&&(delete t.headers["Content-Type"],delete t.headers["Content-Length"],delete t.headers["content-type"],delete t.headers["content-length"]),t.params&&(t.url+="?"+this.queryStr(t.params)),void 0===t.followRedirect||t.followRedirect||((this.isSurge()||this.isLoon())&&(t["auto-redirect"]=!1),this.isQuanX()&&t.opts?t.opts.redirection=!1:t.opts={redirection:!1}),this.getEnv()){case"Surge":case"Loon":case"Stash":case"Shadowrocket":default:this.isSurge()&&this.isNeedRewrite&&(t.headers=t.headers||{},Object.assign(t.headers,{"X-Surge-Skip-Scripting":!1})),$httpClient.get(t,((t,s,i)=>{!t&&s&&(s.body=i,s.statusCode=s.status?s.status:s.statusCode,s.status=s.statusCode),e(t,s,i)}));break;case"Quantumult X":this.isNeedRewrite&&(t.opts=t.opts||{},Object.assign(t.opts,{hints:!1})),$task.fetch(t).then((t=>{const{statusCode:s,statusCode:i,headers:o,body:r}=t;e(null,{status:s,statusCode:i,headers:o,body:r},r)}),(t=>e(t&&t.error||"UndefinedError")));break;case"Node.js":const s=require("iconv-lite");this.initGotEnv(t),this.got(t).then((t=>{const{statusCode:i,statusCode:o,headers:r,rawBody:a}=t,n=s.decode(a,this.encoding);e(null,{status:i,statusCode:o,headers:r,rawBody:a,body:n},n)}),(t=>{const{message:i,response:o}=t;e(i,o,o&&s.decode(o.rawBody,this.encoding))}));break}}post(t,e=(()=>{})){const s=t.method?t.method.toLocaleLowerCase():"post";switch(t.body&&t.headers&&!t.headers["Content-Type"]&&!t.headers["content-type"]&&(t.headers["content-type"]="application/x-www-form-urlencoded"),t.headers&&(delete t.headers["Content-Length"],delete t.headers["content-length"]),void 0===t.followRedirect||t.followRedirect||((this.isSurge()||this.isLoon())&&(t["auto-redirect"]=!1),this.isQuanX()&&t.opts?t.opts.redirection=!1:t.opts={redirection:!1}),this.getEnv()){case"Surge":case"Loon":case"Stash":case"Shadowrocket":default:this.isSurge()&&this.isNeedRewrite&&(t.headers=t.headers||{},Object.assign(t.headers,{"X-Surge-Skip-Scripting":!1})),$httpClient[s](t,((t,s,i)=>{!t&&s&&(s.body=i,s.statusCode=s.status?s.status:s.statusCode,s.status=s.statusCode),e(t,s,i)}));break;case"Quantumult X":t.method=s,this.isNeedRewrite&&(t.opts=t.opts||{},Object.assign(t.opts,{hints:!1})),$task.fetch(t).then((t=>{const{statusCode:s,statusCode:i,headers:o,body:r}=t;e(null,{status:s,statusCode:i,headers:o,body:r},r)}),(t=>e(t&&t.error||"UndefinedError")));break;case"Node.js":let i=require("iconv-lite");this.initGotEnv(t);const{url:o,...r}=t;this.got[s](o,r).then((t=>{const{statusCode:s,statusCode:o,headers:r,rawBody:a}=t,n=i.decode(a,this.encoding);e(null,{status:s,statusCode:o,headers:r,rawBody:a,body:n},n)}),(t=>{const{message:s,response:o}=t;e(s,o,o&&i.decode(o.rawBody,this.encoding))}));break}}queryStr(t){let e="";for(const s in t){let i=t[s];null!=i&&""!==i&&("object"==typeof i&&(i=JSON.stringify(i)),e+=`${s}=${i}&`)}return e=e.substring(0,e.length-1),e}msg(e=t,s="",i="",o={}){if(!this.isMute)switch(this.getEnv()){case"Surge":case"Loon":case"Stash":case"Shadowrocket":default:$notification.post(e,s,i,o);break;case"Quantumult X":$notify(e,s,i,o);break;case"Node.js":break}if(!this.isMuteLog){let t=["","==============📣系统通知📣=============="];t.push(e),s&&t.push(s),i&&t.push(i),console.log(t.join("\n")),this.logs=this.logs.concat(t)}}log(...t){t.length>0&&(this.logs=[...this.logs,...t],console.log(t.map((t=>t??String(t))).join(this.logSeparator)))}logErr(t,e){this.log("",`❗️${this.name}, 错误!`,e,t)}wait(t){return new Promise((e=>setTimeout(e,t)))}done(t={}){const e=((new Date).getTime()-this.startTime)/1e3;switch(this.log("",`🔔${this.name}, 结束! 🕛 ${e} 秒`),this.getEnv()){case"Surge":case"Loon":case"Stash":case"Shadowrocket":case"Quantumult X":default:$done(t);break;case"Node.js":break}}initGotEnv(t){this.got=this.got?this.got:require("got"),this.cktough=this.cktough?this.cktough:require("tough-cookie"),this.ckjar=this.ckjar?this.ckjar:new this.cktough.CookieJar,t&&(t.headers=t.headers?t.headers:{},t&&(t.headers=t.headers?t.headers:{},void 0===t.headers.cookie&&void 0===t.headers.Cookie&&void 0===t.cookieJar&&(t.cookieJar=this.ckjar)))}}(t,e)}
+
+const $ = new Env(scriptName);
+
+// ============ 常量 ============
+const BASE = 'https://re0.me';
+/* cf_clearance 与 UA 绑定：抓 Cookie 时脚本会把浏览器 UA 记到 re0_ua，这里只是兜底 */
+const UA_DEFAULT = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.0 Mobile/15E148 Safari/604.1';
+let UA = UA_DEFAULT;
+const KEEP = ['token', 'refresh_token', 'csrf_access_token', 'hdh_uid', 'hdh_sa_token', 'cf_clearance'];
+
+/* 每日签到和赌狗签到是同一个 Server Action，靠请求体区分：每日 [false] / 赌狗 [true] */
+const ACTION_DEFAULT = {
+  login: '6014e85b3c42c65c13a43120e9713c84ff6103b035',
+  checkin: '409c3461f006f9de5e010af69e072690dd8b736acd',
+};
+const ACTION_CACHE = { login: 're0_action_login', checkin: 're0_action_checkin' };
+/* action 自愈用的页面与导出函数名（随站点构建变化） */
+const ACTION_SOURCE = {
+  login: { page: '/login', fn: 'login' },
+  checkin: { page: '/', fn: 'checkIn' },
+};
+const CF_HINT = 'Cloudflare 拦截：cf_clearance 绑出网 IP + UA，请让脚本与抓 Cookie 的浏览器走同一节点（站点常态屏蔽大陆 IP）';
+
+// ============ 工具 ============
+function fmtErr(e) { return (e && e.message) ? e.message : String(e); }
+function tryJson(s) { try { return JSON.parse(s); } catch (e) { return null; } }
+function cut(s, n = 180) { return (s || '').slice(0, n).replace(/\s+/g, ' '); }
 function b64(s) {
   if (typeof Buffer !== 'undefined') return Buffer.from(s, 'utf8').toString('base64');
   return btoa(unescape(encodeURIComponent(s)));
 }
-function fmtErr(e) { return (e && e.message) ? e.message : String(e); }
-function tryJson(s) { try { return JSON.parse(s); } catch (e) { return null; } }
-function cut(s, n = 200) { return (s || '').slice(0, n).replace(/\n/g, ' '); }
 function jwtExp(token) {
   try {
     let seg = String(token || '').split('.')[1];
@@ -98,7 +126,7 @@ function mergeSetCookie(m, sc) {
   const re = /([A-Za-z_][A-Za-z0-9_]*)=([^;,\s]*)/g;
   for (const s of list) { let x; while ((x = re.exec(s))) if (KEEP.includes(x[1])) m[x[1]] = x[2]; }
 }
-// 有 token 且未过期才算有效
+/* 有 token 且未过期才算有效 */
 function validCookie(str) {
   const m = cookieMap(str);
   return (m.token && !tokenExpired(m.token)) ? m : null;
@@ -108,11 +136,12 @@ function validCookie(str) {
 function http(opts, method = 'GET') {
   return new Promise((resolve, reject) => {
     const done = (err, status, headers, body) => {
-      if (err) return reject(new Error(err));
-      const cf = Object.keys(headers || {}).some(k => k.toLowerCase() === 'cf-mitigated')
-        || /Just a moment|cf-challenge/i.test(body || '');
+      if (err) return reject(new Error(fmtErr(err)));
+      const h = headers || {};
+      const cf = Object.keys(h).some(k => k.toLowerCase() === 'cf-mitigated')
+        || /Just a moment|cf-challenge|Attention Required/i.test(body || '');
       if (cf) return reject(new Error(`${CF_HINT}（HTTP ${status}）`));
-      resolve({ status, headers: headers || {}, body: body || '' });
+      resolve({ status, headers: h, body: body || '' });
     };
     if (typeof $task !== 'undefined') {
       $task.fetch({ url: opts.url, method, headers: opts.headers || {}, body: opts.body || '', timeout: 30000 })
@@ -146,8 +175,7 @@ function nodeReq(opts, method, retry = 3) {
 
 // ============ 账号 ============
 class Re0 {
-  constructor(base, account, ids, mode) {
-    this.base = base;
+  constructor(account, ids, mode) {
     this.user = account.username;
     this.pass = account.password;
     this.ids = ids;
@@ -159,99 +187,128 @@ class Re0 {
   set meta(m) { $.setdata(JSON.stringify(m), this.metaKey); }
 
   async req(method, path, headers = {}, body = '') {
-    const h = { 'User-Agent': UA, ...HEADERS, ...headers };
+    const h = { 'User-Agent': UA, ...headers };
     if (Object.keys(this.jar).length) h['Cookie'] = cookieStr(this.jar);
     if (body) h['Content-Type'] = 'text/plain;charset=UTF-8';
-    const r = await http({ url: this.base + path, headers: h, body }, method);
+    const r = await http({ url: BASE + path, headers: h, body }, method);
     for (const k of Object.keys(r.headers)) {
       if (k.toLowerCase() === 'set-cookie') { mergeSetCookie(this.jar, r.headers[k]); break; }
     }
     return r;
   }
+  /* 普通页面请求，顺带把 hdh_sa_token 拿到手 */
   get(path, accept = 'text/html') {
     const h = accept === 'text/html' ? {
       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'zh-CN,zh-Hans;q=0.9',
       'Upgrade-Insecure-Requests': '1',
-      'Sec-Fetch-Dest': 'document', 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Site': 'none', 'Sec-Fetch-User': '?1',
+      'Sec-Fetch-Dest': 'document', 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Site': 'same-origin', 'Sec-Fetch-User': '?1',
     } : {
-      'Accept': accept, 'Sec-Fetch-Dest': 'empty', 'Sec-Fetch-Mode': 'cors', 'Sec-Fetch-Site': 'same-origin',
+      'Accept': accept, 'Accept-Language': 'zh-CN,zh-Hans;q=0.9',
+      'Sec-Fetch-Dest': 'empty', 'Sec-Fetch-Mode': 'cors', 'Sec-Fetch-Site': 'same-origin',
     };
     return this.req('GET', path, h);
   }
-  post(path, action, body = '[true]') {
+  /* Next.js Server Action */
+  post(path, action, body = '[false]') {
     return this.req('POST', path, {
       'Accept': 'text/x-component',
-      'Origin': this.base, 'Referer': this.base + path, 'Next-Action': action,
+      'Accept-Language': 'zh-CN,zh-Hans;q=0.9',
+      'Origin': BASE, 'Referer': BASE + path, 'Next-Action': action,
       'Sec-Fetch-Dest': 'empty', 'Sec-Fetch-Mode': 'cors', 'Sec-Fetch-Site': 'same-origin',
     }, body);
   }
 
   async login() {
-    await this.get('/login?redirect=/');   // 先绑 hdh_sa_token，否则 action_token_required
+    await this.get('/login');   // 先绑 hdh_sa_token，否则 action_token_required
     const body = JSON.stringify([{ username: this.user, password: b64(this.pass), password_transport: 'base64' }, '/']);
-    const r = await this.post('/login?redirect=/', this.ids.login, body);
+    const r = await this.post('/login', this.ids.login, body);
     if (!this.jar.token) throw new Error(`登录失败（HTTP ${r.status}）：${cut(r.body) || '空响应'}`);
+    $.log(`[RE0] ${this.user} 登录成功`);
   }
 
   async checkIn() {
     const gambler = this.mode === 'gambler';
-    const path = gambler ? '/' : '/manager/account';
-    await this.get(path, gambler ? 'text/html' : 'text/x-component');   // 先绑 hdh_sa_token
-    return this.post(path, gambler ? this.ids.gambler : this.ids.checkin);
+    await this.get('/');                                  // 签到前刷新 hdh_sa_token
+    return this.post('/', this.ids.checkin, gambler ? '[true]' : '[false]');
   }
 }
 
 // ============ 响应解析 ============
+/* Server Action 返回 RSC 流，结果行形如：
+   1:{"response":{"success":true,"message":"签到成功，获得 8 积分","code":"200"}}
+   1:{"error":{"success":false,"message":"签到失败","description":"你已经签到过了，明天再来吧","code":"400"}} */
 function parseResult(resp) {
   const raw = resp.body || '';
-  const body = raw.replace(/\\"/g, '"');
-  let j = tryJson(raw) || tryJson(body);
-  if (!j) {   // RSC 流里的 action 结果行：1:{"response":{...}}
-    const m = body.match(/^1:(\{.*\})$/m);
-    if (m) j = tryJson(m[1]);
+  const t = raw.replace(/\\"/g, '"');
+  let obj = null;
+  for (const line of t.split('\n')) {
+    const m = line.match(/^\d+:(\{.*\})$/);
+    if (!m) continue;
+    const o = tryJson(m[1]);
+    if (!o) continue;
+    const r = o.response || o.error;
+    if (r && (r.message || r.description)) { obj = o; break; }
   }
-  const p = (j && j.response) || j || {};
-  const err = p.error || {};
-  const msg = p.message || err.message || '';
-  const text = (msg + ' ' + (p.description || err.description || '')).trim();
-  const already = /已签到|签到过|明日再来|明天再来/.test(text);
-  const ok = p.success === true || /签到成功|checkin success/i.test(text);
-  return { ok: ok || already, already, msg: text || `HTTP ${resp.status}`, gained: (text.match(/获得\s*(\d+)/) || [])[1] };
+  const r = (obj && (obj.response || obj.error)) || {};
+  const text = ((r.message || '') + ' ' + (r.description || '')).trim();
+  const already = /已签到|签到过|明天再来|明日再来/.test(text);
+  const ok = r.success === true || /签到成功/.test(text);
+  return {
+    ok: ok || already,
+    already,
+    msg: text || `HTTP ${resp.status}`,
+    gained: (text.match(/获得\s*(\d+)/) || [])[1],
+  };
 }
 function parseProfile(body) {
   const t = (body || '').replace(/\\"/g, '"');
   const o = {};
-  const n = t.match(/"currentUser":\{[^}]*"nickname":"([^"]*)"/);
+  const n = t.match(/"currentUser":\{[^}]*?"nickname":"([^"]*)"/);
   if (n) o.nickname = n[1];
   const m = t.match(/"user_meta":\{"points":(\d+),"signin_days_total":(\d+)/);
   if (m) { o.points = +m[1]; o.days = +m[2]; }
   return o;
 }
 
-// ============ action 自愈：从 chunk 扫 createServerReference ============
-function chunkFrom(html, part) {
-  const m = (html || '').match(new RegExp('([^"\']*' + part + '[^"\']*\\.js[^"\']*)'));
-  if (!m) return '';
-  let c = m[1].replace(/\\+$/, '');
-  if (c.charAt(0) !== '/') c = '/_next/' + c.replace(/^\/+/, '');
-  return c;
+// ============ action 自愈：从页面 chunk 里扫 createServerReference ============
+function chunkFrom(html, page) {
+  const m = (html || '').match(/["']([^"']*_next\/static\/chunks\/[^"']*app\/[^"']*\.js)["']/g);
+  if (!m) return [];
+  const out = [];
+  for (const raw of m) {
+    const c = raw.replace(/^["']|["']$/g, '');
+    if (page === '/login' ? !/login/i.test(c) : /login/i.test(c)) continue;
+    out.push(c);
+  }
+  return out;
 }
 function actionFrom(js, fn) {
-  const m = (js || '').match(new RegExp('createServerReference\\)?\\s*\\(\\s*["\']([0-9a-f]{20,})["\'][^)]*?,\\s*["\']' + fn + '["\']'));
-  return m ? m[1] : '';
+  const re = /createServerReference\)?\s*\(\s*["']([0-9a-f]{20,})["'][^)]*?["']([A-Za-z_$][\w$]*)["']/g;
+  let m, fallback = '';
+  while ((m = re.exec(js || ''))) {
+    if (!fallback) fallback = m[1];
+    if (fn && m[2] === fn) return m[1];
+  }
+  return fn ? '' : fallback;
 }
-async function discover(kind, jar, base) {
+async function discover(kind, jar) {
   const s = ACTION_SOURCE[kind];
   const h = {
-    'User-Agent': UA, ...HEADERS, 'Accept': 'text/html',
+    'User-Agent': UA, 'Accept': 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'zh-CN,zh-Hans;q=0.9',
     'Sec-Fetch-Dest': 'document', 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Site': 'same-origin',
   };
   if (Object.keys(jar).length) h['Cookie'] = cookieStr(jar);
-  const page = await http({ url: base + s.page, headers: h });
-  const chunk = chunkFrom(page.body, s.chunk);
-  if (!chunk) return '';
-  const js = await http({ url: base + chunk, headers: h });
-  return actionFrom(js.body, s.fn);
+  const page = await http({ url: BASE + s.page, headers: h });
+  for (const c of chunkFrom(page.body, s.page)) {
+    try {
+      const js = await http({ url: BASE + c, headers: h });
+      const id = actionFrom(js.body, s.fn);
+      if (id) return id;
+    } catch (e) { /* 单个 chunk 失败不影响整体 */ }
+  }
+  return '';
 }
 
 // ============ Cookie 采集（rewrite） ============
@@ -259,11 +316,11 @@ function captureCookie() {
   const h = $request.headers || {};
   const ck = h['Cookie'] || h['cookie'] || '';
   const m = cookieMap(ck);
-  if (!m.token) return;                        // 非登录态，静默
+  if (!m.token) return;                                  // 非登录态，静默
   if (tokenExpired(m.token)) {
-    if ($.getdata('re0_cookie_bad') !== ck) {   // 同一份过期 Cookie 只提示一次
+    if ($.getdata('re0_cookie_bad') !== ck) {            // 同一份过期 Cookie 只提示一次
       $.setdata(ck, 're0_cookie_bad');
-      $.msg('RE0签到', 'Cookie已过期', '请在浏览器重新登录 re0.me');
+      $.msg(scriptName, 'Cookie已过期', '请在浏览器重新登录 re0.me');
     }
     return;
   }
@@ -272,12 +329,12 @@ function captureCookie() {
   if (ua) $.setdata(ua, 're0_ua');
   if ($.getdata('re0_cookie') === ck) return;
   $.setdata(ck, 're0_cookie');
-  $.msg('RE0签到', 'Cookie已抓取', '定时任务将使用免密签到');
+  $.msg(scriptName, 'Cookie已抓取', '定时任务将使用免密直签');
 }
 
 // ============ 单账号执行 ============
-async function runAccount(acc, ids, mode, key, modeName) {
-  const w = new Re0(BASE, acc, ids, mode);
+async function runAccount(acc, ids, mode, modeName) {
+  const w = new Re0(acc, ids, mode);
 
   if (acc.password) {
     const cached = validCookie(w.meta.cookie || '');
@@ -291,13 +348,14 @@ async function runAccount(acc, ids, mode, key, modeName) {
   let r = parseResult(resp);
 
   // action 疑似失效 → 重扫 chunk 后重试一次
-  if (!r.already && /action|Action|未知/.test(r.msg)) {
-    const nid = await discover(key, w.jar, BASE).catch(() => '');
-    if (nid && nid !== ids[key]) {
-      ids[key] = nid; w.ids[key] = nid;
-      $.setdata(nid, ACTION_CACHE[key]);
+  if (!r.ok && !r.already) {
+    const nid = await discover('checkin', w.jar).catch(() => '');
+    if (nid && nid !== ids.checkin) {
+      ids.checkin = nid; w.ids.checkin = nid;
+      $.setdata(nid, ACTION_CACHE.checkin);
       $.log(`[RE0] ${modeName} action 已刷新: ${nid}`);
-      r = parseResult(await w.checkIn());
+      resp = await w.checkIn();
+      r = parseResult(resp);
     }
   }
 
@@ -310,12 +368,12 @@ async function runAccount(acc, ids, mode, key, modeName) {
   if (r.ok) return { ok: true, line: `「${name}」签到成功${extra}` };
   return { ok: false, line: `「${name}」签到失败 ${r.msg}` };
 }
-async function runAll(accounts, ids, mode, key, modeName) {
+async function runAll(accounts, ids, mode, modeName) {
   const out = [];
   let ok = 0;
   for (const acc of accounts) {
     try {
-      const r = await runAccount(acc, ids, mode, key, modeName);
+      const r = await runAccount(acc, ids, mode, modeName);
       out.push(r.line);
       if (r.ok) ok++;
     } catch (e) {
@@ -329,9 +387,11 @@ async function runAll(accounts, ids, mode, key, modeName) {
 !(async () => {
   if (typeof $request !== 'undefined' && $request) return captureCookie();
 
-  const mode = /^(2|gambler|gg|赌狗)$/.test(String(argValue('re0_mode') || $.getdata('re0_mode') || '1').toLowerCase()) ? 'gambler' : 'normal';
+  const rawMode = String(argValue('re0_mode') || $.getdata('re0_mode') || '1').toLowerCase();
+  const mode = /^(2|gambler|gg|赌狗)$/.test(rawMode) ? 'gambler' : 'normal';
   const modeName = mode === 'gambler' ? '赌狗签到' : '每日签到';
-  const rawAccounts = argValue('re0_accounts') || $.getdata('re0_accounts') || '';
+
+  const rawAccounts = argValue(ckName) || $.getdata(ckName) || '';
   const rawCookie = argValue('re0_cookie') || $.getdata('re0_cookie') || '';
   UA = argValue('re0_ua') || $.getdata('re0_ua') || UA_DEFAULT;
 
@@ -341,7 +401,7 @@ async function runAll(accounts, ids, mode, key, modeName) {
   });
   const gMap = validCookie(rawCookie);
   if (!gMap && !listed.length) {
-    $.msg('RE0签到', '❌ 未配置账号', '填 re0_accounts（user#pass）或开 Cookie 重写后浏览器打开 re0.me');
+    $.msg(scriptName, '❌ 未配置账号', '填 re0_accounts（user#pass），或开 Cookie 重写后浏览器打开 re0.me');
     return;
   }
   $.log(`[RE0] ${modeName}｜免密 Cookie ${gMap ? '有效' : '无'}｜账号 ${listed.length} 个`);
@@ -349,22 +409,20 @@ async function runAll(accounts, ids, mode, key, modeName) {
   const ids = {
     login: $.getdata(ACTION_CACHE.login) || ACTION_DEFAULT.login,
     checkin: $.getdata(ACTION_CACHE.checkin) || ACTION_DEFAULT.checkin,
-    gambler: $.getdata(ACTION_CACHE.gambler) || ACTION_DEFAULT.gambler,
   };
-  const key = mode === 'gambler' ? 'gambler' : 'checkin';
 
   let out, ok;
   if (gMap) {
-    ({ out, ok } = await runAll([{ username: 'cookie', password: '', cookie: rawCookie }], ids, mode, key, modeName));
-    if (!ok && listed.length) {   // 免密挂了（过期/CF）→ 回落账号密码
+    ({ out, ok } = await runAll([{ username: 'cookie', password: '', cookie: rawCookie }], ids, mode, modeName));
+    if (!ok && listed.length) {                          // 免密挂了（过期 / CF）→ 回落账号密码
       $.log('[RE0] 免密直签失败，回落账号密码登录');
-      const r2 = await runAll(listed, ids, mode, key, modeName);
+      const r2 = await runAll(listed, ids, mode, modeName);
       out = out.concat(r2.out); ok = r2.ok;
     }
   } else {
-    ({ out, ok } = await runAll(listed, ids, mode, key, modeName));
+    ({ out, ok } = await runAll(listed, ids, mode, modeName));
   }
-  $.msg('RE0签到', '', out.join('\n'));
+  $.msg(scriptName, '', out.join('\n'));
 })()
-  .catch(e => { $.logErr(e); $.msg('RE0签到', '❌ 执行异常', fmtErr(e)); })
+  .catch(e => { $.logErr(e); $.msg(scriptName, '❌ 执行异常', fmtErr(e)); })
   .finally(() => $.done({}));
