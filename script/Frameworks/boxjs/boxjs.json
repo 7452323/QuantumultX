@@ -194,8 +194,8 @@
       ],
       "descs_html": [
         "<span><b>RE0：</b>re0.me 每日签到 / 赌狗签到 双模式（每天二选一）— Next.js Server Action 协议。</span>",
-        "<span><b>免密：</b>开 RE0Cookie 重写后浏览器打开 re0.me（登录态）自动抓取，有效时跳过密码登录。</span>",
-        "<span><b>自动签到：</b>开 RE0AutoCheckin 响应重写，每天首次打开 re0.me 时页面内自动签到（真浏览器指纹，不过 CF 验证）。</span>",
+        "<span><b>认证：</b>re0_cookie 有效则免密直签；否则用 re0_accounts（user#pass）登录，登录后 Cookie 自动缓存复用。</span>",
+        "<span><b>注意：</b>cf_clearance 绑定出网 IP —— 浏览器抓 Cookie 时需与脚本走同一节点。</span>",
         "<span><b>脚本来源：</b>7452323</span>"
       ]
     },
