@@ -1,5 +1,5 @@
 #!name=RE0签到
-#!desc=RE0(re0.me，原HDHive影巢) 每日签到/赌狗签到 — Next.js Server Action 协议（免 X-HDH 签名）v3.4.0；签到模式 1/2 每天二选一；支持打开网站自动抓Cookie免密签到，JWT预判过期
+#!desc=RE0(re0.me，原HDHive影巢) 每日签到/赌狗签到 — Next.js Server Action 协议（免 X-HDH 签名）v3.5.0；签到模式 1/2 每天二选一；打开网站自动抓Cookie免密签到（带有效性验证），有有效Cookie时CF拦截自动跳过密码登录
 #!author=7452323
 #!arguments=RE0账号:--,签到模式:1
 #!arguments-desc=RE0账号填 user#pass，多账号用 & 连接，填 -- 则读持久化存储 re0_accounts；签到模式填 1 每日签到 或 2 赌狗签到（每天只能二选一）
