@@ -36,7 +36,6 @@ hostname = re0.me
 格式: user#pass（多账号用 & 分隔）
 BoxJS: re0_accounts / re0_cookie / re0_mode
 
-
 */
 
 const scriptName = 'RE0签到';
@@ -83,6 +82,11 @@ const ACTION_SOURCE = {
   checkin: { page: '/', fn: 'checkIn' },
 };
 const CF_HINT = 'Cloudflare 拦截：cf_clearance 绑出网 IP + UA，请让脚本与抓 Cookie 的浏览器走同一节点（站点常态屏蔽大陆 IP）';
+/* 本次运行的出口 IP（cf_clearance 绑定对象之一，报错时带上便于对比） */
+let CUR_IP = '';
+function cfHint(status) {
+  return `Cloudflare 拦截（HTTP ${status}${CUR_IP ? '｜出口 IP ' + CUR_IP : ''}）：cf_clearance 绑出网 IP + UA，请让脚本与抓 Cookie 的浏览器走同一节点（站点常态屏蔽大陆 IP）`;
+}
 
 // ============ 工具 ============
 function fmtErr(e) { return (e && e.message) ? e.message : String(e); }
@@ -134,7 +138,7 @@ function http(opts, method = 'GET') {
       const h = headers || {};
       const cf = Object.keys(h).some(k => k.toLowerCase() === 'cf-mitigated')
         || /Just a moment|cf-challenge|Attention Required/i.test(body || '');
-      if (cf) return reject(new Error(`${CF_HINT}（HTTP ${status}）`));
+      if (cf) return reject(new Error(cfHint(status)));
       resolve({ status, headers: h, body: body || '' });
     };
     if (typeof $task !== 'undefined') {
@@ -165,6 +169,15 @@ function nodeReq(opts, method, retry = 3) {
     if (opts.body) req.write(opts.body);
     req.end();
   });
+}
+/* 出口 IP 自检：走 re0.me 自己的 /cdn-cgi/trace（同一域名 → 同一条线路/节点，不受 CF 挑战），
+   用来确认脚本出网 IP 是否与抓 Cookie 的浏览器一致 */
+async function egressIP() {
+  try {
+    const r = await http({ url: BASE + '/cdn-cgi/trace', headers: { 'User-Agent': UA, 'Accept': 'text/plain' } });
+    const m = (r.body || '').match(/^ip=(.+)$/m);
+    return m ? m[1].trim() : '';
+  } catch (e) { return ''; }
 }
 
 // ============ 账号 ============
@@ -388,6 +401,7 @@ async function runAll(accounts, ids, mode, modeName) {
   const rawAccounts = argValue(ckName) || $.getdata(ckName) || '';
   const rawCookie = argValue('re0_cookie') || $.getdata('re0_cookie') || '';
   UA = argValue('re0_ua') || $.getdata('re0_ua') || UA_DEFAULT;
+  const cfOverride = argValue('re0_cf') || $.getdata('re0_cf') || '';
 
   const listed = rawAccounts.split('&').map(s => s.trim()).filter(Boolean).map(item => {
     const p = item.split('#');
@@ -400,23 +414,44 @@ async function runAll(accounts, ids, mode, modeName) {
   }
   $.log(`[RE0] ${modeName}｜免密 Cookie ${gMap ? '有效' : '无'}｜账号 ${listed.length} 个`);
 
+  /* 出口 IP 自检：cf_clearance 绑 IP，节点一变必吃 403，先把它打出来 */
+  CUR_IP = await egressIP();
+  const okIP = $.getdata('re0_ok_ip') || '';
+  if (CUR_IP) {
+    $.log(`[RE0] 出口 IP ${CUR_IP}` + (okIP && okIP !== CUR_IP ? `（上次成功 ${okIP}，节点已变 → cf_clearance 必失效）` : ''));
+    $.setdata(CUR_IP, 're0_last_ip');
+  }
+
   const ids = {
     login: $.getdata(ACTION_CACHE.login) || ACTION_DEFAULT.login,
     checkin: $.getdata(ACTION_CACHE.checkin) || ACTION_DEFAULT.checkin,
   };
 
+  /* 账号密码回落也必须带 cf_clearance：CF 在鉴权之前就拦，光有账密必吃 403 */
+  const cfOnly = cfOverride || cookieMap(rawCookie).cf_clearance || '';
+  const seeded = listed.map(a => ({ ...a, cookie: cfOnly ? 'cf_clearance=' + cfOnly : '' }));
+
   let out, ok;
   if (gMap) {
     ({ out, ok } = await runAll([{ username: 'cookie', password: '', cookie: rawCookie }], ids, mode, modeName));
-    if (!ok && listed.length) {                          // 免密挂了（过期 / CF）→ 回落账号密码
+    if (!ok && seeded.length) {                          // 免密挂了（过期 / CF）→ 回落账号密码
       $.log('[RE0] 免密直签失败，回落账号密码登录');
-      const r2 = await runAll(listed, ids, mode, modeName);
+      const r2 = await runAll(seeded, ids, mode, modeName);
       out = out.concat(r2.out); ok = r2.ok;
     }
   } else {
-    ({ out, ok } = await runAll(listed, ids, mode, modeName));
+    ({ out, ok } = await runAll(seeded, ids, mode, modeName));
   }
-  $.msg(scriptName, '', out.join('\n'));
+
+  /* 两条路撞的是同一堵 CF 墙时只报一次 */
+  const seen = new Set();
+  const lines = out.filter(l => {
+    const k = l.replace(/^「[^」]*」/, '');
+    if (seen.has(k)) return false;
+    seen.add(k); return true;
+  });
+  if (ok && CUR_IP) $.setdata(CUR_IP, 're0_ok_ip');
+  $.msg(scriptName, '', lines.join('\n'));
 })()
   .catch(e => { $.logErr(e); $.msg(scriptName, '❌ 执行异常', fmtErr(e)); })
   .finally(() => $.done({}));
