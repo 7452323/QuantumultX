@@ -70,10 +70,11 @@ const UA_DEFAULT = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) Apple
 let UA = UA_DEFAULT;
 const KEEP = ['token', 'refresh_token', 'csrf_access_token', 'hdh_uid', 'hdh_sa_token', 'cf_clearance'];
 
-/* 每日签到和赌狗签到是同一个 Server Action，靠请求体区分：每日 [false] / 赌狗 [true] */
+/* 每日签到和赌狗签到是同一个 Server Action，靠请求体区分：每日 [false] / 赌狗 [true]
+   ⚠️ 站点每次发版都会换 action id，这里只是兜底；真正靠下面的 discover() 自愈 */
 const ACTION_DEFAULT = {
-  login: '6014e85b3c42c65c13a43120e9713c84ff6103b035',
-  checkin: '409c3461f006f9de5e010af69e072690dd8b736acd',
+  login: '60b72a92b1ab887450d50b360c839f6b1cc3eb53de',
+  checkin: '4055877e0a65fb183d3aa623de450ded197271fb60',
 };
 const ACTION_CACHE = { login: 're0_action_login', checkin: 're0_action_checkin' };
 /* action 自愈用的页面与导出函数名（随站点构建变化） */
@@ -92,6 +93,12 @@ function cfHint(status) {
 function fmtErr(e) { return (e && e.message) ? e.message : String(e); }
 function tryJson(s) { try { return JSON.parse(s); } catch (e) { return null; } }
 function cut(s, n = 180) { return (s || '').slice(0, n).replace(/\s+/g, ' '); }
+/* RSC 响应里把服务端的 message/description 抠出来，别把整段 payload 塞进通知 */
+function rscMsg(body) {
+  const t = (body || '').replace(/\\"/g, '"');
+  const m = t.match(/"(?:message|description)":"([^"]{1,120})"/);
+  return m ? m[1] : '';
+}
 function b64(s) {
   if (typeof Buffer !== 'undefined') return Buffer.from(s, 'utf8').toString('base64');
   return btoa(unescape(encodeURIComponent(s)));
@@ -229,8 +236,17 @@ class Re0 {
   async login() {
     await this.get('/login');   // 先绑 hdh_sa_token，否则 action_token_required
     const body = JSON.stringify([{ username: this.user, password: b64(this.pass), password_transport: 'base64' }, '/']);
-    const r = await this.post('/login', this.ids.login, body);
-    if (!this.jar.token) throw new Error(`登录失败（HTTP ${r.status}）：${cut(r.body) || '空响应'}`);
+    let r = await this.post('/login', this.ids.login, body);
+    if (!this.jar.token && staleAction(r)) {              // action 换版 / 安全 token 过期 → 自愈重试一次
+      const nid = await discover('login', this.jar).catch(() => '');
+      if (nid && nid !== this.ids.login) {
+        this.ids.login = nid; $.setdata(nid, ACTION_CACHE.login);
+        $.log(`[RE0] login action 已刷新: ${nid}`);
+      }
+      await this.get('/login');
+      r = await this.post('/login', this.ids.login, body);
+    }
+    if (!this.jar.token) throw new Error(`登录失败（HTTP ${r.status}）：${rscMsg(r.body) || cut(r.body) || '空响应'}`);
     $.log(`[RE0] ${this.user} 登录成功`);
   }
 
@@ -264,7 +280,7 @@ function parseResult(resp) {
   return {
     ok: ok || already,
     already,
-    msg: text || `HTTP ${resp.status}`,
+    msg: text || (staleAction(resp) ? `HTTP ${resp.status}（Server Action 已失效）` : `HTTP ${resp.status}`),
     gained: (text.match(/获得\s*(\d+)/) || [])[1],
   };
 }
@@ -278,13 +294,17 @@ function parseProfile(body) {
   return o;
 }
 
-// ============ action 自愈：从页面 chunk 里扫 createServerReference ============
+/* action 自愈：从页面 chunk 里扫 createServerReference
+   chunk 路径出现两处：script src 的 /_next/static/chunks/xxx.js，以及 RSC flight 数据里的
+   static/chunks/app/(app)/layout-xxx.js（无 _next/ 前缀、引号被转义成 \"），两种都要吃 */
 function chunkFrom(html, page) {
-  const m = (html || '').match(/["']([^"']*_next\/static\/chunks\/[^"']*app\/[^"']*\.js)["']/g);
-  if (!m) return [];
-  const out = [];
-  for (const raw of m) {
-    const c = raw.replace(/^["']|["']$/g, '');
+  const out = [], seen = {};
+  const re = /(?:https?:\/\/[^"'\s\\]+)?\/?((?:_next\/)?static\/chunks\/[^"'\s\\]+?\.js)/g;
+  let m;
+  while ((m = re.exec(html || ''))) {
+    const c = m[1].indexOf('_next/') === 0 ? '/' + m[1] : '/_next/' + m[1];
+    if (seen[c]) continue;
+    seen[c] = 1;
     if (page === '/login' ? !/login/i.test(c) : /login/i.test(c)) continue;
     out.push(c);
   }
@@ -298,6 +318,12 @@ function actionFrom(js, fn) {
     if (fn && m[2] === fn) return m[1];
   }
   return fn ? '' : fallback;
+}
+/* Server Action 失效判定：404 not found（站点换 id）/ 428 action_token_required（安全 token 过期） */
+function staleAction(r) {
+  const b = (r && r.body) || '';
+  return (r && (r.status === 404 || r.status === 428))
+    || /Server action not found|action_token_required|安全验证已更新/.test(b);
 }
 async function discover(kind, jar) {
   const s = ACTION_SOURCE[kind];
@@ -354,16 +380,16 @@ async function runAccount(acc, ids, mode, modeName) {
   let resp = await w.checkIn();
   let r = parseResult(resp);
 
-  // action 疑似失效 → 重扫 chunk 后重试一次
-  if (!r.ok && !r.already) {
+  // action 失效（换版 404 / 安全 token 过期 428）→ 重扫 chunk 后重试一次
+  if (!r.ok && !r.already && staleAction(resp)) {
     const nid = await discover('checkin', w.jar).catch(() => '');
     if (nid && nid !== ids.checkin) {
       ids.checkin = nid; w.ids.checkin = nid;
       $.setdata(nid, ACTION_CACHE.checkin);
       $.log(`[RE0] ${modeName} action 已刷新: ${nid}`);
-      resp = await w.checkIn();
-      r = parseResult(resp);
     }
+    resp = await w.checkIn();                            // checkIn 内部会重取 / 刷新 hdh_sa_token
+    r = parseResult(resp);
   }
 
   const pf = parseProfile(resp.body);
