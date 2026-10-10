@@ -321,6 +321,82 @@
         "<span><b>免费图书馆：</b>每周五 10:00 自动对接免费图书馆书单，精选好书批量入架。</span>",
         "<span><b>脚本来源：</b>TomCatXue (https://github.com/TomCatXue/MyCookieCenter)</span>"
       ]
+    },
+    {
+      "id": "7452323_firsty",
+      "name": "Firsty 看广告领流量",
+      "author": "@7452323",
+      "repo": "https://github.com/7452323/QuantumultX",
+      "icons": [
+        "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png",
+        "https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/banner.png"
+      ],
+      "keys": [
+        "FIRSTY_REFRESH_TOKEN",
+        "FIRSTY_APPCHECK",
+        "FIRSTY_AD_WAIT_MIN",
+        "FIRSTY_AD_WAIT_MAX",
+        "FIRSTY_MAX_ROUNDS"
+      ],
+      "settings": [
+        {
+          "id": "FIRSTY_REFRESH_TOKEN",
+          "name": "Firebase Refresh Token",
+          "val": "",
+          "type": "textarea",
+          "autoGrow": true,
+          "rows": 3,
+          "desc": "定时/青龙模式必填。抓 POST https://securetoken.googleapis.com/v1/token 的响应，取 refresh_token 字段；抓不到就先用代理模式跑一次。"
+        },
+        {
+          "id": "FIRSTY_APPCHECK",
+          "name": "AppCheck 反作弊串",
+          "val": "122ec9ac6d1a92d8638e0d536aae54c48e96a52348ffaf99b4893df0897c7d8196",
+          "type": "text",
+          "desc": "complete 接口必需（64位hex），不带一律 401 INVALID_TOKEN。已内置可用值，一般不用改；代理模式拦截到 complete 时会自动更新。"
+        },
+        {
+          "id": "FIRSTY_AD_WAIT_MIN",
+          "name": "广告间最小等待（秒）",
+          "val": "15",
+          "type": "number",
+          "desc": "每个广告之间随机等待的下限，模拟真人节奏避免风控。"
+        },
+        {
+          "id": "FIRSTY_AD_WAIT_MAX",
+          "name": "广告间最大等待（秒）",
+          "val": "45",
+          "type": "number",
+          "desc": "每个广告之间随机等待的上限。"
+        },
+        {
+          "id": "FIRSTY_MAX_ROUNDS",
+          "name": "单次最多刷几次",
+          "val": "0",
+          "type": "number",
+          "desc": "0 = 刷满当日额度（默认）。"
+        }
+      ],
+      "scripts": [
+        {
+          "name": "Firsty 看广告领流量",
+          "script": "https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Firsty.js"
+        }
+      ],
+      "tasks": [
+        {
+          "name": "Firsty 自动看广告",
+          "cron": "0 8,20 * * *",
+          "script": "https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Firsty.js"
+        }
+      ],
+      "descs_html": [
+        "<span><b>Firsty：</b>eSIM 免费流量 App，看一个广告 +20MB，每日约 18 次。</span>",
+        "<span><b>协议：</b>无签名无加密，纯 Firebase ID token 鉴权；三步链路 eligibility → custom → complete。</span>",
+        "<span><b>代理模式：</b>无需任何凭据，拦截 App 请求抠实时 token 自动刷满，并把最新 refresh token 存进本地存储。</span>",
+        "<span><b>定时模式：</b>用 refresh token 自行刷新 ID token 刷满，轮换后自动落盘续用。</span>",
+        "<span><b>脚本来源：</b>7452323</span>"
+      ]
     }
   ]
 }

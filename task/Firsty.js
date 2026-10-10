@@ -1,6 +1,6 @@
 /*
 Firsty 看广告领流量 — 一个广告 20MB
-版本：1.1.0
+版本：1.2.0
 
 协议（2026-10 逆向，无签名无加密）：
   GET  /api/mobile/advertisements/v2/{uid}/eligibility            查今日剩余次数
@@ -31,6 +31,27 @@ Firsty 看广告领流量 — 一个广告 20MB
 
 [MITM]
 hostname = api.firsty.app, mobile.firsty.app, 35.186.203.117, securetoken.googleapis.com
+
+----- Surge -----
+[Script]
+Firsty-ads = type=http-response,pattern=^https?://(api\.firsty\.app|mobile\.firsty\.app|35\.186\.203\.117)/api/mobile/(advertisements/v2/[^/]+/eligibility|bundles/v4/[^/]+/data-bundles),requires-body=1,max-size=0,script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Firsty.js,timeout=900
+Firsty-appcheck = type=http-request,pattern=^https?://(api\.firsty\.app|mobile\.firsty\.app|35\.186\.203\.117)/api/mobile/advertisements/v2/[^/]+/custom/[^/]+/complete,script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Firsty.js
+Firsty-token = type=http-response,pattern=^https?://securetoken\.googleapis\.com/v1/token,requires-body=1,max-size=0,script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Firsty.js
+Firsty-cron = type=cron,cronexp="0 8,20 * * *",wakeup=true,script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Firsty.js,timeout=1800
+[MITM]
+hostname = %APPEND% api.firsty.app, mobile.firsty.app, 35.186.203.117, securetoken.googleapis.com
+
+----- Loon -----
+[Script]
+http-response ^https?://(api\.firsty\.app|mobile\.firsty\.app|35\.186\.203\.117)/api/mobile/(advertisements/v2/[^/]+/eligibility|bundles/v4/[^/]+/data-bundles) script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Firsty.js, requires-body=true, timeout=900, tag=Firsty刷广告
+http-request ^https?://(api\.firsty\.app|mobile\.firsty\.app|35\.186\.203\.117)/api/mobile/advertisements/v2/[^/]+/custom/[^/]+/complete script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Firsty.js, tag=Firsty抓appcheck
+http-response ^https?://securetoken\.googleapis\.com/v1/token script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Firsty.js, requires-body=true, tag=Firsty存token
+cron "0 8,20 * * *" script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Firsty.js, tag=Firsty定时刷, enable=true
+[MITM]
+hostname = api.firsty.app, mobile.firsty.app, 35.186.203.117, securetoken.googleapis.com
+
+----- JSBox（手动/定时运行，先在 BoxJS 或 $prefs 填 FIRSTY_REFRESH_TOKEN）-----
+  本脚本已适配 JSBox：$http / $prefs / $notification 自动识别，无 $done
 */
 
 const $ = new Env('Firsty');
@@ -76,6 +97,19 @@ function http(method, url, headers, body) {
       req.setTimeout(30000, () => req.destroy(new Error('timeout')));
       if (payload) req.write(payload);
       req.end();
+    } else if (env === 'JSBox') {
+      // JSBox: $http.get / $http.post, 回调式, 无 $done
+      const opt = {
+        url, header: headers, timeout: 30,
+        handler: resp => {
+          const st = (resp && resp.response && resp.response.statusCode) || 0;
+          let b = resp && resp.data;
+          if (b && typeof b !== 'string') b = JSON.stringify(b);
+          resolve({ status: st, body: b || '' });
+        },
+      };
+      if (method === 'GET') $http.get(opt);
+      else $http.post(Object.assign({ body: body || '' }, opt));
     } else {
       const opt = { url, headers, body, timeout: 30 };
       const cb = (err, resp, data) => err ? reject(new Error(err)) : resolve({ status: (resp && (resp.status || resp.statusCode)) || 0, body: data || '' });
@@ -257,6 +291,7 @@ function Env(name) {
       if (typeof $environment !== 'undefined' && $environment['stash-version']) return 'Stash';
       if (typeof $loon !== 'undefined') return 'Loon';
       if (typeof $rocket !== 'undefined') return 'Shadowrocket';
+      if (typeof $jsbox !== 'undefined') return 'JSBox';
       if (typeof module !== 'undefined' && module.exports) return 'Node.js';
       return 'Unknown';
     }
@@ -270,6 +305,7 @@ function Env(name) {
     getdata(k) {
       switch (this.getEnv()) {
         case 'Quantumult X': return $prefs.valueForKey(k) || '';
+        case 'JSBox': return $prefs.get(k) || '';
         case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket': return $persistentStore.read(k) || '';
         case 'Node.js': {
           try {
@@ -288,6 +324,7 @@ function Env(name) {
       switch (this.getEnv()) {
         case 'Quantumult X': return $prefs.setValueForKey(v, k);
         case 'Surge': case 'Loon': case 'Stash': case 'Shadowrocket': return $persistentStore.write(v, k);
+        case 'JSBox': $prefs.set(k, v); return true;
         case 'Node.js': {
           this.data = this.data || {};
           this.data[k] = v;
@@ -313,6 +350,7 @@ function Env(name) {
       this.log(`结束! ${el}s`);
       switch (this.getEnv()) {
         case 'Node.js': process.exit(0); break;
+        case 'JSBox': break;
         default: $done(); break;
       }
     }
