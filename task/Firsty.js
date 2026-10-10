@@ -17,6 +17,7 @@ Firsty 看广告领流量 — 一个广告 20MB
 
 [rewrite_local]
 ^https?:\/\/(api\.firsty\.app|mobile\.firsty\.app|35\.186\.203\.117)\/api\/mobile\/(advertisements\/v2\/[^\/]+\/eligibility|bundles\/v4\/[^\/]+\/data-bundles) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Firsty.js
+^https?:\/\/(api\.firsty\.app|mobile\.firsty\.app|35\.186\.203\.117)\/api\/mobile\/advertisements\/v2\/[^\/]+\/custom\/[^\/]+\/complete url script-request-header https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Firsty.js
 ^https?:\/\/securetoken\.googleapis\.com\/v1\/token url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Firsty.js
 
 [task_local]
@@ -33,6 +34,7 @@ const API_KEYS = [
   'AIzaSyDRkti8LgrV4vLCa9lpeTIG6szb_r7YMnI',
 ];
 const RT_KEY = 'FIRSTY_REFRESH_TOKEN';
+const AC_KEY = 'FIRSTY_APPCHECK';
 const AD_WAIT = Number($.getenv('FIRSTY_AD_WAIT') || 0);
 const MAX_ROUNDS = Number($.getenv('FIRSTY_MAX_ROUNDS') || 0);
 const APP_VERSION = $.getenv('FIRSTY_APP_VERSION') || '1.8.8';
@@ -93,7 +95,7 @@ function b64url(s) {
 }
 
 // 刷满当日广告额度，返回 { ok, fail, quota }
-async function runAds(origin, token, hdrBase, quotaHint) {
+async function runAds(origin, token, hdrBase, quotaHint, appcheck) {
   const uid = b64url(token.split('.')[1]).user_id;
   const EP = p => `${origin}/api/mobile${p}`;
   const H = tokenHeaders(token, hdrBase);
@@ -114,7 +116,8 @@ async function runAds(origin, token, hdrBase, quotaHint) {
       if (c.status !== 200) { fail++; $.log(`#${i} custom ${c.status}: ${String(c.body).slice(0, 120)}`); break; }
       const adId = JSON.parse(c.body).adId;
       if (AD_WAIT > 0) await sleep(AD_WAIT);
-      const d = await http('POST', EP(`/advertisements/v2/${uid}/custom/${adId}/complete`), H, '');
+      const cH = appcheck ? Object.assign({}, H, { 'x-firebase-appcheck': appcheck }) : H;
+      const d = await http('POST', EP(`/advertisements/v2/${uid}/custom/${adId}/complete`), cH, '');
       if (d.status === 204) { ok++; $.log(`#${i} ✓`); }
       else { fail++; $.log(`#${i} complete ${d.status}: ${String(d.body).slice(0, 120)}`); break; }
     } catch (e) {
@@ -147,7 +150,8 @@ async function refreshIdToken(rt) {
 if (typeof $request !== 'undefined') {
   const reqUrl = ($request && $request.url) || '';
   const reqHeaders = ($request && $request.headers) || {};
-  const outBody = $response && $response.body;
+  const hasResp = typeof $response !== 'undefined' && $response;
+  const outBody = hasResp ? $response.body : null;
 
   // 1) 拦截 Firebase 刷新响应 → 存下最新 refresh token（轮换后自动跟进）
   if (/securetoken\.googleapis\.com/.test(reqUrl)) {
@@ -159,8 +163,18 @@ if (typeof $request !== 'undefined') {
       }
     } catch (e) {}
     $done({ body: outBody });
+  } else if (/\/complete(\?|$)/.test(reqUrl)) {
+    // 2) 拦截 complete 请求 → 抠下 appcheck（complete 是全流程唯一带它的接口）
+    const ac = reqHeaders['x-firebase-appcheck'] || reqHeaders['X-Firebase-Appcheck'] || reqHeaders['X-Firebase-AppCheck'] || '';
+    if (ac && $.getdata(AC_KEY) !== ac) {
+      $.setdata(ac, AC_KEY);
+      $.log('[Firsty] 已捕获 appcheck: ' + ac.slice(0, 16) + '...');
+      $.msg($.name, '已捕获 appcheck', '下次打开 App 首页即可自动刷满');
+    }
+    if (hasResp) $done({ body: outBody });
+    else $done({});
   } else {
-    // 2) 拦截 App 广告相关请求 → 用实时 token 刷满
+    // 3) 拦截 App 广告相关请求 → 用实时 token + 已存 appcheck 刷满
     (async () => {
       const origin = (reqUrl.match(/^https?:\/\/[^/]+/) || [''])[0];
       const token = reqHeaders['authorization'] || reqHeaders['Authorization'] || '';
@@ -171,7 +185,7 @@ if (typeof $request !== 'undefined') {
       if (!token) { $.log('[Firsty] 未取到 authorization, 跳过'); $done({ body: outBody }); return; }
 
       try {
-        const r = await runAds(origin, token, base);
+        const r = await runAds(origin, token, base, undefined, $.getdata(AC_KEY));
         if (r.ok) {
           $.msg($.name, `看广告 ${r.ok} 次`, `+${r.ok * 20}MB` + (r.fail ? ` 失败${r.fail}` : ''));
           if (/\/eligibility/.test(reqUrl)) {
@@ -205,7 +219,7 @@ if (typeof $request !== 'undefined') {
     $.setdata(t.refresh, RT_KEY);
     $.log('[Firsty] token 刷新成功');
 
-    const r = await runAds(origin, t.token, {});
+    const r = await runAds(origin, t.token, {}, undefined, $.getdata(AC_KEY));
     const msg = `「Firsty」看广告 ${r.ok} 次 +${r.ok * 20}MB` + (r.fail ? ` 失败${r.fail}` : '');
     $.log(msg);
     $.msg($.name, `看广告 ${r.ok} 次`, `+${r.ok * 20}MB` + (r.fail ? ` 失败${r.fail}` : ''));
