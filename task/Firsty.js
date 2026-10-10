@@ -1,6 +1,6 @@
 /*
 Firsty 看广告领流量 — 一个广告 20MB
-版本：1.0.0
+版本：1.1.0
 
 协议（2026-10 逆向，无签名无加密）：
   GET  /api/mobile/advertisements/v2/{uid}/eligibility            查今日剩余次数
@@ -13,7 +13,13 @@ Firsty 看广告领流量 — 一个广告 20MB
   [青龙模式] 用 refresh token 自行刷新 ID token 刷满，刷新轮换后自动落盘续用
 
 环境变量：FIRSTY_REFRESH_TOKEN  青龙模式必填
-可选变量：FIRSTY_AD_WAIT 单广告等待秒数(默认0) / FIRSTY_MAX_ROUNDS 最多刷几次(默认0=刷满)
+          FIRSTY_APPCHECK       complete 必需的反作弊头(已内置兜底值, 一般不用填)
+可选变量：FIRSTY_AD_WAIT_MIN/MAX 广告间随机等待秒数(默认15~45) / FIRSTY_MAX_ROUNDS 最多刷几次(默认0=刷满)
+
+★ complete 接口必须带 x-firebase-appcheck，不带一律 401 INVALID_TOKEN（已实测）。
+  该值长期有效（3 天前的旧值仍可用），每个 App 安装生成一个固定值，服务端不校验设备绑定。
+  脚本内置兜底值，代理模式拦截到 complete 时会自动更新它。
+  连续刷 6-9 个后可能撞 409 concurrent_limit_reached（已内置退避重试）。
 
 [rewrite_local]
 ^https?:\/\/(api\.firsty\.app|mobile\.firsty\.app|35\.186\.203\.117)\/api\/mobile\/(advertisements\/v2\/[^\/]+\/eligibility|bundles\/v4\/[^\/]+\/data-bundles) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Firsty.js
@@ -35,11 +41,16 @@ const API_KEYS = [
 ];
 const RT_KEY = 'FIRSTY_REFRESH_TOKEN';
 const AC_KEY = 'FIRSTY_APPCHECK';
-const AD_WAIT = Number($.getenv('FIRSTY_AD_WAIT') || 0);
+// 每个广告之间随机等待, 模拟真人节奏, 避免固定间隔被风控
+const AD_WAIT_MIN = Number($.getenv('FIRSTY_AD_WAIT_MIN') || 15);
+const AD_WAIT_MAX = Number($.getenv('FIRSTY_AD_WAIT_MAX') || 45);
 const MAX_ROUNDS = Number($.getenv('FIRSTY_MAX_ROUNDS') || 0);
 const APP_VERSION = $.getenv('FIRSTY_APP_VERSION') || '1.8.8';
 const APP_BUILD = $.getenv('FIRSTY_APP_BUILD') || '8700';
 const DEVICE_INFO = $.getenv('FIRSTY_DEVICE_INFO') || 'iPhone9,2 15.7';
+// complete 接口必需的反作弊头，不带一律 401 INVALID_TOKEN（已实测）。
+// 长期有效：3 天前的旧值仍可用；每个 App 安装生成一个固定值，服务端不校验与设备的绑定。
+const DEFAULT_APPCHECK = '122ec9ac6d1a92d8638e0d536aae54c48e96a52348ffaf99b4893df0897c7d8196';
 
 const sleep = s => new Promise(r => setTimeout(r, s * 1000));
 
@@ -109,16 +120,32 @@ async function runAds(origin, token, hdrBase, quotaHint, appcheck) {
   if (MAX_ROUNDS > 0) quota = Math.min(quota, MAX_ROUNDS);
   $.log(`uid=${uid} 今日剩余 ${quota} 次`);
 
+  let nick = '';
+  try {
+    const ir = await http('GET', EP(`/users/v2/${uid}/info`), H, null);
+    if (ir.status === 200) nick = (JSON.parse(ir.body).data || {}).userName || '';
+  } catch (e) {}
+  if (!nick) nick = uid.slice(0, 6);
+
   let ok = 0, fail = 0;
   for (let i = 1; i <= quota; i++) {
     try {
-      const c = await http('POST', EP(`/advertisements/v2/${uid}/custom`), H, '');
+      let c = null;
+      for (let t = 0; t < 4; t++) {
+        c = await http('POST', EP(`/advertisements/v2/${uid}/custom`), H, '');
+        if (c.status === 200) break;
+        if (c.status === 409) { await sleep(4); continue; }  // concurrent_limit_reached: 等上一单结算
+        break;
+      }
       if (c.status !== 200) { fail++; $.log(`#${i} custom ${c.status}: ${String(c.body).slice(0, 120)}`); break; }
       const adId = JSON.parse(c.body).adId;
-      if (AD_WAIT > 0) await sleep(AD_WAIT);
+      if (i > 1) {
+        const w = AD_WAIT_MIN + Math.random() * Math.max(0, AD_WAIT_MAX - AD_WAIT_MIN);
+        await sleep(Math.round(w));
+      }
       const cH = appcheck ? Object.assign({}, H, { 'x-firebase-appcheck': appcheck }) : H;
       const d = await http('POST', EP(`/advertisements/v2/${uid}/custom/${adId}/complete`), cH, '');
-      if (d.status === 204) { ok++; $.log(`#${i} ✓`); }
+      if (d.status === 204) { ok++; $.log(`#${i} ✓`); $.msg(nick, '', `已观看广告${i}/${quota}次`); }
       else { fail++; $.log(`#${i} complete ${d.status}: ${String(d.body).slice(0, 120)}`); break; }
     } catch (e) {
       fail++;
@@ -126,7 +153,8 @@ async function runAds(origin, token, hdrBase, quotaHint, appcheck) {
       break;
     }
   }
-  return { ok, fail, quota, uid };
+  if (quota > 0 && ok >= quota) $.msg(nick, '', `今日已刷 ${ok}/${quota} 明日再来吧`);
+  return { ok, fail, quota, uid, nick };
 }
 
 // 用 refresh token 换 ID token，返回 { token, refresh, uid }
@@ -185,9 +213,9 @@ if (typeof $request !== 'undefined') {
       if (!token) { $.log('[Firsty] 未取到 authorization, 跳过'); $done({ body: outBody }); return; }
 
       try {
-        const r = await runAds(origin, token, base, undefined, $.getdata(AC_KEY));
+        const ac = $.getenv(AC_KEY) || $.getdata(AC_KEY) || DEFAULT_APPCHECK;
+        const r = await runAds(origin, token, base, undefined, ac);
         if (r.ok) {
-          $.msg($.name, `看广告 ${r.ok} 次`, `+${r.ok * 20}MB` + (r.fail ? ` 失败${r.fail}` : ''));
           if (/\/eligibility/.test(reqUrl)) {
             try {
               const e = JSON.parse(outBody);
@@ -219,10 +247,9 @@ if (typeof $request !== 'undefined') {
     $.setdata(t.refresh, RT_KEY);
     $.log('[Firsty] token 刷新成功');
 
-    const r = await runAds(origin, t.token, {}, undefined, $.getdata(AC_KEY));
-    const msg = `「Firsty」看广告 ${r.ok} 次 +${r.ok * 20}MB` + (r.fail ? ` 失败${r.fail}` : '');
-    $.log(msg);
-    $.msg($.name, `看广告 ${r.ok} 次`, `+${r.ok * 20}MB` + (r.fail ? ` 失败${r.fail}` : ''));
+    const ac = $.getenv(AC_KEY) || $.getdata(AC_KEY) || DEFAULT_APPCHECK;
+    const r = await runAds(origin, t.token, {}, undefined, ac);
+    $.log(`「Firsty」${r.nick} 已观看广告 ${r.ok}/${r.quota} 次`);
     $.done();
   })().catch(e => {
     $.log('[Firsty] 错误: ' + ((e && e.message) || e));
