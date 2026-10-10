@@ -139,10 +139,9 @@ async function runAds(origin, token, hdrBase, quotaHint, appcheck) {
       }
       if (c.status !== 200) { fail++; $.log(`#${i} custom ${c.status}: ${String(c.body).slice(0, 120)}`); break; }
       const adId = JSON.parse(c.body).adId;
-      if (i > 1) {
-        const w = AD_WAIT_MIN + Math.random() * Math.max(0, AD_WAIT_MAX - AD_WAIT_MIN);
-        await sleep(Math.round(w));
-      }
+      // 模拟广告播放时长, 每次随机等待
+      const w = AD_WAIT_MIN + Math.random() * Math.max(0, AD_WAIT_MAX - AD_WAIT_MIN);
+      await sleep(Math.round(w));
       const cH = appcheck ? Object.assign({}, H, { 'x-firebase-appcheck': appcheck }) : H;
       const d = await http('POST', EP(`/advertisements/v2/${uid}/custom/${adId}/complete`), cH, '');
       if (d.status === 204) { ok++; $.log(`#${i} ✓`); $.msg(nick, '', `已观看广告${i}/${quota}次`); }
@@ -212,24 +211,15 @@ if (typeof $request !== 'undefined') {
       });
       if (!token) { $.log('[Firsty] 未取到 authorization, 跳过'); $done({ body: outBody }); return; }
 
+      // 先放行 App 请求, 再后台刷 —— 否则首页要转圈等完所有广告
+      $done({ body: outBody });
       try {
         const ac = $.getenv(AC_KEY) || $.getdata(AC_KEY) || DEFAULT_APPCHECK;
-        const r = await runAds(origin, token, base, undefined, ac);
-        if (r.ok) {
-          if (/\/eligibility/.test(reqUrl)) {
-            try {
-              const e = JSON.parse(outBody);
-              e.remainingToday = Math.max(0, r.quota - r.ok);
-              e.currentDataBundles = (e.currentDataBundles || 0) + r.ok;
-              $done({ body: JSON.stringify(e) }); return;
-            } catch (err) {}
-          }
-        }
+        await runAds(origin, token, base, undefined, ac);
       } catch (e) {
         $.log('[Firsty] 出错: ' + ((e && e.message) || e));
         $.msg($.name, '刷广告出错', String((e && e.message) || e).slice(0, 120));
       }
-      $done({ body: outBody });
     })();
   }
 } else {
