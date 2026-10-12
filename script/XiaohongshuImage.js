@@ -8,10 +8,14 @@
 没有小尺寸无水印版，所以不能拿它去喂页面显示。
 */
 const UA_RE = /PostSaver/i;
+/* /notes_pre_post/ 这类图必须放过：fileId 前缀 1040g3k0（视频封面类），
+   在 sns-img-bd 上不存在，302 过去就是 404 → 整片空白（HAR 实测 404 20 次全来自它） */
+const BAD_RE = /\/notes_pre_(?:post|view)\//i;
 const IMG_RE = /^https?:\/\/sns-webpic[a-z0-9\-]*\.xhscdn\.com\/(?:[^/?#]+\/)+([^/!?#]+)!h5_1080(?:jpg|webp)(?:\?.*)?$/;
 
 const ua = ($request.headers && ($request.headers['User-Agent'] || $request.headers['user-agent'])) || '';
 if (!UA_RE.test(ua)) return $done({});
+if (BAD_RE.test($request.url)) return $done({});
 
 const m = $request.url.match(IMG_RE);
 if (!m) return $done({});
