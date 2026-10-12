@@ -1,0 +1,15 @@
+#!name=Xiaohongshu
+#!desc=小红书图片无水印原图，保存/下载即无水印
+#!author=7452323
+#!homepage=https://github.com/7452323/QuantumultX
+
+[Rule]
+AND,((PROTOCOL,QUIC),(DOMAIN-SUFFIX,xiaohongshu.com)),REJECT
+AND,((PROTOCOL,QUIC),(DOMAIN-SUFFIX,xhscdn.com)),REJECT
+
+[Rewrite]
+^https?://sns-webpic[a-z0-9\-]*\.xhscdn\.com/(?:[^/?#]+/)+([^/!?#]+)![^/?#]*(?:\?.*)?$ https://sns-img-bd.xhscdn.com/$1
+^https?://sns-webpic[a-z0-9\-]*\.xhscdn\.com/(?:[^/?#]+/)+([^/!?#]+)$ https://sns-img-bd.xhscdn.com/$1
+
+[MITM]
+hostname = sns-webpic-qc.xhscdn.com, sns-webpic.xhscdn.com, sns-webpic-bd.xhscdn.com, sns-webpic-hw.xhscdn.com
