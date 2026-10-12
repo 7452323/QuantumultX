@@ -3,6 +3,9 @@
 #!author=7452323
 #!homepage=https://github.com/7452323/QuantumultX
 
+[Rule]
+AND,((PROTOCOL,QUIC),(DOMAIN-SUFFIX,xiaohongshu.com,extended-matching)),REJECT
+
 [Script]
 XiaohongshuVideo = type=http-response,pattern=^https://www\.xiaohongshu\.com/(?:discovery/item|explore)/,script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/XiaohongshuVideo.js,requires-body=true,max-size=-1
 
