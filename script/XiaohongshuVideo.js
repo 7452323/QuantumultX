@@ -26,12 +26,18 @@ const FAST_HOST = 'sns-video-qc.xhscdn.com';
 const ALT_HOST = 'sns-video-hw.xhscdn.com';
 
 /* 原文本里 URL 后可能紧跟 \ 等 JSON 转义，反斜杠不能吞进替换结果 */
+/* 保留原 scheme + ?sign=..&t=.. —— 
+   scheme：页面原本就是 http://，保持 http 让代理不用 MITM 也能改响应头；
+   query：CDN 会忽略它（实测随便填都 200），但播放器可能校验"链接是否带签名" */
 function build(match, host, token) {
   const trimmed = match.replace(/\\+$/, '');
   const trail = match.slice(trimmed.length);
+  const q = trimmed.indexOf('?');
+  const query = q >= 0 ? trimmed.slice(q) : '';
+  const scheme = trimmed.indexOf('https:') === 0 ? 'https' : 'http';
   return (trimmed.indexOf('\\u002F') >= 0
-    ? 'https:\\u002F\\u002F' + host + '\\u002F' + token
-    : 'https://' + host + '/' + token) + trail;
+    ? scheme + ':\\u002F\\u002F' + host + '\\u002F' + token
+    : scheme + '://' + host + '/' + token) + query + trail;
 }
 
 function main() {
