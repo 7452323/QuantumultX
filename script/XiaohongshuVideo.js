@@ -1,16 +1,4 @@
 /*
-小红书去水印 —— 视频部分（图片走 302 重定向，见模块文件）
-
-笔记页里：
-- video.media.stream.*.masterUrl = sns-video-v3.xhscdn.com/stream/.../xxx.mp4?sign=...
-  是 720p 转码流，烧了水印+昵称；video.consumer.originVideoKey 才是无水印原片 key。
-
-图片不能在这里改：imageList[].url 是 sns-webpic-qc/<日期>/<hash>/<fileId>!h5_1080jpg，
-页面的 JS 依赖这个形态渲染，一旦换成 sns-img-bd/<fileId> 就整片空白。所以图片改用
-URL Rewrite 302 在 HTTP 层重定向，页面体保持原样。
-
-host 选择：三台视频 CDN 字节完全相同（md5 一致），但 bd 实测只有 0.4-2.5MB/s、
-qc/hw 20MB+/s，8.3MB 的原片喂不上就卡。所以 masterUrl 一律 qc，其余走 hw。
 
 [rewrite_local]
 ^https?:\/\/www\.xiaohongshu\.com\/(?:discovery\/item|explore)\/.*$ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/XiaohongshuVideo.js
