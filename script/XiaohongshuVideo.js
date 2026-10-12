@@ -28,6 +28,9 @@ function build(match, host, token) {
     : scheme + '://' + host + '/' + token) + query + trail;
 }
 
+/* 音轨、封面、图片一律不碰：换成视频原片会让播放器拿视频当音轨 → 没声音 */
+const SKIP_RE = /(audio|music|\/frame\/|\.webp|\.jpe?g|\.png)/i;
+
 function main() {
   const body = $response && $response.body;
   if (!body || typeof body !== 'string') return $done({});
@@ -39,11 +42,13 @@ function main() {
   let n = 0;
   /* masterUrl 先换成最快的 qc；换完就没有 .mp4 尾巴了，后面的兜底 pass 不会再碰它 */
   let out = body.replace(MASTER_RE, function (_, pre, url) {
+    if (SKIP_RE.test(url)) return pre + url;
     n++;
     return pre + build(url, FAST_HOST, key);
   });
   /* 其余（backupUrls 等）一律走同样快的 hw —— bd 喂不动 8.3MB 原片 */
   out = out.replace(VID_RE, function (s) {
+    if (SKIP_RE.test(s)) return s;
     n++;
     return build(s, ALT_HOST, key);
   });
