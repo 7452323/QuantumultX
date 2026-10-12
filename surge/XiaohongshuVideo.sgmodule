@@ -1,0 +1,21 @@
+#!name=Post Saver 保存无水印
+#!desc=单纯为Post Saver导入小红书链接去水印
+#!author=7452323
+#!homepage=https://github.com/7452323/QuantumultX
+
+[Rule]
+# 图片 CDN 走 QUIC 会绕过 MITM，重定向就不生效
+AND,((PROTOCOL,QUIC),(DOMAIN,sns-webpic-qc.xhscdn.com)),REJECT
+
+[URL Rewrite]
+# sns-webpic-qc/<日期>/<hash>/<fileId>!h5_1080jpg → sns-img-bd/<fileId> 无水印原图
+# 在 HTTP 层重定向，页面体不动，所以页面自己的图片渲染不受影响
+^https?://sns-webpic[a-z0-9\-]*\.xhscdn\.com/(?:[^/?#]+/)+([^/!?#]+)(?:![^/?#]*)?(?:\?.*)?$ https://sns-img-bd.xhscdn.com/$1 302
+
+[Script]
+XiaohongshuVideo = type=http-response,pattern=^https://www\.xiaohongshu\.com/(?:discovery/item|explore)/,script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/XiaohongshuVideo.js,requires-body=true,max-size=-1
+# 有的原片被 CDN 标成 application/octet-stream，播放器会当"链接过期"处理
+XiaohongshuVideoType = type=http-response,pattern=^https?://sns-video-[a-z0-9\-]+\.xhscdn\.com/,script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/XiaohongshuVideoType.js
+
+[MITM]
+hostname = %APPEND% www.xiaohongshu.com, sns-webpic-qc.xhscdn.com, sns-webpic.xhscdn.com, sns-video-qc.xhscdn.com, sns-video-hw.xhscdn.com, sns-video-bd.xhscdn.com
