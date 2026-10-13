@@ -1,4 +1,6 @@
 /* IG 受限内容修复：embed 被判 invalid（仅关注者可见等）时用登录会话重取 */
+let ARGS = null;
+
 const FB_UA = 'facebookexternalhit/1.1';
 const DESK_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36';
 const ALPHA = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
@@ -17,7 +19,24 @@ if (!/instagram\.com\/.*\/embed\//.test(url) || !code || !broken) {
 }
 
 function arg(name) {
-    if (typeof $argument !== 'undefined' && $argument && $argument[name]) return $argument[name];
+    if (ARGS === null) {
+        ARGS = {};
+        const a = (typeof $argument !== 'undefined') ? $argument : '';
+        if (a && typeof a === 'object') { ARGS = a; }
+        else if (typeof a === 'string' && a) {
+            const t = a.trim();
+            if (t.charAt(0) === '{') { try { ARGS = JSON.parse(t); } catch (e) {} }
+            if (Object.keys(ARGS).length) { /* json 已解析 */ }
+            else a.split('&').forEach(function (kv) {
+                const i = kv.indexOf('=');
+                if (i < 0) return;
+                const k = decodeURIComponent(kv.slice(0, i));
+                const v = decodeURIComponent(kv.slice(i + 1));
+                if (k) ARGS[k] = v;
+            });
+        }
+    }
+    if (ARGS[name]) return ARGS[name];
     try { if (typeof $persistentStore !== 'undefined') { const v = $persistentStore.read(name); if (v) return v; } } catch (e) {}
     try { if (typeof $prefs !== 'undefined') { const v = $prefs.valueForKey(name); if (v) return v; } } catch (e) {}
     if (name === 'IG_SESSION') return IG_SESSION_FALLBACK;
