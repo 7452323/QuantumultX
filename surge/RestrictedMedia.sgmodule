@@ -3,7 +3,7 @@
 #!author=7452323
 #!homepage=https://github.com/7452323/QuantumultX
 #!arguments=IG_SESSION,X_COOKIE
-#!arguments-desc=IG_SESSION\nInstagram 网页版 cookie 里 sessionid 的值（只填值，别写 sessionid=）。仅关注者可见 / 受限的帖子必须填。\n\nX_COOKIE\nX 的 cookie，一般不用填。脚本先走 api.fxtwitter.com，不通时才用它拉主站页。
+#!arguments-desc=IG_SESSION\nInstagram 网页版 cookie 里 sessionid 的值（只填值，别写 sessionid=）。仅关注者可见 / 年龄限制 的帖子必须填（不填只剩一张 640×640 糊图）。\n\nX_COOKIE\nX 的 cookie，一般不用填。脚本先走 api.fxtwitter.com，不通时才用它拉主站页。
 
 [Rule]
 # QUIC 会绕过 MITM
