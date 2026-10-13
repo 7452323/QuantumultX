@@ -5,7 +5,9 @@
 #!homepage=https://github.com/7452323/QuantumultX
 
 [Script]
-http-response ^https?:\/\/(api\.meiyan\.com|api-tool-meiyan\.meituyun\.com)\/vip\/(user_info|user_center|user_subscription_info|center_module) script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/MeiYanXiagJi.js, requires-body=true, timeout=60, tag=美颜相机-解锁
+http-response ^https?:\/\/api\.account\.meitu\.com\/(users\/show_current|common\/check_device_login_pwd_list) script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/MeiYanXiagJi.js, requires-body=true, timeout=60, tag=美颜相机-账号会员
+http-response ^https?:\/\/vesdk\.meitu\.com\/subscribe\/func_limit_batch_query script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/MeiYanXiagJi.js, requires-body=true, timeout=60, tag=美颜相机-功能限额
+http-response ^https?:\/\/(api\.meiyan\.com|api-tool-meiyan\.meituyun\.com)\/vip\/(user_info|user_center|user_subscription_info|center_module) script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/MeiYanXiagJi.js, requires-body=true, timeout=60, tag=美颜相机-会员中心
 
 [MITM]
-hostname = api.meiyan.com, api-tool-meiyan.meituyun.com, api-user-meiyan.meituyun.com
+hostname = api.account.meitu.com, vesdk.meitu.com, api.meiyan.com, api-tool-meiyan.meituyun.com
