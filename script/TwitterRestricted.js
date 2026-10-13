@@ -3,6 +3,7 @@ const SYND_RE = /^https:\/\/cdn\.syndication\.twimg\.com\/tweet-result/;
 const UA = 'PostSaver/17 CFNetwork/3896.100.1.2.1 Darwin/27.0.0';
 const BROWSER = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
 const SRC = ['https://api.fxtwitter.com/status/', 'https://api.vxtwitter.com/status/'];
+const X_COOKIE_FALLBACK = '';
 
 const url = ($request && $request.url) || '';
 const body = ($response && typeof $response.body === 'string') ? $response.body : '';
@@ -18,6 +19,7 @@ function arg(name) {
     if (typeof $argument !== 'undefined' && $argument && $argument[name]) return $argument[name];
     try { if (typeof $persistentStore !== 'undefined') { const v = $persistentStore.read(name); if (v) return v; } } catch (e) {}
     try { if (typeof $prefs !== 'undefined') { const v = $prefs.valueForKey(name); if (v) return v; } } catch (e) {}
+    if (name === 'X_COOKIE') return X_COOKIE_FALLBACK;
     return '';
 }
 
