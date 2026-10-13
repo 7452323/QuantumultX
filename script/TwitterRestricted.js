@@ -1,4 +1,6 @@
 /* X 敏感推文修复：syndication 返回 TweetTombstone 时重建响应体 */
+let ARGS = null;
+
 const SYND_RE = /^https:\/\/cdn\.syndication\.twimg\.com\/tweet-result/;
 const UA = 'PostSaver/17 CFNetwork/3896.100.1.2.1 Darwin/27.0.0';
 const BROWSER = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
@@ -16,7 +18,24 @@ if (!SYND_RE.test(url) || !id || (body && body.indexOf('TweetTombstone') < 0)) {
 }
 
 function arg(name) {
-    if (typeof $argument !== 'undefined' && $argument && $argument[name]) return $argument[name];
+    if (ARGS === null) {
+        ARGS = {};
+        const a = (typeof $argument !== 'undefined') ? $argument : '';
+        if (a && typeof a === 'object') { ARGS = a; }
+        else if (typeof a === 'string' && a) {
+            const t = a.trim();
+            if (t.charAt(0) === '{') { try { ARGS = JSON.parse(t); } catch (e) {} }
+            if (Object.keys(ARGS).length) { /* json 已解析 */ }
+            else a.split('&').forEach(function (kv) {
+                const i = kv.indexOf('=');
+                if (i < 0) return;
+                const k = decodeURIComponent(kv.slice(0, i));
+                const v = decodeURIComponent(kv.slice(i + 1));
+                if (k) ARGS[k] = v;
+            });
+        }
+    }
+    if (ARGS[name]) return ARGS[name];
     try { if (typeof $persistentStore !== 'undefined') { const v = $persistentStore.read(name); if (v) return v; } } catch (e) {}
     try { if (typeof $prefs !== 'undefined') { const v = $prefs.valueForKey(name); if (v) return v; } } catch (e) {}
     if (name === 'X_COOKIE') return X_COOKIE_FALLBACK;
