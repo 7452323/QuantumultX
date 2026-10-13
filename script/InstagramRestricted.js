@@ -11,6 +11,7 @@ const url = ($request && $request.url) || '';
 const body = ($response && typeof $response.body === 'string') ? $response.body : '';
 const code = (url.match(/\/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/) || [])[1] || '';
 const broken = !body || body.indexOf('utm_campaign=invalid') > -1 || body.indexOf('EmbeddedMediaImage') < 0;
+const ageGated = /age-restricted/i.test(body);
 
 if (!/instagram\.com\/.*\/embed\//.test(url) || !code || !broken) {
     $done({});
@@ -162,7 +163,7 @@ function shortcodeToId(c) {
 function step1() {
     const ck = cookie();
     if (!ck) {
-        notify('未配置会话', '仅关注者可见的帖子需要登录，请填 IG_SESSION');
+        notify('需要登录会话', ageGated ? '此帖年龄限制，IG 服务端强制登录 —— 请填 IG_SESSION' : '此帖仅关注者可见 —— 请填 IG_SESSION');
         return step2();
     }
     get({ url: url, headers: { 'User-Agent': FB_UA, 'Cookie': ck, 'Accept-Language': 'zh-CN,zh-Hans;q=0.9' } }, function (html) {
