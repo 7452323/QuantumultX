@@ -1,0 +1,11 @@
+#!name=美颜相机 会员
+#!desc=美颜相机 - 解锁会员(紫钻VIP)
+#!author=7452323
+#!icon=https://raw.githubusercontent.com/7452323/QuantumultX/main/icon/Loon.png
+#!homepage=https://github.com/7452323/QuantumultX
+
+[Script]
+http-response ^https?:\/\/(api\.meiyan\.com|api-tool-meiyan\.meituyun\.com)\/vip\/(user_info|user_center|user_subscription_info|center_module) script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/MeiYanXiagJi.js, requires-body=true, timeout=60, tag=美颜相机-解锁
+
+[MITM]
+hostname = api.meiyan.com, api-tool-meiyan.meituyun.com, api-user-meiyan.meituyun.com
