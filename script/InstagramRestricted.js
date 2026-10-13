@@ -1,7 +1,7 @@
 /* Instagram 受限内容修复：embed 被判 invalid 时，先用登录会话重取，再用主站 og 兜底重建 */
-const SESSION = '';
 const UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
 const ALPHA = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+const SESSION_FALLBACK = '';
 
 const url = ($request && $request.url) || '';
 const body = ($response && typeof $response.body === 'string') ? $response.body : '';
@@ -11,6 +11,21 @@ if (!/instagram\.com\/.*\/embed\//.test(url) || !code || body.indexOf('EmbeddedM
     $done({});
 } else {
     withSession();
+}
+
+function arg(name) {
+    if (typeof $argument !== 'undefined' && $argument && $argument[name]) return $argument[name];
+    try { if (typeof $persistentStore !== 'undefined') { const v = $persistentStore.read(name); if (v) return v; } } catch (e) {}
+    try { if (typeof $prefs !== 'undefined') { const v = $prefs.valueForKey(name); if (v) return v; } } catch (e) {}
+    if (name === 'IG_SESSION') return SESSION_FALLBACK;
+    return '';
+}
+
+function notify(sub, msg) {
+    try {
+        if (typeof $notification !== 'undefined' && $notification.post) $notification.post('Instagram 受限内容修复', sub, msg);
+        else if (typeof $notify !== 'undefined') $notify('Instagram 受限内容修复', sub, msg);
+    } catch (e) {}
 }
 
 function shortcodeToId(c) {
@@ -27,20 +42,15 @@ function get(req, cb) {
     } else { cb(null, null); }
 }
 
-function ok(html) {
-    $done({
-        response: {
-            status: 200,
-            headers: { 'Content-Type': 'text/html; charset=utf-8', 'Access-Control-Allow-Origin': '*' },
-            body: html
-        }
-    });
-}
-
 function withSession() {
-    if (!SESSION) return fallback();
-    get({ url: url, headers: { 'User-Agent': UA, 'Cookie': 'sessionid=' + SESSION } }, function (html) {
-        if (html && html.indexOf('EmbeddedMediaImage') > -1) return ok(html);
+    const session = arg('IG_SESSION');
+    if (!session) { notify('未配置会话', '只能取到封面图，视频需填 IG_SESSION'); return fallback(); }
+    get({ url: url, headers: { 'User-Agent': UA, 'Cookie': 'sessionid=' + session } }, function (html) {
+        if (html && html.indexOf('EmbeddedMediaImage') > -1) {
+            notify('已用登录会话取回', code, '');
+            return $done({ body: html });
+        }
+        notify('会话无效', 'sessionid 可能已过期', '退回封面图');
         fallback();
     });
 }
@@ -50,7 +60,7 @@ function fallback() {
     get({ url: page, headers: { 'User-Agent': UA, 'Accept-Language': 'en-US,en;q=0.9' } }, function (html) {
         if (!html) return $done({});
         const img = (html.match(/<meta property="og:image" content="([^"]+)"/) || [])[1] || '';
-        if (!img) return $done({});
+        if (!img) { notify('兜底也失败', '主站未返回 og:image', ''); return $done({}); }
         const desc = (html.match(/<meta property="og:description" content="([^"]*)"/) || [])[1] || '';
         const cap = desc.replace(/^[^:]*:\s*/, '').replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&#x([0-9a-f]+);/gi, function (m, h) {
             return String.fromCharCode(parseInt(h, 16));
@@ -70,6 +80,6 @@ function fallback() {
             '<div class="CaptionComments"><span>' + cap + '</span></div>' +
             '<script>require([["PolarisEmbedSimple","init",[],[{"isRichEmbed":true,"contextJSON":' +
             JSON.stringify(JSON.stringify(ctx)) + '}]]]);</script></body></html>';
-        ok(out);
+        $done({ body: out });
     });
 }
