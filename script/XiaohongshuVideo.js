@@ -13,10 +13,7 @@ const MASTER_RE = /("(?:masterUrl|master_url)"\s*:\s*")(https?:(?:\\u002F|\/){2}
 const FAST_HOST = 'sns-video-qc.xhscdn.com';
 const ALT_HOST = 'sns-video-hw.xhscdn.com';
 
-/* 原文本里 URL 后可能紧跟 \ 等 JSON 转义，反斜杠不能吞进替换结果 */
-/* 保留原 scheme + ?sign=..&t=.. —— 
-   scheme：页面原本就是 http://，保持 http 让代理不用 MITM 也能改响应头；
-   query：CDN 会忽略它（实测随便填都 200），但播放器可能校验"链接是否带签名" */
+/* 保留原 scheme 和 ?sign=..&t=..（播放器校验签名形态），URL 后紧跟的 JSON 转义反斜杠不能吞 */
 function build(match, host, token) {
   const trimmed = match.replace(/\\+$/, '');
   const trail = match.slice(trimmed.length);
@@ -28,9 +25,7 @@ function build(match, host, token) {
     : scheme + '://' + host + '/' + token) + query + trail;
 }
 
-/* 音轨、封面、图片一律不碰：换成视频原片会让播放器拿视频当音轨 → 没声音 */
-/* 实况图（live photo）的视频轨也不碰：它 streamType=19，路径带 /10/19/、文件名 _19.mp4。
-   实况图是图片组件在播，换成主视频原片会让整块实况图废掉 */
+/* 音轨/封面/图片、实况图视频轨(路径 /10/19/、文件名 _19.mp4)一律不碰，否则没声音或实况图废掉 */
 const SKIP_RE = /(audio|music|\/frame\/|\.webp|\.jpe?g|\.png)/i;
 const LIVE_RE = /\/10\/19\/|_19\.mp4/i;
 
@@ -43,13 +38,13 @@ function main() {
   const key = km[1];
 
   let n = 0;
-  /* masterUrl 先换成最快的 qc；换完就没有 .mp4 尾巴了，后面的兜底 pass 不会再碰它 */
+  /* masterUrl 换最快的 qc；换完没有 .mp4 尾巴，兜底 pass 不会再碰它 */
   let out = body.replace(MASTER_RE, function (_, pre, url) {
     if (SKIP_RE.test(url) || LIVE_RE.test(url)) return pre + url;
     n++;
     return pre + build(url, FAST_HOST, key);
   });
-  /* 其余（backupUrls 等）一律走同样快的 hw —— bd 喂不动 8.3MB 原片 */
+  /* 其余（backupUrls 等）走同样快的 hw，bd 喂不动原片 */
   out = out.replace(VID_RE, function (s) {
     if (SKIP_RE.test(s) || LIVE_RE.test(s)) return s;
     n++;
