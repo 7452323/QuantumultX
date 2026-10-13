@@ -1,22 +1,20 @@
-/* IG 受限内容修复：embed 被判 invalid（仅关注者可见等）时用登录会话重取 */
+/* IG 受限内容修复：App 拿到的 embed 被判 invalid 时，改用 IG web GraphQL 重建 */
 let ARGS = null;
 
-const FB_UA = 'facebookexternalhit/1.1';
-const DESK_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36';
-const ALPHA = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
-const IG_SESSION_FALLBACK = '';
-const IG_COOKIE_FALLBACK = '';
+const GQL = 'https://www.instagram.com/graphql/query';
+const HOME = 'https://www.instagram.com/';
+const DOC_ID = '27128499623469141';
+const DESK_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
 const url = ($request && $request.url) || '';
 const body = ($response && typeof $response.body === 'string') ? $response.body : '';
-const code = (url.match(/\/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/) || [])[1] || '';
+const code = (url.match(/\/(?:p|reel|reels|tv)\/([A-Za-z0-9_-]+)/) || [])[1] || '';
 const broken = !body || body.indexOf('utm_campaign=invalid') > -1 || body.indexOf('EmbeddedMediaImage') < 0;
-const ageGated = /age-restricted/i.test(body);
 
 if (!/instagram\.com\/.*\/embed\//.test(url) || !code || !broken) {
     $done({});
 } else {
-    step1();
+    run();
 }
 
 function arg(name) {
@@ -27,8 +25,7 @@ function arg(name) {
         else if (typeof a === 'string' && a) {
             const t = a.trim();
             if (t.charAt(0) === '{') { try { ARGS = JSON.parse(t); } catch (e) {} }
-            if (Object.keys(ARGS).length) { /* json 已解析 */ }
-            else a.split('&').forEach(function (kv) {
+            if (!Object.keys(ARGS).length) a.split('&').forEach(function (kv) {
                 const i = kv.indexOf('=');
                 if (i < 0) return;
                 const k = decodeURIComponent(kv.slice(0, i));
@@ -40,16 +37,23 @@ function arg(name) {
     if (ARGS[name]) return ARGS[name];
     try { if (typeof $persistentStore !== 'undefined') { const v = $persistentStore.read(name); if (v) return v; } } catch (e) {}
     try { if (typeof $prefs !== 'undefined') { const v = $prefs.valueForKey(name); if (v) return v; } } catch (e) {}
-    if (name === 'IG_SESSION') return IG_SESSION_FALLBACK;
-    if (name === 'IG_COOKIE') return IG_COOKIE_FALLBACK;
     return '';
 }
 
-function cookie() {
-    const c = arg('IG_COOKIE');
-    if (c) return c;
-    const s = arg('IG_SESSION');
-    return s ? 'sessionid=' + s : '';
+/* 会话值容错：只填值 / sessionid=xxx / 整条 cookie 串 都认 */
+function normSession(s) {
+    s = String(s || '').trim();
+    if (!s) return '';
+    const m = s.match(/(?:^|;\s*)sessionid=([^;]+)/);
+    if (m) return m[1].trim();
+    if (s.indexOf('=') > -1) {
+        const parts = s.split(/;\s*/);
+        for (let i = 0; i < parts.length; i++) {
+            const j = parts[i].indexOf('=');
+            if (j > 0 && parts[i].slice(0, j).trim() === 'sessionid') return parts[i].slice(j + 1).trim();
+        }
+    }
+    return s;
 }
 
 function notify(sub, msg) {
@@ -61,224 +65,151 @@ function notify(sub, msg) {
 
 function get(req, cb) {
     if (typeof $httpClient !== 'undefined') {
-        $httpClient.get(req, function (e, r, d) { cb(e ? null : d); });
+        $httpClient.get(req, function (e, r, d) { cb(e ? null : d, r, d); });
     } else if (typeof $task !== 'undefined') {
-        $task.fetch(req).then(function (r) { cb(r.body); }, function () { cb(null); });
+        $task.fetch(req).then(function (r) { cb(r.body, r, r.body); }, function () { cb(null); });
     } else { cb(null); }
 }
 
-function unesc(s) {
-    return s.replace(/\\u0025/g, '%').replace(/\\u0026/g, '&').replace(/\\u003D/g, '=')
-        .replace(/\\u003C/g, '<').replace(/\\u003E/g, '>').replace(/\\\//g, '/').replace(/&amp;/g, '&')
-        .replace(/&#x([0-9a-f]+);/gi, function (m, h) { return String.fromCharCode(parseInt(h, 16)); })
-        .replace(/&#(\d+);/g, function (m, d) { return String.fromCharCode(parseInt(d, 10)); })
-        .replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+function post(req, cb) {
+    if (typeof $httpClient !== 'undefined') {
+        $httpClient.post(req, function (e, r, d) { cb(e, r, e ? null : d); });
+    } else if (typeof $task !== 'undefined') {
+        $task.fetch({ url: req.url, method: 'POST', headers: req.headers, body: req.body })
+            .then(function (r) { cb(null, r, r.body); }, function (e) { cb(e, null, null); });
+    } else { cb('no http', null, null); }
 }
 
-function cleanCap(s) {
-    if (!s) return '';
-    return unesc(s).replace(/\\n/g, '\n').replace(/\\"/g, '"')
-        .replace(/^\d+\s*likes?,\s*\d+\s*comments?\s*-\s*/i, '')
-        .replace(/^\d+\s*[^,]*,\s*\d{4}\s*$/, '').trim();
+/* App 自己请求带的 cookie + 用户填的会话 */
+function reqCookie() {
+    const jar = {};
+    const raw = ($request && $request.headers && ($request.headers.Cookie || $request.headers.cookie)) || '';
+    String(raw).split(/;\s*/).forEach(function (p) {
+        const i = p.indexOf('=');
+        if (i > 0) jar[p.slice(0, i).trim()] = p.slice(i + 1).trim();
+    });
+    const c = arg('IG_COOKIE');
+    if (c) String(c).split(/;\s*/).forEach(function (p) {
+        const i = p.indexOf('=');
+        if (i > 0) jar[p.slice(0, i).trim()] = p.slice(i + 1).trim();
+    });
+    const s = normSession(arg('IG_SESSION'));
+    if (s) jar.sessionid = s;
+    return jar;
 }
 
-/* 从 video_versions 数组挑可播的那条：优先 type 101，排除 DASH 分片 */
+function cookieStr(jar) {
+    return Object.keys(jar).map(function (k) { return k + '=' + jar[k]; }).join('; ');
+}
+
+function run() {
+    const jar = reqCookie();
+    if (jar.csrftoken) return gql(jar);
+    get({ url: HOME, headers: { 'User-Agent': DESK_UA, 'Accept': 'text/html,application/xhtml+xml' } }, function (html, resp) {
+        const setc = (resp && resp.headers && (resp.headers['Set-Cookie'] || resp.headers['set-cookie'])) || '';
+        const m = String(setc).match(/csrftoken=([^;]+)/);
+        if (m) jar.csrftoken = m[1];
+        if (!jar.csrftoken && html) {
+            const m2 = String(html).match(/csrftoken["']?\s*[:=]\s*["']([A-Za-z0-9_-]{10,})/);
+            if (m2) jar.csrftoken = m2[1];
+        }
+        gql(jar);
+    });
+}
+
+function gql(jar) {
+    const hdrs = {
+        'User-Agent': DESK_UA,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': '*/*',
+        'Accept-Language': 'en-US,en;q=0.8',
+        'Referer': 'https://www.instagram.com/',
+        'X-IG-App-ID': '936619743392459',
+        'Cookie': cookieStr(jar)
+    };
+    if (jar.csrftoken) hdrs['x-csrftoken'] = jar.csrftoken;
+    const vars = '{"shortcode":"' + code + '","__relay_internal__pv__PolarisAIGMMediaWebLabelEnabledrelayprovider":false}';
+    const payload = 'variables=' + encodeURIComponent(vars) + '&doc_id=' + DOC_ID + '&server_timestamps=true';
+    post({ url: GQL, headers: hdrs, body: payload }, function (err, resp, data) {
+        let item = null;
+        try { item = JSON.parse(data).data.xdt_api__v1__media__shortcode__web_info.items[0]; } catch (e) {}
+        if (!item) {
+            if (!jar.sessionid) return notify('需要登录会话', '此帖 IG 拒绝匿名访问（年龄限制 / 仅关注者可见）—— 请填 IG_SESSION');
+            return notify('取数据失败', '会话可能已失效，请重新获取 sessionid');
+        }
+        const vid = pickVid(item.video_versions);
+        const img = bigImg(item);
+        const w = item.original_width || 1080, h = item.original_height || 1350;
+        const owner = (item.user || {}).username || '';
+        const cap = ((item.caption || {}).text) || '';
+        const sm = {
+            __typename: vid ? 'GraphVideo' : (item.carousel_media ? 'GraphSidecar' : 'GraphImage'),
+            id: String(item.pk || item.id || ''),
+            shortcode: code,
+            is_video: !!vid,
+            display_url: img,
+            display_resources: (function () {
+                const c = (item.image_versions2 || {}).candidates || [];
+                return c.length ? c.map(function (x) { return { src: x.url, config_width: x.width, config_height: x.height }; })
+                    : [{ src: img, config_width: w, config_height: h }];
+            })(),
+            thumbnail_src: img,
+            dimensions: { height: h, width: w },
+            owner: { username: owner, is_verified: false },
+            edge_media_to_caption: { edges: [{ node: { text: cap } }] },
+            edge_media_to_comment: { count: item.comment_count || 0 },
+            edge_liked_by: { count: item.like_count || 0 },
+            accessibility_caption: item.accessibility_caption || null,
+            product_type: item.product_type || 'clips'
+        };
+        if (vid) {
+            sm.video_url = vid;
+            sm.video_duration = Math.round((item.video_duration || 0) * 1000);
+            sm.video_view_count = item.view_count || 0;
+        }
+        const ctx = { context: { type: sm.__typename, shortcode: code, copyright_blocked: false }, gql_data: { shortcode_media: sm } };
+        const rid = Math.random().toString(36).slice(2, 12);
+        const link = 'https://www.instagram.com/reel/' + code + '/?utm_source=ig_embed&ig_rid=' + rid;
+        $done({ body: '<!DOCTYPE html><html><head><meta charset="utf-8">'
+            + '<meta property="og:image" content="' + esc(img) + '">'
+            + '<meta property="og:description" content="' + esc(cap).slice(0, 200) + '">'
+            + '</head><body><div class="EmbeddedMedia">'
+            + '<div class="EmbeddedMediaImageContainer"><a href="' + link + '" data-ios-link="media?id=' + code + '&utm_source=ig_embed&ig_rid=' + rid + '" data-log-event="mediaClick" target="_blank">'
+            + '<img class="EmbeddedMediaImage" alt="Instagram post shared by &#064;' + esc(owner) + '" src="' + esc(img) + '"></a></div>'
+            + '<div class="Caption">' + esc(cap) + '</div>'
+            + '<div class="CaptionComments"><a class="CaptionCommentsExpand" href="' + link + '" target="_blank">View all comments</a></div>'
+            + '</div><script>require([["PolarisEmbedSimple","init",[],[{"isRichEmbed":true,"isSidecar":false,"isGuideEmbed":false,"isProfileEmbed":false,"contextJSON":'
+            + JSON.stringify(JSON.stringify(ctx)) + '}]]]);</script></body></html>' });
+        notify('已重建', '@' + owner + (vid ? ' 视频 ' + w + 'x' + h : ' 图片'), vid ? vid.slice(0, 70) : img.slice(0, 70));
+    });
+}
+
+/* 挑最大分辨率封面：默认那套最大只有 640，是糊图根因 */
+function bigImg(item) {
+    const c = (item.image_versions2 || {}).candidates || [];
+    let best = '', bestPx = -1;
+    for (let i = 0; i < c.length; i++) {
+        const w = c[i].width || 0, h = c[i].height || 0;
+        if (w * h > bestPx) { bestPx = w * h; best = c[i].url || ''; }
+    }
+    return best || item.display_uri || '';
+}
+
+/* 挑可播 mp4：优先 type 101，排除 DASH 分片 */
 function pickVid(list) {
     if (!list || !list.length) return '';
-    let best = '', bestW = -1;
+    let best = '', score = -1;
     for (let i = 0; i < list.length; i++) {
         const v = list[i] || {}, u = String(v.url || '');
         if (u.indexOf('.mp4') < 0) continue;
         if (u.indexOf('dashinit') > -1 || u.indexOf('bytestart') > -1 || u.indexOf('byteend') > -1) continue;
-        const w = v.width || parseInt((u.match(/\/(\d+)x(\d+)\//) || [])[1] || '0', 10);
-        const bonus = (v.type === 101) ? 100000 : 0;
-        if (w + bonus > bestW) { bestW = w + bonus; best = u; }
+        const s = (v.width || 0) + (v.type === 101 ? 100000 : 0);
+        if (s > score) { score = s; best = u; }
     }
     return best;
 }
 
-function parse(html) {
-    const grab = function (re) { const x = html.match(re); return x ? unesc(x[1]) : ''; };
-    let image = grab(/<meta[^>]*og:image[^>]*content="([^"]+)"/);
-    if (!image) image = grab(/"display_url":"((?:[^"\\]|\\.)+?)"/);
-    if (!image) image = grab(/"image_versions2":\{"candidates":\[\{"width":\d+,"height":\d+,"url":"((?:[^"\\]|\\.)+?)"/);
-    if (!image) return null;
-
-    let video = '';
-    const i = html.indexOf('video_versions');
-    if (i > -1) {
-        const flat = html.slice(i, i + 30000)
-            .replace(/\\\\\//g, '/').replace(/\\\//g, '/').replace(/\\"/g, '"').replace(/\\\\u0026/g, '&').replace(/\\u0026/g, '&');
-        const s0 = flat.indexOf('[');
-        if (s0 > -1) {
-            let depth = 0, end = -1;
-            for (let k = s0; k < flat.length; k++) {
-                if (flat[k] === '[') depth++;
-                else if (flat[k] === ']') { depth--; if (!depth) { end = k + 1; break; } }
-            }
-            if (end > 0) {
-                const arr = flat.slice(s0, end);
-                const re = /"type":(\d+),"url":"([^"]+)"/g;
-                let m, bestW = -1;
-                while ((m = re.exec(arr))) {
-                    const u = m[2].replace(/&amp;/g, '&');
-                    if (u.indexOf('.mp4') < 0) continue;
-                    if (u.indexOf('dashinit') > -1 || u.indexOf('bytestart') > -1 || u.indexOf('byteend') > -1) continue;
-                    const w = parseInt((u.match(/\/(\d+)x(\d+)\//) || [])[1] || '0', 10);
-                    if (w > bestW) { bestW = w; video = u; }
-                }
-                if (!video) {
-                    const re2 = /"url":"([^"]+\.mp4[^"]*)"/g;
-                    while ((m = re2.exec(arr))) {
-                        const u = m[1].replace(/&amp;/g, '&');
-                        if (u.indexOf('dashinit') > -1 || u.indexOf('bytestart') > -1) continue;
-                        video = u; break;
-                    }
-                }
-            }
-        }
-    }
-    let caption = '';
-    const cm = html.match(/"edge_media_to_caption":\{"edges":\[\{"node":\{"text":"((?:[^"\\]|\\.)+?)"/);
-    if (cm) caption = cleanCap(cm[1]);
-    if (!caption) caption = cleanCap(grab(/<meta[^>]*og:description[^>]*content="([^"]*)"/));
-    return {
-        owner: grab(/"owner":\{"id":"\d+","username":"([^"]+)"/) || grab(/"username":"([^"]+)"/),
-        image: image, video: video,
-        dur: parseFloat(grab(/"video_duration":([0-9.]+)/)) || 0,
-        w: parseInt(grab(/"dimensions":\{"height":\d+,"width":(\d+)\}/), 10) || 720,
-        h: parseInt(grab(/"dimensions":\{"height":(\d+)/), 10) || 1280,
-        type: (video ? 'GraphVideo' : 'GraphImage'),
-        caption: caption
-    };
-}
-
-function shortcodeToId(c) {
-    let n = 0n;
-    for (let i = 0; i < c.length; i++) n = n * 64n + BigInt(ALPHA.indexOf(c[i]));
-    return n.toString();
-}
-
-/* 1) 带登录会话重取同一个 embed —— 仅关注者可见的帖子只有这条路能出内容 */
-function step1() {
-    const ck = cookie();
-    if (!ck) {
-        notify('需要登录会话', ageGated ? '此帖年龄限制，IG 服务端强制登录 —— 请填 IG_SESSION' : '此帖仅关注者可见 —— 请填 IG_SESSION');
-        return step2();
-    }
-    get({ url: url, headers: { 'User-Agent': FB_UA, 'Cookie': ck, 'Accept-Language': 'zh-CN,zh-Hans;q=0.9' } }, function (html) {
-        if (html && html.indexOf('EmbeddedMediaImage') > -1) {
-            notify('已用登录会话取回', '@' + ((html.match(/shared by &#064;([A-Za-z0-9._]+)/) || [])[1] || ''));
-            return $done({ body: html });
-        }
-        step2();
-    });
-}
-
-/* 2) 带会话拉主站页，吃 SSR 数据 */
-function step2() {
-    const hdrs = {
-        'User-Agent': DESK_UA,
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'zh-CN,zh-Hans;q=0.9',
-        'sec-fetch-dest': 'document',
-        'sec-fetch-mode': 'navigate',
-        'sec-fetch-site': 'none'
-    };
-    const ck = cookie();
-    if (ck) hdrs['Cookie'] = ck;
-    get({ url: 'https://www.instagram.com/reel/' + code + '/', headers: hdrs }, function (html) {
-        if (!html) return step3();
-        const m = parse(html);
-        if (!m) return stepApi();
-        if (m.video) {
-            $done({ body: shell(m, m.image) });
-            return notify('已重建', '@' + m.owner + ' 视频 ' + m.w + 'x' + m.h, m.video.slice(0, 70));
-        }
-        stepApi(m);
-    });
-}
-
-/* 2.5) SSR 没给视频，问私有 API 要（公开帖匿名可取） */
-function stepApi(prev) {
-    const hdrs = {
-        'User-Agent': DESK_UA,
-        'X-IG-App-ID': '936619743392459',
-        'X-Requested-With': 'XMLHttpRequest',
-        'Accept': '*/*',
-        'Referer': 'https://www.instagram.com/'
-    };
-    const ck = cookie();
-    if (ck) hdrs['Cookie'] = ck;
-    get({ url: 'https://www.instagram.com/api/v1/media/' + shortcodeToId(code) + '/info/', headers: hdrs }, function (body) {
-        let it = null;
-        try { it = JSON.parse(body).items[0]; } catch (e) {}
-        if (it && it.video_versions && it.video_versions.length) {
-            const best = pickVid(it.video_versions) || it.video_versions[0].url;
-            const im = (it.image_versions2 && it.image_versions2.candidates && it.image_versions2.candidates[0].url) || (prev ? prev.image : '');
-            const w = it.video_versions[0].width || 1080, h = it.video_versions[0].height || 1920;
-            const own = (it.owner && it.owner.username) || (prev ? prev.owner : '');
-            $done({ body: shell({ owner: own, video: best, dur: Math.round((it.video_duration || 0) * 1000), w: w, h: h, type: 'GraphVideo', caption: (it.caption && it.caption.text) || '' }, im) });
-            return notify('已重建(API)', '@' + own + ' 视频 ' + w + 'x' + h, best.slice(0, 70));
-        }
-        if (prev) {
-            $done({ body: shell(prev, prev.image) });
-            return notify('已重建', '@' + prev.owner + ' 仅封面', prev.image.slice(0, 70));
-        }
-        step3();
-    });
-}
-
-/* 3) 只剩封面 */
-function step3() {
-    get({ url: 'https://www.instagram.com/reel/' + code + '/', headers: { 'User-Agent': DESK_UA, 'sec-fetch-site': 'none', 'Accept-Language': 'zh-CN,zh-Hans;q=0.9' } }, function (html) {
-        const img = html ? unesc((html.match(/<meta[^>]*og:image[^>]*content="([^"]+)"/) || [])[1] || '') : '';
-        if (!img) { notify('兜底失败', '主站没给 og:image，会话可能无效'); return $done({}); }
-        const desc = unesc((html.match(/<meta[^>]*og:description[^>]*content="([^"]*)"/) || [])[1] || '');
-        $done({ body: shell({ owner: '', image: img, video: '', dur: 0, w: 1080, h: 1350, type: 'GraphImage', caption: cleanCap(desc) }, img) });
-    });
-}
-
-function attr(u) { return String(u || '').replace(/&/g, '&amp;'); }
-
-function shell(d, img) {
-    const sm = {
-        __typename: d.type,
-        id: shortcodeToId(code),
-        shortcode: code,
-        is_video: !!d.video,
-        display_url: img,
-        display_resources: [
-            { src: img, config_width: d.w, config_height: d.h },
-            { src: img, config_width: 640, config_height: Math.round(640 * d.h / (d.w || 1)) },
-            { src: img, config_width: 480, config_height: Math.round(480 * d.h / (d.w || 1)) }
-        ],
-        thumbnail_src: img,
-        dimensions: { height: d.h, width: d.w },
-        owner: { username: d.owner, is_verified: false },
-        edge_media_to_caption: { edges: [{ node: { text: d.caption } }] },
-        edge_media_to_comment: { count: 0 },
-        edge_liked_by: { count: 0 },
-        accessibility_caption: null,
-        product_type: 'clips'
-    };
-    if (d.video) {
-        sm.video_url = d.video;
-        sm.video_duration = d.dur;
-        sm.video_view_count = 0;
-    }
-    const ctx = { context: { type: d.type, shortcode: code, copyright_blocked: false }, gql_data: { shortcode_media: sm } };
-    const rid = Math.random().toString(36).slice(2, 12);
-    const link = 'https://www.instagram.com/reel/' + code + '/?utm_source=ig_embed&ig_rid=' + rid;
-    const cap = (d.caption || '').replace(/</g, '&lt;');
-    return '<!DOCTYPE html><html><head><meta charset="utf-8">'
-        + '<meta property="og:image" content="' + attr(img) + '">'
-        + '<meta property="og:description" content="' + (d.caption || '').slice(0, 200).replace(/"/g, '') + '">'
-        + '</head><body><div class="EmbeddedMedia">'
-        + '<div class="EmbeddedMediaImageContainer"><a href="' + link + '" data-ios-link="media?id=' + code + '&utm_source=ig_embed&ig_rid=' + rid + '" data-log-event="mediaClick" target="_blank">'
-        + '<img class="EmbeddedMediaImage" alt="Instagram post shared by &#064;' + d.owner + '" src="' + attr(img) + '"></a></div>'
-        + '<div class="Caption">' + cap + '</div>'
-        + '<div class="CaptionComments"><a class="CaptionCommentsExpand" href="' + link + '" target="_blank">View all comments</a></div>'
-        + '</div><script>require([["PolarisEmbedSimple","init",[],[{"isRichEmbed":true,"isSidecar":false,"isGuideEmbed":false,"isProfileEmbed":false,"contextJSON":'
-        + JSON.stringify(JSON.stringify(ctx)) + '}]]]);</script></body></html>';
+function esc(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
