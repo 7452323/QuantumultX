@@ -1,6 +1,8 @@
-/* IG 受限内容修复：embed 被判 invalid 时改拉主站页 SSR 数据重建 */
+/* IG 受限内容修复：embed 被判 invalid（仅关注者可见等）时用登录会话重取 */
+const FB_UA = 'facebookexternalhit/1.1';
 const DESK_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36';
 const ALPHA = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+const IG_SESSION_FALLBACK = '';
 const IG_COOKIE_FALLBACK = '';
 
 const url = ($request && $request.url) || '';
@@ -11,20 +13,29 @@ const broken = !body || body.indexOf('utm_campaign=invalid') > -1 || body.indexO
 if (!/instagram\.com\/.*\/embed\//.test(url) || !code || !broken) {
     $done({});
 } else {
-    mainPage();
+    step1();
 }
 
 function arg(name) {
     if (typeof $argument !== 'undefined' && $argument && $argument[name]) return $argument[name];
     try { if (typeof $persistentStore !== 'undefined') { const v = $persistentStore.read(name); if (v) return v; } } catch (e) {}
     try { if (typeof $prefs !== 'undefined') { const v = $prefs.valueForKey(name); if (v) return v; } } catch (e) {}
+    if (name === 'IG_SESSION') return IG_SESSION_FALLBACK;
+    if (name === 'IG_COOKIE') return IG_COOKIE_FALLBACK;
     return '';
+}
+
+function cookie() {
+    const c = arg('IG_COOKIE');
+    if (c) return c;
+    const s = arg('IG_SESSION');
+    return s ? 'sessionid=' + s : '';
 }
 
 function notify(sub, msg) {
     try {
-        if (typeof $notification !== 'undefined' && $notification.post) $notification.post('IG 受限内容修复', sub, msg);
-        else if (typeof $notify !== 'undefined') $notify('IG 受限内容修复', sub, msg);
+        if (typeof $notification !== 'undefined' && $notification.post) $notification.post('IG 受限内容修复', sub, msg || '');
+        else if (typeof $notify !== 'undefined') $notify('IG 受限内容修复', sub, msg || '');
     } catch (e) {}
 }
 
@@ -49,36 +60,6 @@ function cleanCap(s) {
     return unesc(s).replace(/\\n/g, '\n').replace(/\\"/g, '"')
         .replace(/^\d+\s*likes?,\s*\d+\s*comments?\s*-\s*/i, '')
         .replace(/^\d+\s*[^,]*,\s*\d{4}\s*$/, '').trim();
-}
-
-function mainPage() {
-    const hdrs = {
-        'User-Agent': DESK_UA,
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'zh-CN,zh-Hans;q=0.9',
-        'sec-fetch-dest': 'document',
-        'sec-fetch-mode': 'navigate',
-        'sec-fetch-site': 'none',
-        'upgrade-insecure-requests': '1'
-    };
-    const ck = arg('IG_COOKIE');
-    if (ck) hdrs['Cookie'] = ck;
-    tryPath(['/reel/', '/p/', '/tv/'], 0, hdrs);
-}
-
-function tryPath(paths, i, hdrs) {
-    if (i >= paths.length) {
-        notify('取数据失败', '主站页没吐 SSR（多半是 IP 被限流），退回封面图');
-        return thumbOnly();
-    }
-    get({ url: 'https://www.instagram.com' + paths[i] + code + '/', headers: hdrs }, function (html) {
-        if (!html) return tryPath(paths, i + 1, hdrs);
-        const m = parse(html);
-        if (!m) return tryPath(paths, i + 1, hdrs);
-        $done({ body: embed(m) });
-        notify('已重建', '@' + m.owner + ' ' + (m.video ? '视频 ' + m.w + 'x' + m.h : '图片'),
-            m.video ? m.video.slice(0, 70) : m.image.slice(0, 70));
-    });
 }
 
 function parse(html) {
@@ -122,19 +103,67 @@ function shortcodeToId(c) {
     return n.toString();
 }
 
-function embed(d) {
+/* 1) 带登录会话重取同一个 embed —— 仅关注者可见的帖子只有这条路能出内容 */
+function step1() {
+    const ck = cookie();
+    if (!ck) {
+        notify('未配置会话', '仅关注者可见的帖子需要登录，请填 IG_SESSION');
+        return step2();
+    }
+    get({ url: url, headers: { 'User-Agent': FB_UA, 'Cookie': ck, 'Accept-Language': 'zh-CN,zh-Hans;q=0.9' } }, function (html) {
+        if (html && html.indexOf('EmbeddedMediaImage') > -1) {
+            notify('已用登录会话取回', '@' + ((html.match(/shared by &#064;([A-Za-z0-9._]+)/) || [])[1] || ''));
+            return $done({ body: html });
+        }
+        step2();
+    });
+}
+
+/* 2) 带会话拉主站页，吃 SSR 数据 */
+function step2() {
+    const hdrs = {
+        'User-Agent': DESK_UA,
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'zh-CN,zh-Hans;q=0.9',
+        'sec-fetch-dest': 'document',
+        'sec-fetch-mode': 'navigate',
+        'sec-fetch-site': 'none'
+    };
+    const ck = cookie();
+    if (ck) hdrs['Cookie'] = ck;
+    get({ url: 'https://www.instagram.com/reel/' + code + '/', headers: hdrs }, function (html) {
+        if (!html) return step3();
+        const m = parse(html);
+        if (!m) return step3();
+        $done({ body: shell(m, m.image) });
+        notify('已重建', '@' + m.owner + ' ' + (m.video ? '视频 ' + m.w + 'x' + m.h : '图片'),
+            m.video ? m.video.slice(0, 70) : m.image.slice(0, 70));
+    });
+}
+
+/* 3) 只剩封面 */
+function step3() {
+    get({ url: 'https://www.instagram.com/reel/' + code + '/', headers: { 'User-Agent': DESK_UA, 'sec-fetch-site': 'none', 'Accept-Language': 'zh-CN,zh-Hans;q=0.9' } }, function (html) {
+        const img = html ? ((html.match(/<meta[^>]*og:image[^>]*content="([^"]+)"/) || [])[1] || '') : '';
+        if (!img) { notify('兜底失败', '主站没给 og:image，会话可能无效'); return $done({}); }
+        const desc = (html.match(/<meta[^>]*og:description[^>]*content="([^"]*)"/) || [])[1] || '';
+        $done({ body: shell({ owner: '', image: img, video: '', dur: 0, w: 1080, h: 1350, type: 'GraphImage', caption: cleanCap(desc) }, img) });
+    });
+}
+
+function shell(d, img) {
     const sm = {
         __typename: d.type,
         id: shortcodeToId(code),
         shortcode: code,
         is_video: !!d.video,
-        display_url: d.image,
+        display_url: img,
         display_resources: [
-            { src: d.image, config_width: d.w, config_height: d.h },
-            { src: d.image, config_width: 640, config_height: Math.round(640 * d.h / (d.w || 1)) },
-            { src: d.image, config_width: 480, config_height: Math.round(480 * d.h / (d.w || 1)) }
+            { src: img, config_width: d.w, config_height: d.h },
+            { src: img, config_width: 640, config_height: Math.round(640 * d.h / (d.w || 1)) },
+            { src: img, config_width: 480, config_height: Math.round(480 * d.h / (d.w || 1)) }
         ],
-        thumbnail_src: d.image,
+        thumbnail_src: img,
         dimensions: { height: d.h, width: d.w },
         owner: { username: d.owner, is_verified: false },
         edge_media_to_caption: { edges: [{ node: { text: d.caption } }] },
@@ -148,23 +177,6 @@ function embed(d) {
         sm.video_duration = d.dur;
         sm.video_view_count = 0;
     }
-    return shell(sm, d, d.image);
-}
-
-function thumbOnly() {
-    const page = url.replace(/\/embed\/.*$/, '/');
-    get({ url: page, headers: { 'User-Agent': DESK_UA, 'sec-fetch-site': 'none', 'Accept-Language': 'zh-CN,zh-Hans;q=0.9' } }, function (html) {
-        if (!html) { notify('兜底失败', '主站也拉不到', ''); return $done({}); }
-        const img = (html.match(/<meta[^>]*og:image[^>]*content="([^"]+)"/) || [])[1] || '';
-        if (!img) { notify('兜底失败', '主站没给 og:image', ''); return $done({}); }
-        const desc = (html.match(/<meta[^>]*og:description[^>]*content="([^"]*)"/) || [])[1] || '';
-        const cap = cleanCap(desc);
-        const d = { owner: '', image: img, video: '', dur: 0, w: 1080, h: 1350, type: 'GraphImage', caption: cap };
-        $done({ body: embed(d) });
-    });
-}
-
-function shell(sm, d, img) {
     const ctx = { context: { type: d.type, shortcode: code, copyright_blocked: false }, gql_data: { shortcode_media: sm } };
     const rid = Math.random().toString(36).slice(2, 12);
     const link = 'https://www.instagram.com/reel/' + code + '/?utm_source=ig_embed&ig_rid=' + rid;
