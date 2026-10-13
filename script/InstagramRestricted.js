@@ -88,17 +88,38 @@ function parse(html) {
     if (!image) image = grab(/"image_versions2":\{"candidates":\[\{"width":\d+,"height":\d+,"url":"((?:[^"\\]|\\.)+?)"/);
     if (!image) return null;
 
-    let video = '', bestW = 0;
-    const i = html.indexOf('"video_versions"');
+    let video = '';
+    const i = html.indexOf('video_versions');
     if (i > -1) {
-        const seg = html.slice(i, i + 9000);
-        const re = /"url":"((?:[^"\\]|\\.)+?)"/g;
-        let m;
-        while ((m = re.exec(seg))) {
-            const u = unesc(m[1]);
-            if (u.indexOf('.mp4') < 0) continue;
-            const w = parseInt((u.match(/\/(\d+)x(\d+)\//) || [])[1] || '0', 10);
-            if (w >= bestW) { bestW = w; video = u; }
+        const flat = html.slice(i, i + 30000)
+            .replace(/\\\\\//g, '/').replace(/\\\//g, '/').replace(/\\"/g, '"').replace(/\\\\u0026/g, '&').replace(/\\u0026/g, '&');
+        const s0 = flat.indexOf('[');
+        if (s0 > -1) {
+            let depth = 0, end = -1;
+            for (let k = s0; k < flat.length; k++) {
+                if (flat[k] === '[') depth++;
+                else if (flat[k] === ']') { depth--; if (!depth) { end = k + 1; break; } }
+            }
+            if (end > 0) {
+                const arr = flat.slice(s0, end);
+                const re = /"type":(\d+),"url":"([^"]+)"/g;
+                let m, bestW = -1;
+                while ((m = re.exec(arr))) {
+                    const u = m[2].replace(/&amp;/g, '&');
+                    if (u.indexOf('.mp4') < 0) continue;
+                    if (u.indexOf('dashinit') > -1 || u.indexOf('bytestart') > -1 || u.indexOf('byteend') > -1) continue;
+                    const w = parseInt((u.match(/\/(\d+)x(\d+)\//) || [])[1] || '0', 10);
+                    if (w > bestW) { bestW = w; video = u; }
+                }
+                if (!video) {
+                    const re2 = /"url":"([^"]+\.mp4[^"]*)"/g;
+                    while ((m = re2.exec(arr))) {
+                        const u = m[1].replace(/&amp;/g, '&');
+                        if (u.indexOf('dashinit') > -1 || u.indexOf('bytestart') > -1) continue;
+                        video = u; break;
+                    }
+                }
+            }
         }
     }
     let caption = '';
@@ -170,6 +191,8 @@ function step3() {
     });
 }
 
+function attr(u) { return String(u || '').replace(/&/g, '&amp;'); }
+
 function shell(d, img) {
     const sm = {
         __typename: d.type,
@@ -201,11 +224,11 @@ function shell(d, img) {
     const link = 'https://www.instagram.com/reel/' + code + '/?utm_source=ig_embed&ig_rid=' + rid;
     const cap = (d.caption || '').replace(/</g, '&lt;');
     return '<!DOCTYPE html><html><head><meta charset="utf-8">'
-        + '<meta property="og:image" content="' + img + '">'
+        + '<meta property="og:image" content="' + attr(img) + '">'
         + '<meta property="og:description" content="' + (d.caption || '').slice(0, 200).replace(/"/g, '') + '">'
         + '</head><body><div class="EmbeddedMedia">'
         + '<div class="EmbeddedMediaImageContainer"><a href="' + link + '" data-ios-link="media?id=' + code + '&utm_source=ig_embed&ig_rid=' + rid + '" data-log-event="mediaClick" target="_blank">'
-        + '<img class="EmbeddedMediaImage" alt="Instagram post shared by &#064;' + d.owner + '" src="' + img + '"></a></div>'
+        + '<img class="EmbeddedMediaImage" alt="Instagram post shared by &#064;' + d.owner + '" src="' + attr(img) + '"></a></div>'
         + '<div class="Caption">' + cap + '</div>'
         + '<div class="CaptionComments"><a class="CaptionCommentsExpand" href="' + link + '" target="_blank">View all comments</a></div>'
         + '</div><script>require([["PolarisEmbedSimple","init",[],[{"isRichEmbed":true,"isSidecar":false,"isGuideEmbed":false,"isProfileEmbed":false,"contextJSON":'
