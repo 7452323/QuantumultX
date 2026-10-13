@@ -4,15 +4,14 @@
 #!homepage=https://github.com/7452323/QuantumultX
 
 [Rule]
-# 图片 CDN 走 QUIC 会绕过 MITM，302 就不生效
+# 图片去水印：302 到 sns-img-bd 无水印原图
 AND,((PROTOCOL,QUIC),(DOMAIN,sns-webpic-qc.xhscdn.com)),REJECT
 
 [Script]
-# 图片：全部 302 到 sns-img-bd 无水印原图。界面显示(priority 带 i)取 ?imageView2/2/w/1080 缩小版，保存取全分辨率
-# 302 目标保留 <日期>/<hash>/ 之后的整条尾巴 —— notes_pre_post/ 前缀剥了必 404（单图空白、多图带水印）
+# 图片去水印：302 到 sns-img-bd 无水印原图
 XiaohongshuImage = type=http-request,pattern=^https?://sns-webpic[a-z0-9\-]*\.xhscdn\.com/,script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/XiaohongshuImage.js
 XiaohongshuVideo = type=http-response,pattern=^https://www\.xiaohongshu\.com/(?:discovery/item|explore)/,script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/XiaohongshuVideo.js,requires-body=true,max-size=-1
-# 有的原片被 CDN 标成 application/octet-stream，播放器会当"链接过期"处理
+# 原片被 CDN 标成 application/octet-stream 时改成 video/mp4
 XiaohongshuVideoType = type=http-response,pattern=^https?://sns-video-[a-z0-9\-]+\.xhscdn\.com/,script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/XiaohongshuVideoType.js
 
 [MITM]
