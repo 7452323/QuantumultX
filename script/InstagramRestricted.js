@@ -81,6 +81,21 @@ function cleanCap(s) {
         .replace(/^\d+\s*[^,]*,\s*\d{4}\s*$/, '').trim();
 }
 
+/* 从 video_versions 数组挑可播的那条：优先 type 101，排除 DASH 分片 */
+function pickVid(list) {
+    if (!list || !list.length) return '';
+    let best = '', bestW = -1;
+    for (let i = 0; i < list.length; i++) {
+        const v = list[i] || {}, u = String(v.url || '');
+        if (u.indexOf('.mp4') < 0) continue;
+        if (u.indexOf('dashinit') > -1 || u.indexOf('bytestart') > -1 || u.indexOf('byteend') > -1) continue;
+        const w = v.width || parseInt((u.match(/\/(\d+)x(\d+)\//) || [])[1] || '0', 10);
+        const bonus = (v.type === 101) ? 100000 : 0;
+        if (w + bonus > bestW) { bestW = w + bonus; best = u; }
+    }
+    return best;
+}
+
 function parse(html) {
     const grab = function (re) { const x = html.match(re); return x ? unesc(x[1]) : ''; };
     let image = grab(/<meta[^>]*og:image[^>]*content="([^"]+)"/);
@@ -174,19 +189,51 @@ function step2() {
     get({ url: 'https://www.instagram.com/reel/' + code + '/', headers: hdrs }, function (html) {
         if (!html) return step3();
         const m = parse(html);
-        if (!m) return step3();
-        $done({ body: shell(m, m.image) });
-        notify('已重建', '@' + m.owner + ' ' + (m.video ? '视频 ' + m.w + 'x' + m.h : '图片'),
-            m.video ? m.video.slice(0, 70) : m.image.slice(0, 70));
+        if (!m) return stepApi();
+        if (m.video) {
+            $done({ body: shell(m, m.image) });
+            return notify('已重建', '@' + m.owner + ' 视频 ' + m.w + 'x' + m.h, m.video.slice(0, 70));
+        }
+        stepApi(m);
+    });
+}
+
+/* 2.5) SSR 没给视频，问私有 API 要（公开帖匿名可取） */
+function stepApi(prev) {
+    const hdrs = {
+        'User-Agent': DESK_UA,
+        'X-IG-App-ID': '936619743392459',
+        'X-Requested-With': 'XMLHttpRequest',
+        'Accept': '*/*',
+        'Referer': 'https://www.instagram.com/'
+    };
+    const ck = cookie();
+    if (ck) hdrs['Cookie'] = ck;
+    get({ url: 'https://www.instagram.com/api/v1/media/' + shortcodeToId(code) + '/info/', headers: hdrs }, function (body) {
+        let it = null;
+        try { it = JSON.parse(body).items[0]; } catch (e) {}
+        if (it && it.video_versions && it.video_versions.length) {
+            const best = pickVid(it.video_versions) || it.video_versions[0].url;
+            const im = (it.image_versions2 && it.image_versions2.candidates && it.image_versions2.candidates[0].url) || (prev ? prev.image : '');
+            const w = it.video_versions[0].width || 1080, h = it.video_versions[0].height || 1920;
+            const own = (it.owner && it.owner.username) || (prev ? prev.owner : '');
+            $done({ body: shell({ owner: own, video: best, dur: Math.round((it.video_duration || 0) * 1000), w: w, h: h, type: 'GraphVideo', caption: (it.caption && it.caption.text) || '' }, im) });
+            return notify('已重建(API)', '@' + own + ' 视频 ' + w + 'x' + h, best.slice(0, 70));
+        }
+        if (prev) {
+            $done({ body: shell(prev, prev.image) });
+            return notify('已重建', '@' + prev.owner + ' 仅封面', prev.image.slice(0, 70));
+        }
+        step3();
     });
 }
 
 /* 3) 只剩封面 */
 function step3() {
     get({ url: 'https://www.instagram.com/reel/' + code + '/', headers: { 'User-Agent': DESK_UA, 'sec-fetch-site': 'none', 'Accept-Language': 'zh-CN,zh-Hans;q=0.9' } }, function (html) {
-        const img = html ? ((html.match(/<meta[^>]*og:image[^>]*content="([^"]+)"/) || [])[1] || '') : '';
+        const img = html ? unesc((html.match(/<meta[^>]*og:image[^>]*content="([^"]+)"/) || [])[1] || '') : '';
         if (!img) { notify('兜底失败', '主站没给 og:image，会话可能无效'); return $done({}); }
-        const desc = (html.match(/<meta[^>]*og:description[^>]*content="([^"]*)"/) || [])[1] || '';
+        const desc = unesc((html.match(/<meta[^>]*og:description[^>]*content="([^"]*)"/) || [])[1] || '');
         $done({ body: shell({ owner: '', image: img, video: '', dur: 0, w: 1080, h: 1350, type: 'GraphImage', caption: cleanCap(desc) }, img) });
     });
 }
