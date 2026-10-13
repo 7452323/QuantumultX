@@ -2,9 +2,9 @@
 #!desc=修复 Post Saver 保存推特/Instagram 受限内容失败
 #!author=7452323
 #!homepage=https://github.com/7452323/QuantumultX
-#!arguments=IG_COOKIE:string::Instagram cookie（可选，被限流时填）
-#!arguments=X_COOKIE:string::X cookie（可选，第三方源不通时兜底）
-#!arguments-desc=IG_COOKIE:一般不用填。脚本拉主站页拿 SSR 数据，不需要登录；只有 IP 被 IG 限流时补上浏览器 cookie。|X_COOKIE:一般不用填。脚本先走 api.fxtwitter.com；不通时才用 cookie 拉主站页。
+#!arguments=IG_SESSION:string::Instagram 登录后的 sessionid（仅关注者可见的帖子必填）
+#!arguments=X_COOKIE:string::X cookie（可选，一般不用填）
+#!arguments-desc=IG_SESSION:Instagram 网页版 cookie 里的 sessionid 值（只填值，不用写 sessionid=）。仅关注者可见/受限的帖子必须填。|X_COOKIE:脚本先走 api.fxtwitter.com，一般不用填；不通时才用它拉主站页。
 
 [Rule]
 # QUIC 会绕过 MITM
