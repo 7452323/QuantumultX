@@ -1,0 +1,18 @@
+#!name=Post Saver 受限内容修复
+#!desc=修复 Post Saver 保存推特/Instagram 受限内容失败
+#!author=7452323
+#!homepage=https://github.com/7452323/QuantumultX
+
+[Rule]
+# QUIC 会绕过 MITM
+AND,((PROTOCOL,QUIC),(DOMAIN,cdn.syndication.twimg.com)),REJECT
+AND,((PROTOCOL,QUIC),(DOMAIN,www.instagram.com)),REJECT
+
+[Script]
+# 推特：syndication 返回 TweetTombstone 时用 fxtwitter 重建
+TwitterRestricted = type=http-response,pattern=^https://cdn\.syndication\.twimg\.com/tweet-result,script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/TwitterRestricted.js,requires-body=true,max-size=-1
+# Instagram：embed 被判 invalid 时用登录会话重取，再以主站 og 兜底
+InstagramRestricted = type=http-response,pattern=^https://www\.instagram\.com/.*/embed/,script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/InstagramRestricted.js,requires-body=true,max-size=-1
+
+[MITM]
+hostname = %APPEND% cdn.syndication.twimg.com, www.instagram.com
