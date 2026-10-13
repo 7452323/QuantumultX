@@ -4,7 +4,7 @@
 #!homepage=https://github.com/7452323/QuantumultX
 
 [Rule]
-# 图片去水印：302 到 sns-img-bd 无水印原图
+# 图片 CDN 走 QUIC 会绕过 MITM
 AND,((PROTOCOL,QUIC),(DOMAIN,sns-webpic-qc.xhscdn.com)),REJECT
 
 [Script]
