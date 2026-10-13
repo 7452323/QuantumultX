@@ -4,12 +4,12 @@
  * @author 7452323
  *
 [rewrite_local]
-^https?:\/\/api\.account\.meitu\.com\/(users\/show_current|common\/check_device_login_pwd_list) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/MeiYanXiagJi.js
-^https?:\/\/vesdk\.meitu\.com\/subscribe\/func_limit_batch_query url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/MeiYanXiagJi.js
+^https?:\/\/api\.account\.meitu\.com\/ url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/MeiYanXiagJi.js
+^https?:\/\/vesdk\.meitu\.com\/subscribe\/(func_limit_batch_query|func_list) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/MeiYanXiagJi.js
 ^https?:\/\/(api\.meiyan\.com|api-tool-meiyan\.meituyun\.com)\/vip\/(user_info|user_center|user_subscription_info|center_module) url script-response-body https://raw.githubusercontent.com/7452323/QuantumultX/main/script/MeiYanXiagJi.js
 
 [mitm]
-hostname = api.account.meitu.com, vesdk.meitu.com, api.meiyan.com, api-tool-meiyan.meituyun.com
+hostname = api.account.meitu.com, account.meitu.com, vesdk.meitu.com, api.meiyan.com, api-tool-meiyan.meituyun.com
 */
 
 const url = $request.url;
@@ -19,6 +19,35 @@ let body = JSON.parse($response.body);
 
 /* 账号会员枚举: 0未知 1会员 2已过期 3非会员 */
 const VIP = 1;
+
+/* 递归改所有应用级会员位: meiyan_vip / xiuxiu_vip / ..._vip */
+function fix(o) {
+  if (!o || typeof o !== "object") return;
+  if (Array.isArray(o)) {
+    o.forEach(fix);
+    return;
+  }
+  Object.keys(o).forEach(function (k) {
+    let v = o[k];
+    if (/^[a-z0-9_]+_vip$/i.test(k) && typeof v === "number") {
+      o[k] = VIP;
+      return;
+    }
+    if (k === "vip" && v && typeof v === "object" && !Array.isArray(v)) {
+      Object.keys(v).forEach(function (k2) {
+        if (/^[a-z0-9_]+_vip$/i.test(k2) && typeof v[k2] === "number") v[k2] = VIP;
+      });
+      if (Array.isArray(v.list)) {
+        v.list.forEach(function (it) {
+          if (it && it.status !== undefined) it.status = 1;
+        });
+      }
+      fix(v);
+      return;
+    }
+    fix(v);
+  });
+}
 
 /* 会员字段, 兼容新旧版本 */
 function vip(o) {
@@ -39,16 +68,9 @@ function vip(o) {
   return o;
 }
 
-/* 账号接口: 应用级会员标记 */
-if (url.indexOf("/users/show_current") != -1) {
-  body.response.user.vip = body.response.user.vip || {};
-  body.response.user.vip.meiyan_vip = VIP;
-}
-
-if (url.indexOf("check_device_login_pwd_list") != -1) {
-  (body.response.list || []).forEach(function (i) {
-    if (i.vip) i.vip.meiyan_vip = VIP;
-  });
+/* 账号接口: 登录/初始化/用户信息 全量改会员位 */
+if (url.indexOf("account.meitu.com") != -1) {
+  fix(body);
 }
 
 /* vesdk 功能限额: 全放开 */
@@ -70,6 +92,13 @@ if (url.indexOf("func_limit_batch_query") != -1) {
     i.media_limit_left_num = 999999;
     i.media_limit_used_num = 0;
     delete i.subscribe_banner;
+  });
+}
+
+/* vesdk 功能列表: 全按会员功能标记 */
+if (url.indexOf("func_list") != -1) {
+  (body.response || []).forEach(function (i) {
+    i.function_mode = 1;
   });
 }
 
