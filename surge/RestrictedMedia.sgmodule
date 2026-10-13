@@ -2,9 +2,8 @@
 #!desc=修复 Post Saver 保存推特/Instagram 受限内容失败
 #!author=7452323
 #!homepage=https://github.com/7452323/QuantumultX
-#!arguments=IG_SESSION:string::Instagram 登录后的 sessionid（仅关注者可见的帖子必填）
-#!arguments=X_COOKIE:string::X cookie（可选，一般不用填）
-#!arguments-desc=IG_SESSION:Instagram 网页版 cookie 里的 sessionid 值（只填值，不用写 sessionid=）。仅关注者可见/受限的帖子必须填。|X_COOKIE:脚本先走 api.fxtwitter.com，一般不用填；不通时才用它拉主站页。
+#!arguments=IG_SESSION,X_COOKIE
+#!arguments-desc=IG_SESSION\nInstagram 网页版 cookie 里 sessionid 的值（只填值，别写 sessionid=）。仅关注者可见 / 受限的帖子必须填。\n\nX_COOKIE\nX 的 cookie，一般不用填。脚本先走 api.fxtwitter.com，不通时才用它拉主站页。
 
 [Rule]
 # QUIC 会绕过 MITM
@@ -15,9 +14,9 @@ AND,((PROTOCOL,QUIC),(DOMAIN,api.fxtwitter.com)),REJECT
 
 [Script]
 # 推特：syndication 返回 TweetTombstone 时用 fxtwitter 重建
-TwitterRestricted = type=http-response,pattern=^https://cdn\.syndication\.twimg\.com/tweet-result,script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/TwitterRestricted.js,requires-body=true,max-size=-1
+TwitterRestricted = type=http-response,pattern=^https://cdn\.syndication\.twimg\.com/tweet-result,script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/TwitterRestricted.js,requires-body=true,max-size=-1,argument="X_COOKIE={{{X_COOKIE}}}"
 # Instagram：embed 被判 invalid 时拉主站页 SSR 数据重建（无需登录）
-InstagramRestricted = type=http-response,pattern=^https://www\.instagram\.com/.*/embed/,script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/InstagramRestricted.js,requires-body=true,max-size=-1
+InstagramRestricted = type=http-response,pattern=^https://www\.instagram\.com/.*/embed/,script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/InstagramRestricted.js,requires-body=true,max-size=-1,argument="IG_SESSION={{{IG_SESSION}}}"
 
 [MITM]
 hostname = %APPEND% cdn.syndication.twimg.com, www.instagram.com
