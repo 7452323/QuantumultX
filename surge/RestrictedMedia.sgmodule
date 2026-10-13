@@ -2,11 +2,16 @@
 #!desc=修复 Post Saver 保存推特/Instagram 受限内容失败
 #!author=7452323
 #!homepage=https://github.com/7452323/QuantumultX
+#!arguments=IG_SESSION:string::Instagram 登录后的 sessionid（受限视频必填）
+#!arguments=X_COOKIE:string::X 登录后的 cookie（第三方源不通时兜底）
+#!arguments-desc=IG_SESSION:填 Instagram 网页版 cookie 里的 sessionid。留空只能取到封面图。|X_COOKIE:填 X 的 auth_token=...; ct0=... 。一般不用填，脚本会先走第三方源。
 
 [Rule]
 # QUIC 会绕过 MITM
 AND,((PROTOCOL,QUIC),(DOMAIN,cdn.syndication.twimg.com)),REJECT
 AND,((PROTOCOL,QUIC),(DOMAIN,www.instagram.com)),REJECT
+# 脚本要出网取数据，这个域名必须走代理
+AND,((PROTOCOL,QUIC),(DOMAIN,api.fxtwitter.com)),REJECT
 
 [Script]
 # 推特：syndication 返回 TweetTombstone 时用 fxtwitter 重建
