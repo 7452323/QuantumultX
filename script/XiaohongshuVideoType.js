@@ -10,7 +10,7 @@ hostname = sns-video-qc.xhscdn.com, sns-video-hw.xhscdn.com, sns-video-bd.xhscdn
   var res = typeof $response !== 'undefined' ? $response : null;
   if (!res || !res.headers) return $done({});
 
-  /* 图片一律不碰：路径带图片后缀 / /frame/ / !变体后缀 的直接放过 */
+  /* 图片不碰：/frame/、!变体后缀、图片扩展名一律放过 */
   var url = (typeof $request !== 'undefined' && $request.url) ? $request.url : '';
   if (/\/frame\//.test(url) || url.indexOf('!') >= 0) return $done({});
   if (/\.(webp|jpg|jpeg|png|gif|heic|avif|bmp|svg)(\?|#|$)/i.test(url)) return $done({});
