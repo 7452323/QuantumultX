@@ -8,7 +8,7 @@
 AND,((PROTOCOL,QUIC),(DOMAIN,sns-webpic-qc.xhscdn.com)),REJECT
 
 [Script]
-# 图片：302 到 sns-img-bd 的无水印原图。页面显示走 sns-na-i6 域，不受影响。
+# 图片：只给 App 的保存下载 302 无水印原图；界面显示(WKWebView 增量加载, priority 带 i)放过拿 56KB 缩略图
 # 302 目标保留 <日期>/<hash>/ 之后的整条尾巴 —— notes_pre_post/ 前缀剥了必 404（单图空白、多图带水印）
 XiaohongshuImage = type=http-request,pattern=^https?://sns-webpic[a-z0-9\-]*\.xhscdn\.com/,script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/XiaohongshuImage.js
 XiaohongshuVideo = type=http-response,pattern=^https://www\.xiaohongshu\.com/(?:discovery/item|explore)/,script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/XiaohongshuVideo.js,requires-body=true,max-size=-1
