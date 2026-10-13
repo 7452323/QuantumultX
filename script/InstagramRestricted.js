@@ -40,20 +40,20 @@ function arg(name) {
     return '';
 }
 
-/* 会话值容错：只填值 / sessionid=xxx / 整条 cookie 串 都认 */
-function normSession(s) {
-    s = String(s || '').trim();
-    if (!s) return '';
-    const m = s.match(/(?:^|;\s*)sessionid=([^;]+)/);
-    if (m) return m[1].trim();
-    if (s.indexOf('=') > -1) {
-        const parts = s.split(/;\s*/);
-        for (let i = 0; i < parts.length; i++) {
-            const j = parts[i].indexOf('=');
-            if (j > 0 && parts[i].slice(0, j).trim() === 'sessionid') return parts[i].slice(j + 1).trim();
-        }
+/* 会话值容错：只填值 / sessionid=xxx / 整条 cookie 串 都认。
+   整串时把每一对都并进去 —— csrftoken 必须和 sessionid 同源，否则 IG 判 CSRF 不匹配 */
+function mergeSession(jar, raw) {
+    raw = String(raw || '').trim();
+    if (!raw) return jar;
+    if (raw.indexOf('=') > -1) {
+        raw.split(/;\s*/).forEach(function (p) {
+            const i = p.indexOf('=');
+            if (i > 0) jar[p.slice(0, i).trim()] = p.slice(i + 1).trim();
+        });
+        if (jar.sessionid) return jar;
     }
-    return s;
+    if (raw) jar.sessionid = raw;
+    return jar;
 }
 
 function notify(sub, msg) {
@@ -93,9 +93,8 @@ function reqCookie() {
         const i = p.indexOf('=');
         if (i > 0) jar[p.slice(0, i).trim()] = p.slice(i + 1).trim();
     });
-    const s = normSession(arg('IG_SESSION'));
-    if (s) jar.sessionid = s;
-    return jar;
+    const s = mergeSession(jar, arg('IG_SESSION'));
+    return s;
 }
 
 function cookieStr(jar) {
@@ -105,7 +104,8 @@ function cookieStr(jar) {
 function run() {
     const jar = reqCookie();
     if (jar.csrftoken) return gql(jar);
-    get({ url: HOME, headers: { 'User-Agent': DESK_UA, 'Accept': 'text/html,application/xhtml+xml' } }, function (html, resp) {
+    /* 必须带着会话 cookie 去取 csrftoken —— 否则拿到的 token 和 sessionid 不同源 */
+    get({ url: HOME, headers: { 'User-Agent': DESK_UA, 'Accept': 'text/html,application/xhtml+xml', 'Cookie': cookieStr(jar) } }, function (html, resp) {
         const setc = (resp && resp.headers && (resp.headers['Set-Cookie'] || resp.headers['set-cookie'])) || '';
         const m = String(setc).match(/csrftoken=([^;]+)/);
         if (m) jar.csrftoken = m[1];
@@ -131,11 +131,13 @@ function gql(jar) {
     const vars = '{"shortcode":"' + code + '","__relay_internal__pv__PolarisAIGMMediaWebLabelEnabledrelayprovider":false}';
     const payload = 'variables=' + encodeURIComponent(vars) + '&doc_id=' + DOC_ID + '&server_timestamps=true';
     post({ url: GQL, headers: hdrs, body: payload }, function (err, resp, data) {
-        let item = null;
-        try { item = JSON.parse(data).data.xdt_api__v1__media__shortcode__web_info.items[0]; } catch (e) {}
+        let item = null, perr = '';
+        try { item = JSON.parse(data).data.xdt_api__v1__media__shortcode__web_info.items[0]; } catch (e) { perr = String(e).slice(0, 60); }
         if (!item) {
-            if (!jar.sessionid) return notify('需要登录会话', '此帖 IG 拒绝匿名访问（年龄限制 / 仅关注者可见）—— 请填 IG_SESSION');
-            return notify('取数据失败', '会话可能已失效，请重新获取 sessionid');
+            const st = (resp && resp.status) || (resp && resp.statusCode) || '?';
+            const snip = String(data || err || perr || '').replace(/\s+/g, ' ').slice(0, 90);
+            if (!jar.sessionid) return notify('需要登录会话', 'HTTP ' + st + ' — 此帖 IG 拒绝匿名访问，请填 IG_SESSION');
+            return notify('取数据失败', 'HTTP ' + st + ' | 有 sessionid 但被拒：' + snip);
         }
         const vid = pickVid(item.video_versions);
         const img = bigImg(item);
