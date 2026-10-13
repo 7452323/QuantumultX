@@ -1,9 +1,0 @@
-#!name=字体大全 VIP 解锁
-#!desc=解锁字体大全 VIP（永久）
-#!author=Sliverkiss
-
-[Script]
-Ztdq = type=http-response,pattern=^https:\/\/api\.yqzx8\.com\/1\.1\/functions\/vip1,requires-body=1,max-size=0,script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/Ztdq.js
-
-[MITM]
-hostname = api.yqzx8.com
