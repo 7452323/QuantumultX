@@ -8,8 +8,8 @@
 AND,((protocol,quic),(domain,sns-webpic-qc.xhscdn.com)),REJECT
 
 [Script]
-# 图片：只拦 Post Saver 自己的下载（UA 带 PostSaver），302 到无水印原图；
-# 页面显示要的 56KB 小图一律放过 —— 否则 17 张 3MB 原图会把多图/实况图拖死
+# 图片：302 到 sns-img-bd 的无水印原图。页面显示走 sns-na-i6 域，不受影响。
+# 302 目标保留 <日期>/<hash>/ 之后的整条尾巴 —— notes_pre_post/ 前缀剥了必 404（单图空白、多图带水印）
 http-request ^https?://sns-webpic[a-z0-9\-]*\.xhscdn\.com/ script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/XiaohongshuImage.js, tag=XiaohongshuImage
 http-response ^https://www\.xiaohongshu\.com/(?:discovery/item|explore)/ script-path=https://raw.githubusercontent.com/7452323/QuantumultX/main/script/XiaohongshuVideo.js, requires-body=true, tag=XiaohongshuVideo
 # 有的原片被 CDN 标成 application/octet-stream，播放器会当"链接过期"处理
