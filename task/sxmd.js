@@ -103,6 +103,15 @@ function captureCookie() {
   const ck = h['Cookie'] || h['cookie'] || ''
   const ua = h['User-Agent'] || h['user-agent'] || ''
   $.log(`[capture] url=${$request.url} headerKeys=${Object.keys(h).length} ckLen=${ck.length} uaLen=${ua.length}`)
+  // 诊断通道：把本次抓取情况写进 sxmd_dbg（便于远程排查）
+  $.setdata($.toStr({
+    at: new Date().toISOString(),
+    url: $request.url,
+    method: $request.method,
+    keys: Object.keys(h),
+    ckLen: ck.length,
+    uaLen: ua.length,
+  }), 'sxmd_dbg')
   if (ua) $.setdata(ua, UA_KEY)                 // UA 一起存：论坛风控与后续请求都靠它
   if (!ck) {
     $.log('[capture] no cookie header')
