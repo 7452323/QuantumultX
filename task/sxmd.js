@@ -38,11 +38,12 @@ const UA_DEFAULT = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Apple
 
 // ============ Env.js 精简版（接口与 chavyleung 原版兼容） ============
 function Env(name) {
-  const env = typeof $environment !== 'undefined'
-    ? ($environment['surge-version'] ? 'Surge' : $environment['stash-version'] ? 'Stash'
-      : typeof $task !== 'undefined' ? 'QuanX' : typeof $loon !== 'undefined' ? 'Loon' : 'Unknown')
-    : (typeof $task !== 'undefined' ? 'QuanX' : 'Unknown')
-  const surgeFamily = ['Surge', 'Loon', 'Stash', 'Shadowrocket'].indexOf(env) >= 0
+  // ⚠️ 不要靠 $environment['surge-version'] 判环境：http-request 上下文里不一定拿得到
+  //    用能力探测（有没有 $persistentStore / $task）最稳
+  const hasPS = typeof $persistentStore !== 'undefined'
+  const hasTask = typeof $task !== 'undefined'
+  const env = hasPS ? 'Surge' : (hasTask ? 'QuanX' : 'Unknown')
+  const surgeFamily = hasPS
   const self = {
     env, name, startTime: Date.now(),
     isSurge: () => env === 'Surge',
