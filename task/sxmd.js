@@ -235,6 +235,17 @@ class Account {
     this.pageGained = gained
     if (already) return { ok: true, already: true, msg: '今日已签到', total, gained }
     if (/签到成功|恭喜/.test(b)) return { ok: true, already: false, msg: '签到成功', total, gained }
+    // 兜底：POST 返回的常是整页 HTML，不一定带「签到成功」字样 → 复查页面状态
+    try {
+      await sleep(600)
+      const page = await this.req(SIGN_PAGE)
+      if (/今天已签到|今日已签到/.test(page.body)) {
+        return { ok: true, already: false, msg: '签到成功', total: this.pageTotal, gained: this.pageGained }
+      }
+      if (/今天未签到/.test(page.body)) {
+        return { ok: false, already: false, msg: '签到未生效（页面仍显示未签到）', total, gained }
+      }
+    } catch (e) { }
     return { ok: false, already: false, msg: stripTags(b).slice(0, 160) || ('HTTP ' + r.status), total, gained }
   }
 }
