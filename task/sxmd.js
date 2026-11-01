@@ -265,6 +265,14 @@ async function main() {
 }
 
 // ============ 入口 ============
+// 诊断：记录本次实际运行环境（远程排查用，无副作用）
+try {
+  $persistentStore.write('typeofRequest=' + (typeof $request) +
+    ' typeofDone=' + (typeof $done) +
+    ' url=' + ((typeof $request !== 'undefined' && $request && $request.url) || '-') +
+    ' at=' + new Date().toISOString(), 'sxmd_dbg2')
+} catch (e) { }
+
 if (typeof $request !== 'undefined' && $request) {
   captureCookie()
 } else {
