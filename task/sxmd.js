@@ -98,6 +98,17 @@ function argValue(key) {
 const DEBUG = (argValue('debug') || $.getdata('is_debug') || '0') === '1'
 const ENABLE_COOKIE = (argValue('enable_cookie') || '1') !== '0'
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+// txtnovel 是 GBK 站点：Surge 把 GBK 字节按 Latin-1 映射成字符，需自己还原
+// （需要引擎支持 TextDecoder，故脚本行要写 engine=webview）
+function decodeGbk(s) {
+  try {
+    if (typeof TextDecoder === 'undefined') return s
+    if (/[\u4e00-\u9fa5]/.test(s)) return s      // 已经是正常中文，不动
+    const bytes = new Uint8Array(s.length)
+    for (let i = 0; i < s.length; i++) bytes[i] = s.charCodeAt(i) & 0xff
+    return new TextDecoder('gbk').decode(bytes)
+  } catch (e) { return s }
+}
 const stripTags = (s) => String(s || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
 
 // ============ Cookie 抓取（http-request 分支） ============
@@ -157,7 +168,7 @@ class Account {
         if (err) return reject(new Error('网络错误: ' + ((err && err.message) || err)))
         if (DEBUG) $.log(`[HTTP←] ${resp.status} ${stripTags(body).slice(0, 200)}`)
         if (resp.status >= 400) return reject(new Error('HTTP ' + resp.status))
-        resolve({ status: resp.status, headers: resp.headers, body: String(body || '') })
+        resolve({ status: resp.status, headers: resp.headers, body: decodeGbk(String(body || '')) })
       })
     })
   }
