@@ -60,6 +60,7 @@ function Env(name) {
     getdata: (k) => surgeFamily ? $persistentStore.read(k) : env === 'QuanX' ? $prefs.valueForKey(k) : null,
     setdata: (v, k) => surgeFamily ? $persistentStore.write(v, k) : env === 'QuanX' ? $prefs.setValueForKey(v, k) : false,
     toObj: (s, d = null) => { try { return JSON.parse(s) } catch (e) { return d } },
+    toStr: (o) => { try { return JSON.stringify(o) } catch (e) { return '' } },
     request: (opt, method, cb) => {
       const o = typeof opt === 'string' ? { url: opt } : opt
       if (self.policy && !o.policy) o.policy = self.policy   // 需要固定出口时设 $.policy
