@@ -77,17 +77,19 @@ function Env(name) {
 }
 
 const $ = new Env(ENV_NAME)
-const $argument = typeof $argument !== 'undefined' ? $argument : undefined // eslint-disable-line
+// ⚠️ 不能写 const $argument = typeof $argument !== 'undefined' ? $argument : undefined
+//    —— 会撞上 TDZ 自引用 ReferenceError，脚本一加载就死（0ms 无日志无输出）
+const RAW_ARG = (typeof $argument !== 'undefined') ? $argument : undefined // eslint-disable-line
 
 // ============ 参数 / 工具 ============
 function argValue(key) {
   let v = ''
-  if (typeof $argument === 'string' && $argument) {
-    $argument.split(/[&,](?=[A-Za-z_][A-Za-z0-9_]*=)/).forEach((p) => {
+  if (typeof RAW_ARG === 'string' && RAW_ARG) {
+    RAW_ARG.split(/[&,](?=[A-Za-z_][A-Za-z0-9_]*=)/).forEach((p) => {
       const i = p.indexOf('=')
       if (i > 0 && p.slice(0, i).trim() === key) v = p.slice(i + 1).trim()
     })
-  } else if ($argument && typeof $argument === 'object') v = $argument[key] || ''
+  } else if (RAW_ARG && typeof RAW_ARG === 'object') v = RAW_ARG[key] || ''
   try { v = decodeURIComponent(v) } catch (e) { }
   return v
 }
