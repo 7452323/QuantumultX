@@ -3,7 +3,10 @@
 @Author: 7452323
 @Github: https://github.com/7452323/QuantumultX
 @Description: RE0影巢 签到脚本（每日签到 / 赌狗签到）
-@Update: 2026.10.03
+@Update: 2026.11.01
+ *  2026.11.01 修复：①未登录时也保存 cf_clearance（原来 if(!token) 直接 return，Cookie 一失效就永远补不回 CF 通行证）
+ *                ②新增 re0_policy：用 $httpClient 的 policy 参数把出口钉在同一节点，防 Smart 组切节点导致 cf_clearance 失效
+ *                ③403 区分「挑战页」与「IP 被拉黑」，提示可执行动作
 ------------------------------------------
 
 # Surge
@@ -85,8 +88,17 @@ const ACTION_SOURCE = {
 const CF_HINT = 'Cloudflare 拦截：cf_clearance 绑出网 IP + UA，请让脚本与抓 Cookie 的浏览器走同一节点（站点常态屏蔽大陆 IP）';
 /* 本次运行的出口 IP（cf_clearance 绑定对象之一，报错时带上便于对比） */
 let CUR_IP = '';
-function cfHint(status) {
-  return `Cloudflare 拦截（HTTP ${status}${CUR_IP ? '｜出口 IP ' + CUR_IP : ''}）：cf_clearance 绑出网 IP + UA，请让脚本与抓 Cookie 的浏览器走同一节点（站点常态屏蔽大陆 IP）`;
+/* 固定出口策略：填 re0_policy（策略组/节点名）。$httpClient 支持 policy 参数，
+   把请求钉在同一个节点上，cf_clearance 才不会因 Smart 组自动切节点而失效 */
+let POLICY = '';
+function cfHint(status, body) {
+  const b = String(body || '');
+  const blocked = /you have been blocked|Access denied|Attention Required|error code/i.test(b);
+  const kind = blocked ? 'IP 被拉黑' : '挑战页未通过';
+  const tail = blocked
+    ? '换一个出口节点后再跑'
+    : '去 Safari 打开一次 re0.me 让挑战通过；建议同时把 re0_policy 设成同一个节点';
+  return `Cloudflare ${kind}（HTTP ${status}${CUR_IP ? '｜出口 IP ' + CUR_IP : ''}${POLICY ? '｜固定策略 ' + POLICY : ''}）：${tail}`;
 }
 
 // ============ 工具 ============
@@ -139,13 +151,14 @@ function validCookie(str) {
 
 // ============ HTTP（cookie 桶随响应自动更新） ============
 function http(opts, method = 'GET') {
+  if (POLICY && !opts.policy) opts.policy = POLICY;   // 钉住出口节点（Surge $httpClient 支持 policy）
   return new Promise((resolve, reject) => {
     const done = (err, status, headers, body) => {
       if (err) return reject(new Error(fmtErr(err)));
       const h = headers || {};
       const cf = Object.keys(h).some(k => k.toLowerCase() === 'cf-mitigated')
         || /Just a moment|cf-challenge|Attention Required/i.test(body || '');
-      if (cf) return reject(new Error(cfHint(status)));
+      if (cf) return reject(new Error(cfHint(status, body)));
       resolve({ status, headers: h, body: body || '' });
     };
     if (typeof $task !== 'undefined') {
@@ -349,7 +362,18 @@ function captureCookie() {
   const h = $request.headers || {};
   const ck = h['Cookie'] || h['cookie'] || '';
   const m = cookieMap(ck);
-  if (!m.token) return;                                  // 非登录态，静默
+
+  /* cf_clearance 绑 IP+UA，且与登录态无关：
+     即使没 token 也必须把它和 UA 存下来，否则账号密码回落必吃 403 */
+  const ua = h['User-Agent'] || h['user-agent'] || '';
+  if (ua) $.setdata(ua, 're0_ua');
+  const cf = m.cf_clearance || '';
+  if (cf && $.getdata('re0_cf') !== cf) {
+    $.setdata(cf, 're0_cf');
+    $.log('[RE0] 已保存 cf_clearance ' + cf.slice(0, 10) + '…（UA 同步更新）');
+  }
+
+  if (!m.token) return;                                  // 非登录态：只更新 CF 通行证，静默
   if (tokenExpired(m.token)) {
     if ($.getdata('re0_cookie_bad') !== ck) {            // 同一份过期 Cookie 只提示一次
       $.setdata(ck, 're0_cookie_bad');
@@ -358,8 +382,6 @@ function captureCookie() {
     return;
   }
   // cf_clearance 与 UA 绑定，必须连 UA 一起存，否则定时任务必吃 403
-  const ua = h['User-Agent'] || h['user-agent'] || '';
-  if (ua) $.setdata(ua, 're0_ua');
   if ($.getdata('re0_cookie') === ck) return;
   $.setdata(ck, 're0_cookie');
   $.msg(scriptName, 'Cookie已抓取', '定时任务将使用免密直签');
@@ -427,6 +449,7 @@ async function runAll(accounts, ids, mode, modeName) {
   const rawAccounts = argValue(ckName) || $.getdata(ckName) || '';
   const rawCookie = argValue('re0_cookie') || $.getdata('re0_cookie') || '';
   UA = argValue('re0_ua') || $.getdata('re0_ua') || UA_DEFAULT;
+  POLICY = argValue('re0_policy') || $.getdata('re0_policy') || '';
   const cfOverride = argValue('re0_cf') || $.getdata('re0_cf') || '';
 
   const listed = rawAccounts.split('&').map(s => s.trim()).filter(Boolean).map(item => {
@@ -438,7 +461,7 @@ async function runAll(accounts, ids, mode, modeName) {
     $.msg(scriptName, '❌ 未配置账号', '填 re0_accounts（user#pass），或开 Cookie 重写后浏览器打开 re0.me');
     return;
   }
-  $.log(`[RE0] ${modeName}｜免密 Cookie ${gMap ? '有效' : '无'}｜账号 ${listed.length} 个`);
+  $.log(`[RE0] ${modeName}｜免密 Cookie ${gMap ? '有效' : '无'}｜账号 ${listed.length} 个` + (POLICY ? `｜固定策略 ${POLICY}` : ''));
 
   /* 出口 IP 自检：cf_clearance 绑 IP，节点一变必吃 403，先把它打出来 */
   CUR_IP = await egressIP();
@@ -454,7 +477,7 @@ async function runAll(accounts, ids, mode, modeName) {
   };
 
   /* 账号密码回落也必须带 cf_clearance：CF 在鉴权之前就拦，光有账密必吃 403 */
-  const cfOnly = cfOverride || cookieMap(rawCookie).cf_clearance || '';
+  const cfOnly = cfOverride || cookieMap(rawCookie).cf_clearance || $.getdata('re0_cf') || '';
   const seeded = listed.map(a => ({ ...a, cookie: cfOnly ? 'cf_clearance=' + cfOnly : '' }));
 
   let out, ok;
