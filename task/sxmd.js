@@ -102,13 +102,16 @@ function captureCookie() {
   const h = $request.headers || {}
   const ck = h['Cookie'] || h['cookie'] || ''
   const ua = h['User-Agent'] || h['user-agent'] || ''
+  $.log(`[capture] url=${$request.url} headerKeys=${Object.keys(h).length} ckLen=${ck.length} uaLen=${ua.length}`)
   if (ua) $.setdata(ua, UA_KEY)                 // UA 一起存：论坛风控与后续请求都靠它
   if (!ck) {
+    $.log('[capture] no cookie header')
     $.msg(ENV_NAME, '❌ 采集失败', '未获取到 Cookie')
     return $.done()
   }
   if ($.getdata(CK_NAME) === ck) return $.done() // 没变化就不重复通知
-  $.setdata(ck, CK_NAME)
+  const ok = $.setdata(ck, CK_NAME)
+  $.log(`[capture] saved=${ok} now=${($.getdata(CK_NAME) || '').length}`)
   $.msg(ENV_NAME, '✅ Cookie 已保存', '定时任务将自动签到')
   $.done()
 }
