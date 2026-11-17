@@ -6,18 +6,22 @@
 #!tag = 微信读书,签到,翻牌,限免
 
 [Argument]
-weread = switch,true,tag=微信读书,desc=包含全量凭据捕获、每日签到、周二翻牌抽奖、周五限免好书入架
+capture = switch,true,tag=票据捕获,desc=打开微信读书「我」和「翻牌/限免」页面补齐票据，抓完建议关闭
+claim = switch,true,tag=每日阅读奖励,desc=每天 23:05 自动领取阅读时长与连续阅读奖励
+flip = switch,true,tag=周二翻牌抽奖,desc=每周二 20:05 自动翻牌抽奖并更新 Web 票据
+free = switch,true,tag=限免入架,desc=每周五 10:05 自动领取/助力限免好书入架
+prefer_coin = input,2,tag=奖励偏好,desc=1=优先体验卡 2=优先书币（默认 2）
 
 [Script]
 # 凭据捕获层
-request if ${url} ~= /^https?:\/\/(i\.)?weread\.qq\.com\/(flip-card-game|user\/|feature|free\/library|checkfreequalify)/i then script("https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading/weread_cookie.js") with enable=${weread}, tag="微信读书·凭据捕获"
-request if ${url} ~= /^https?:\/\/i\.weread\.qq\.com\/login/i then script("https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading/weread_cookie.js") with enable=${weread}, tag="微信读书·登录请求", requires_body=true
-response if ${url} ~= /^https?:\/\/i\.weread\.qq\.com\/login/i then script("https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading/weread_cookie.js") with enable=${weread}, tag="微信读书·登录响应", requires_body=true
+request if ${url} ~= /^https?:\/\/(i\.)?weread\.qq\.com\/(flip-card-game|user\/|feature|free\/library|checkfreequalify)/i then script("https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading/weread_cookie.js") with enable=${capture}, tag="微信读书·凭据捕获", requires_body=true
+request if ${url} ~= /^https?:\/\/i\.weread\.qq\.com\/login/i then script("https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading/weread_cookie.js") with enable=${capture}, tag="微信读书·登录请求", requires_body=true
+response if ${url} ~= /^https?:\/\/i\.weread\.qq\.com\/login/i then script("https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading/weread_cookie.js") with enable=${capture}, tag="微信读书·登录响应", requires_body=true
 
 # 定时执行层
-cron "0 23 * * *" then script("https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading/weread_claim.js") with enable=${weread}, tag="微信读书·每日阅读奖励"
-cron "0 20 * * 2" then script("https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading/weread_flip.js") with enable=${weread}, tag="微信读书·周二翻牌抽奖"
-cron "0 10 * * 5" then script("https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading/weread_free.js") with enable=${weread}, tag="微信读书·每周限免入架"
+cron "5 23 * * *" then script("https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading/weread_claim.js") with enable=${claim}, tag="微信读书·每日阅读奖励"
+cron "5 20 * * 2" then script("https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading/weread_flip.js") with enable=${flip}, tag="微信读书·周二翻牌抽奖"
+cron "5 10 * * 5" then script("https://raw.githubusercontent.com/7452323/QuantumultX/main/task/Reading/weread_free.js") with enable=${free}, tag="微信读书·每周限免入架"
 
 [MITM]
 hostname = weread.qq.com, i.weread.qq.com
