@@ -16,10 +16,10 @@
 #!icon=https://raw.githubusercontent.com/TomCatXue/MyCookieCenter/refs/heads/main/icons/weread.png
 #!tag=微信读书,自动领取,阅读奖励
 
-配置由 loon/CookieCenter.plugin 或 loon/WeReadEnhance.plugin 提供：
+配置由 loon/DaiDaiPanel.plugin 或 loon/WeReadEnhance.plugin 提供：
 - 每日领取 cron -> 本文件（每日 23:00）
 - 凭据自动捕获 -> 本文件（打开微信读书 App 时自动保存）
-参数面板由 boxjs/CookieCenter.boxjs.json 订阅提供。
+参数面板由 boxjs/DaiDaiPanel.boxjs.json 订阅提供。
 */
 
 const AUTH_KEY = "weread_auth_v2";
@@ -615,11 +615,10 @@ async function runClaimWithAuth(auth, cachedBody) {
     let count = 0;
     let details = [];
 
-    // 读取奖励偏好：模块 argument=prefer_coin={{{奖励偏好}}} 的值走 $argument；
-    // Loon 也会把 [Argument] 段的值写进 persistentStore，两条路都要试。
-    let argCoin = parseArgument(typeof $argument === "string" ? $argument : "").prefer_coin;
-    if (argCoin != null && ["--", "-", "none", "null", "无", "空"].indexOf(String(argCoin).trim().toLowerCase()) >= 0) argCoin = "";
-    let prefer = resolvePreferCoin(argCoin || $.getdata("prefer_coin"));
+    // 读取奖励偏好：Loon 把 [Argument] 段参数值存在 persistentStore（key = 参数名），
+    // 直接用 $.getdata("prefer_coin") 读取用户在插件界面选择的值。
+    // 注意：$argument 只对应 argument="..." 里的静态字符串，无法读取 [Argument] 段参数。
+    let prefer = resolvePreferCoin($.getdata("prefer_coin"));
     let firstType = Number(prefer.firstType);
     let secondType = Number(prefer.secondType);
     let preferDesc = prefer.preferCoin ? "优先书币" : "优先体验卡";
